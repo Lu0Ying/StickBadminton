@@ -2,16 +2,11 @@ package org.stickbadminton.gamecomponent;
 
 import javafx.scene.control.Button;
 import javafx.scene.image.Image;
-import javafx.scene.paint.Color;
-import javafx.scene.shape.Rectangle;
-import javafx.util.Duration;
 import org.stickbadminton.GameObject;
 import org.stickbadminton.Room;
 import javafx.scene.image.ImageView;
 import java.util.Objects;
 import javafx.geometry.Insets;
-import javafx.scene.control.Button;
-import javafx.scene.image.Image;
 import javafx.scene.layout.Background;
 
 public class Room1 extends Room {
@@ -34,7 +29,7 @@ public class Room1 extends Room {
         //常态图片样式
         Image imgNormal = new Image(Objects.requireNonNull(getClass().getResource("/button_play.png")).toExternalForm());
         //鼠标悬停时图片样式
-        Image imgHover = new Image(Objects.requireNonNull(getClass().getResource("/yellowPlay.png")).toExternalForm());
+        Image imgHover = new Image(Objects.requireNonNull(getClass().getResource("/button_play_hover.png")).toExternalForm());
         //默认常态
         ImageView iv = new ImageView(imgNormal);
 
