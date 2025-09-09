@@ -13,7 +13,7 @@ public class GameApp extends GameApplication {
 
     @Override
     protected void initSettings(GameSettings settings) {
-        settings.setWidth(800);
+        settings.setWidth(900);
         settings.setHeight(600);
         settings.setScaleAffectedOnResize(true);
         settings.setTitle("火柴人打羽毛球");

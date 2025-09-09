@@ -1,16 +1,14 @@
 package org.stickbadminton.gamecomponent;
 
-import com.almasb.fxgl.dsl.FXGL;
 import javafx.scene.image.Image;
 import javafx.scene.input.KeyCode;
-import javafx.util.Duration;
 import org.stickbadminton.GameObject;
 
 import static org.stickbadminton.KeyInput.keys;
 
 public class Box extends GameObject {
     public Box() {
-        super("block", new Image("Block.png"));
+        super("block", new Image("/Block.png"));
         setCenterPosition(16, 16);
     }
 

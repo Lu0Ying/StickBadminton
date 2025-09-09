@@ -45,6 +45,7 @@ public class GameObject {
         entity.getTransformComponent().setRotationOrigin(new Point2D(centerX, centerY));
     }
     public void setRotation(double rotation) { this.rotation = rotation; entity.setRotation(rotation); }
+    public void setPaintIndex(int index) { entity.getViewComponent().setZIndex(index); }
 
     public GameObject(String name, AnimatedTexture texture) {
         this.name = name;
