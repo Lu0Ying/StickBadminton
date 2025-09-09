@@ -103,7 +103,7 @@ class ObjectControl extends Component {
 
     @Override
     public void onUpdate(double tpf) {
-        //System.out.println("onUpdate called, tpf=" + tpf);
+        System.out.println("onUpdate called, target.spdx=" + target.speedX);
         target.onUpdate();
         target.x += target.speedX * FRAME_TIME;
         target.y += target.speedY * FRAME_TIME;

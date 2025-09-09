@@ -1,5 +1,6 @@
 package org.stickbadminton.gamecomponent;
 
+import javafx.scene.control.Button;
 import javafx.scene.image.Image;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
@@ -9,10 +10,10 @@ import org.stickbadminton.Room;
 
 public class Room1 extends Room {
     public Room1() {
-        addObject(new Box()).setX(300);
+        addObject(new Box());
 
-        Rectangle rectangle = new Rectangle(32,32);
-        rectangle.setFill(new Color(0, 0, 0, 0.1));
-        addUiNode(rectangle, 300, 400);
+        Button button1 = new Button("start");
+        button1.setOnAction(e -> {addObject(new Box()).setPosition(500, 400);});
+        addUiNode(button1, 300, 400);
     }
 }
