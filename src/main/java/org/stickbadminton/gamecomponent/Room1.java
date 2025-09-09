@@ -14,6 +14,8 @@ public class Room1 extends Room {
         addObject(new GameObject("background", new Image("ingame_background.png")));
         //测试用物体，以后版本移除
         addObject(new Box());
+        //火柴人(测试)
+        addObject(new StickMan()).setPosition(700,300);
 
         //ui按钮，需css改样式
         Button button1 = new Button("下一房间");

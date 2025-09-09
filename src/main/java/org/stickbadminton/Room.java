@@ -29,7 +29,7 @@ public class Room {
         gameObject.inRoom = this;
         objects.add(gameObject);
         if (isActive) {
-            FXGL.getGameWorld().addEntity(gameObject.entity);
+            gameObject.activate();
         }
         return gameObject;
     }
@@ -37,7 +37,7 @@ public class Room {
     public void removeObject(GameObject gameObject) {
         objects.remove(gameObject);
         if (isActive) {
-            FXGL.getGameWorld().removeEntity(gameObject.entity);
+            gameObject.deactivate();
         }
         gameObject.inRoom = null;
     }
@@ -61,14 +61,14 @@ public class Room {
     }
 
     public void enter() {
-        objects.forEach(o -> FXGL.getGameWorld().addEntity(o.entity));
+        objects.forEach(o -> o.activate());
         isActive = true;
         uiNodes.forEach( pack -> FXGL.addUINode(pack.getKey(),
                 pack.getValue().getKey(), pack.getValue().getValue()));
     }
 
     public void leave() {
-        objects.forEach(o -> FXGL.getGameWorld().removeEntity(o.entity));
+        objects.forEach(o -> o.deactivate());
         isActive = false;
         uiNodes.forEach( pack -> FXGL.removeUINode(pack.getKey()));
     }

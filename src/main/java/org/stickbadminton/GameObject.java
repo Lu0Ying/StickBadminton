@@ -36,6 +36,8 @@ public class GameObject {
     public double getCenterX() { return centerX; }
     public double getCenterY() { return centerY; }
     public double getRotation() { return rotation; }
+    public Sprite getSprite() { return sprite; }
+    public Entity getEntity() { return entity; }
     public void setX(double x) { this.x = x; entity.setX(x); }
     public void setY(double y) { this.y = y; entity.setY(y); }
     public void setPosition(double x, double y) {setX(x);setY(y);}
@@ -46,6 +48,8 @@ public class GameObject {
     }
     public void setRotation(double rotation) { this.rotation = rotation; entity.setRotation(rotation); }
     public void setPaintIndex(int index) { entity.getViewComponent().setZIndex(index); }
+    public void setOpacity(double opacity) { entity.getViewComponent().setOpacity(opacity); }
+    public void setVisible(boolean visible) { entity.getViewComponent().setVisible(visible); }
 
     public GameObject(String name, AnimatedTexture texture) {
         this.name = name;

@@ -3,10 +3,13 @@ package org.stickbadminton.gamecomponent;
 import javafx.scene.image.Image;
 import javafx.scene.input.KeyCode;
 import org.stickbadminton.GameObject;
+import org.stickbadminton.Sprite;
 
 import static org.stickbadminton.KeyInput.keys;
 
 public class Box extends GameObject {
+    protected Sprite spriteOnMoving;
+
     public Box() {
         super("block", new Image("/Block.png"));
         setCenterPosition(16, 16);
