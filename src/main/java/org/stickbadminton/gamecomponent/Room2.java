@@ -8,12 +8,11 @@ import javafx.util.Duration;
 import org.stickbadminton.GameObject;
 import org.stickbadminton.Room;
 
-public class Room1 extends Room {
-    public Room1() {
-        addObject(new Box());
-
-        Button button1 = new Button("下一房间");
-        button1.setOnAction(e -> {Room2 room2 = new Room2(); this.leave(); room2.enter();});
+public class Room2 extends Room{
+    public Room2() {
+        addObject(new Box()).setPosition(500,500);
+        Button button1 = new Button("返回");
+        button1.setOnAction(e -> {Room1 room1 = new Room1(); this.leave(); room1.enter();});
         addUiNode(button1, 300, 400);
     }
 }
