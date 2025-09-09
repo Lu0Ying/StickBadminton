@@ -33,8 +33,8 @@ public class GameObject {
     }
     public double getX() { return x; }
     public double getY() { return y; }
-    public double getCenterX() { return centerX; }
-    public double getCenterY() { return centerY; }
+    public double getCenterX() { return x + centerX; }
+    public double getCenterY() { return y + centerY; }
     public double getRotation() { return rotation; }
     public Sprite getSprite() { return sprite; }
     public Entity getEntity() { return entity; }
@@ -45,6 +45,7 @@ public class GameObject {
         this.centerX = centerX;
         this.centerY = centerY;
         entity.getTransformComponent().setRotationOrigin(new Point2D(centerX, centerY));
+        entity.getTransformComponent().setScaleOrigin(new Point2D(centerX, centerY));
     }
     public void setRotation(double rotation) { this.rotation = rotation; entity.setRotation(rotation); }
     public void setPaintIndex(int index) { entity.getViewComponent().setZIndex(index); }
