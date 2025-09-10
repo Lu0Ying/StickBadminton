@@ -26,7 +26,10 @@ public class Room1 extends Room {
         addUiNode(button1, 300, 400);
         //测试黄色按钮
         setupPlayButton(button1);
+
+        //在 (300, 20) 处显示数字，电子显像管风格
     }
+
     private void setupPlayButton(Button button) {
         //常态图片样式
         Image imgNormal = new Image(Objects.requireNonNull(getClass().getResource("/button_play.png")).toExternalForm());
