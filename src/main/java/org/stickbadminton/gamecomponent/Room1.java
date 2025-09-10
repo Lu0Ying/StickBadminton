@@ -1,6 +1,8 @@
 package org.stickbadminton.gamecomponent;
 
+import javafx.collections.FXCollections;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
 import javafx.scene.image.Image;
 import org.stickbadminton.GameObject;
 import org.stickbadminton.Room;
@@ -31,15 +33,19 @@ public class Room1 extends Room {
         digitView=createDigitImageView(currentNumber);//初始化为0
         addUiNode(digitView, 300, 20);
 
-        //添加点击加一的按钮（测试用
+        /*
+        *（测试用）
+         */
+        //添加点击加一的按钮
         Button incrementButton = new Button("数字+1");
         incrementButton.setOnAction(e -> incrementNumber());
         addUiNode(incrementButton, 300, 80);
-
         //添加重置按钮
         Button reloadButton = new Button("重置");
         reloadButton.setOnAction(e -> reloadNumber());
         addUiNode(reloadButton, 300, 100);
+        //添加数字选择下拉框
+        setupNumberSelector();
     }
     private final ImageView digitView; // 用于更新显示的数字
     private int currentNumber = 0; // 当前显示的数字
@@ -53,6 +59,24 @@ public class Room1 extends Room {
     private void reloadNumber() {
         currentNumber = 0;
         updateDigitImage(currentNumber);
+    }
+    //数字选择
+    private void setupNumberSelector() {
+        // 创建0-9的数字选项
+        ComboBox<Integer> numberSelector = new ComboBox<>();
+        numberSelector.setItems(FXCollections.observableArrayList(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
+        numberSelector.setValue(0); // 默认选择0
+        numberSelector.setPromptText("选择数字");
+
+        // 选择数字时更新显示
+        numberSelector.setOnAction(e -> {
+            Integer selectedNumber = numberSelector.getValue();
+            if (selectedNumber != null) {
+                currentNumber = selectedNumber;
+                updateDigitImage(selectedNumber);
+            }
+        });
+        addUiNode(numberSelector, 300, 120);
     }
 
     //创建数字图片视图
