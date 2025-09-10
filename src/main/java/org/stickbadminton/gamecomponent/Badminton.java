@@ -9,12 +9,13 @@ import org.stickbadminton.gamecomponent.GameProperties;
 import static org.stickbadminton.KeyInput.keys;
 
 public class Badminton extends GameObject {
-    public final double gravity = 13.0; // 此值可视具体情况调整
+    public static double airResistance = 0;  //空气阻力加速度
     public boolean isFrozen = false; // 待发球状态时为 false，开球后能够自由移动，设为 true
     public boolean isTouchedGround = false; // 球是否落地
     public Badminton() {
         super("badminton", new Image("badminton.png"));
-        speedX= 550; //测试代码
+        speedX= 1000; //测试代码
+        speedY= -500;
         setCenterPosition(10.5, 3);
         setRotation(180);
     }
@@ -50,7 +51,13 @@ public class Badminton extends GameObject {
             }
         }
         else {
-            speedY += gravity;
+            if(speedY==0&&speedX==0)
+                speedY += GameProperties.badmintonGravity;
+            else {
+                airResistance = 0.00001 * (Math.pow(speedX, 2) + Math.pow(speedY, 2));  //空气阻力计算公式
+                speedY += GameProperties.badmintonGravity-0.5*airResistance*(speedY/Math.sqrt(Math.pow(speedX, 2) + Math.pow(speedY, 2)));
+                speedX -= 2.7*airResistance*(speedX/Math.sqrt(Math.pow(speedX, 2) + Math.pow(speedY, 2)));
+            }
         }
         //触墙判断
         if(x<=GameProperties.playFieldLeft||x>=GameProperties.playFieldRight) {
@@ -68,10 +75,10 @@ public class Badminton extends GameObject {
                 speedX = speedX * 0.8;
             }
             else {
-                if(x<GameProperties.netPosition)
-                    x=GameProperties.netPosition-15;
+                if(speedX>0)
+                    x = GameProperties.netPosition - 15;
                 else
-                    x=GameProperties.netPosition+5;
+                    x = GameProperties.netPosition + 15;
                 //System.out.println(2);      //测试代码
                 speedY = speedY * 0.4;
                 speedX = -speedX * 0.4;
