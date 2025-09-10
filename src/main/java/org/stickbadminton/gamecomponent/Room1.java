@@ -54,9 +54,7 @@ public class Room1 extends Room {
         updateDigitImage(currentNumber);
     }
 
-    /**
-     * 创建数字图片视图
-     */
+    //创建数字图片视图
     private ImageView createDigitImageView(int number) {
         String imagePath = "/digital_" + number + ".png";
         try {
@@ -71,9 +69,7 @@ public class Room1 extends Room {
         }
     }
 
-    /**
-     * 更新数字图片
-     */
+    //更新数字图片
     private void updateDigitImage(int number) {
         String imagePath = "/digital_" + number + ".png";
         try {
