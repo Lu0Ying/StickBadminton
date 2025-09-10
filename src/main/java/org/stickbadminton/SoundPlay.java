@@ -6,14 +6,24 @@ import javafx.scene.media.MediaPlayer;
 
 import java.io.File;
 import java.net.MalformedURLException;
+import java.nio.file.Paths;
 
 public class SoundPlay {
     private static MediaPlayer backgroundPlayer;
     private static double backgroundVolume = 1;
     // 播放音频相关的函数
+    public static String getAbsolutePath(String relativePath) {
+       //如果为绝对路径，返回
+        if(Paths.get(relativePath).isAbsolute()) {
+            return relativePath;
+        }
+        String basePath=Paths.get("src","main","resources","sounds").toString();
+        return Paths.get(basePath,relativePath).toString();
+    }
     public static void setBackgroundMusic(String sourceUrl) {
        try{
-           Media media=new Media(new File(sourceUrl).toURI().toURL().toString());
+
+           Media media=new Media(new File(getAbsolutePath(sourceUrl)).toURI().toURL().toString());
            backgroundPlayer=new MediaPlayer(media);
 
            //设置循环播放和音量
@@ -52,7 +62,7 @@ public class SoundPlay {
         // 播放指定的音效，以给定的音量
         // volume 范围：0为静音，1为原音量
         try {
-            Media media = new Media(new File(sourceUrl).toURI().toURL().toString());
+            Media media = new Media(new File(getAbsolutePath(sourceUrl)).toURI().toURL().toString());
             MediaPlayer soundPlayer = new MediaPlayer(media);
 
             soundPlayer.setVolume(Math.max(0,Math.min(1,volume)));
