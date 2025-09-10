@@ -28,6 +28,33 @@ public class Room1 extends Room {
         setupPlayButton(button1);
 
         //在 (300, 20) 处显示数字，电子显像管风格
+        displayDigitalNumber(300, 20, 6);
+    }
+
+    /**
+     * 在指定位置显示电子显像管风格的数字
+     * x X坐标
+     * y Y坐标
+     * number 要显示的数字
+     */
+    private void displayDigitalNumber(int x, int y, int number) {
+        // 构建图片路径
+        String imagePath ="/digital_"+number+".png";
+
+        // 加载数字图片
+        Image digitalImage = new Image(Objects.requireNonNull(getClass().getResource(imagePath)).toExternalForm());
+
+        // 创建ImageView显示数字
+        ImageView digitView = new ImageView(digitalImage);
+        digitView.setPreserveRatio(true);
+        digitView.setFitWidth(30);
+
+        // 设置位置
+        digitView.setX(x);
+        digitView.setY(y);
+
+        // 添加到UI节点
+        addUiNode(digitView, x, y);
     }
 
     private void setupPlayButton(Button button) {
