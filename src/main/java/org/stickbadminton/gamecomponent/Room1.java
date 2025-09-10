@@ -20,7 +20,7 @@ public class Room1 extends Room {
         //火柴人(未完成)
         addObject(new StickMan(1)).setPosition(200, 300);
         //羽毛球(未完成)
-        addObject(new Badminton()).setPosition(100, 300);
+        addObject(new Badminton()).setPosition(100, 100);
         //ui按钮，需css改样式
         UITextButton button1 = new UITextButton("button_start.png");
         button1.setOnAction(e -> {
