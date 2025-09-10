@@ -17,7 +17,7 @@ public class SoundPlay {
         if(Paths.get(relativePath).isAbsolute()) {
             return relativePath;
         }
-        String basePath=Paths.get("src","main","resources","sound").toString();
+        String basePath=Paths.get("src","main","resources","sounds").toString();
         return Paths.get(basePath,relativePath).toString();
     }
     public static void setBackgroundMusic(String sourceUrl) {
