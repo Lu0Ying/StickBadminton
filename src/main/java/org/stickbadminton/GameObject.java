@@ -6,11 +6,7 @@ import com.almasb.fxgl.entity.component.Component;
 import com.almasb.fxgl.texture.AnimatedTexture;
 import javafx.geometry.Point2D;
 import javafx.scene.image.Image;
-import javafx.scene.input.KeyCode;
 import javafx.util.Duration;
-
-import java.util.HashSet;
-import java.util.Set;
 
 public class GameObject {
 
@@ -22,8 +18,8 @@ public class GameObject {
     protected double x;
     protected double y;
     protected double rotation;
-    protected double centerX = 0.0;
-    protected double centerY = 0.0;
+    protected double spriteCenterX = 0.0;
+    protected double spriteCenterY = 0.0;
     public double speedX;
     public double speedY;
     public double speedRotation;
@@ -33,19 +29,19 @@ public class GameObject {
     }
     public double getX() { return x; }
     public double getY() { return y; }
-    public double getCenterX() { return x + centerX; }
-    public double getCenterY() { return y + centerY; }
+    public double getCenterX() { return x + spriteCenterX; }
+    public double getCenterY() { return y + spriteCenterY; }
     public double getRotation() { return rotation; }
     public Sprite getSprite() { return sprite; }
     public Entity getEntity() { return entity; }
     public void setX(double x) { this.x = x; entity.setX(x); }
     public void setY(double y) { this.y = y; entity.setY(y); }
     public void setPosition(double x, double y) {setX(x);setY(y);}
-    public void setCenterPosition(double centerX, double centerY) {
-        this.centerX = centerX;
-        this.centerY = centerY;
-        entity.getTransformComponent().setRotationOrigin(new Point2D(centerX, centerY));
-        entity.getTransformComponent().setScaleOrigin(new Point2D(centerX, centerY));
+    public void setCenterPosition(double spriteCenterX, double spriteCenterY) {
+        this.spriteCenterX = spriteCenterX;
+        this.spriteCenterY = spriteCenterY;
+        entity.getTransformComponent().setRotationOrigin(new Point2D(spriteCenterX, spriteCenterY));
+        entity.getTransformComponent().setScaleOrigin(new Point2D(spriteCenterX, spriteCenterY));
     }
     public void setRotation(double rotation) { this.rotation = rotation; entity.setRotation(rotation); }
     public void setPaintIndex(int index) { entity.getViewComponent().setZIndex(index); }

@@ -11,8 +11,8 @@ import org.stickbadminton.Room;
 public class Room2 extends Room{
     public Room2() {
         addObject(new Box()).setPosition(500,500);
-        Button button1 = new Button("返回");
-        button1.setOnAction(e -> {Room1 room1 = new Room1(); this.leave(); room1.enter();});
+        Button button1 = new Button("选人界面");
+        button1.setOnAction(e -> {RoomStickmanSelect room = new RoomStickmanSelect(); this.leave(); room.enter();});
         addUiNode(button1, 300, 400);
     }
 }

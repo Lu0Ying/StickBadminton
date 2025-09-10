@@ -55,7 +55,5 @@ public class Sprite {
     void play() {
         texture.loop();
     }
-    void stop() {
-        texture.stop();
-    }
+    void stop() { texture.stop(); }
 }
