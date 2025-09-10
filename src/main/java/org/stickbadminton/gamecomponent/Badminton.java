@@ -68,13 +68,13 @@ public class Badminton extends GameObject {
                 speedX = speedX * 0.8;
             }
             else {
-            if(x<GameProperties.netPosition)
-                x=GameProperties.netPosition-15;
-            else
-                x=GameProperties.netPosition+5;
-            //System.out.println(2);      //测试代码
-            speedY = speedY * 0.4;
-            speedX = -speedX * 0.4;
+                if(x<GameProperties.netPosition)
+                    x=GameProperties.netPosition-15;
+                else
+                    x=GameProperties.netPosition+5;
+                //System.out.println(2);      //测试代码
+                speedY = speedY * 0.4;
+                speedX = -speedX * 0.4;
             }
         }
         //方向修正
