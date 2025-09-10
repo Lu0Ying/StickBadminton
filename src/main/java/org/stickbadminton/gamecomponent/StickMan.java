@@ -31,7 +31,7 @@ public class StickMan extends GameObject {
 
         bodyIdle = new GameObject("bodyIdle", new Image("stickman_body_idle.png"));
         bodyIdle.getEntity().setScaleOrigin(new Point2D(12, 0));
-        bodyMoving = new GameObject("bodyMoving", new Image("stickman_body_moving.png"), 32, Duration.seconds(0.2));
+        bodyMoving = new GameObject("bodyMoving", new Image("stickman_body_moving.png"), 32, Duration.seconds(0.15));
         bodyMoving.getEntity().setScaleOrigin(new Point2D(16, 0));
 
         rightHand = new GameObject("right_hand", new Image("stickman_righthand.png"));
@@ -59,15 +59,23 @@ public class StickMan extends GameObject {
 
         bodyIdle.setX(x - 2 - 6 * side);
         bodyIdle.setY(y + 20);
+        bodyIdle.speedX = speedX;
+        bodyIdle.speedY = speedY;
         bodyMoving.setX(x - 6 - 8 * side);
         bodyMoving.setY(y + 20);
+        bodyMoving.speedX = speedX;
+        bodyMoving.speedY = speedY;
 
         rightHand.setX(x + 9 - 3 * side);
         rightHand.setY(y + 25);
         rightHand.setRotation(90 * side);
+        rightHand.speedX = speedX;
+        rightHand.speedY = speedY;
 
         leftHandIdle.setX(x + 9 - 3 * side);
         leftHandIdle.setY(y + 25);
+        leftHandIdle.speedX = speedX;
+        leftHandIdle.speedY = speedY;
 
         if (isMoving) {
             bodyIdle.setVisible(false);
@@ -82,9 +90,16 @@ public class StickMan extends GameObject {
     @Override
     public void onUpdate() {
         isMoving = false;
-        if (keys.contains(KeyCode.LEFT)) {
+        speedX = 0;
+        if (keys.contains(KeyCode.RIGHT)) {
             isMoving = true;
+            speedX = GameProperties.moveSpeed;
         }
+        else if (keys.contains(KeyCode.LEFT)) {
+            isMoving = true;
+            speedX = -GameProperties.moveSpeed;
+        }
+
 
 
         bindBodyPart();

@@ -37,4 +37,6 @@ public class GameProperties {
     public static final double jumpSpeedY = 150.0;
     // 人物在跳跃过程中受到的重力
     public static final double jumpGravity = 10.0;
+    // 人物移动速度
+    public static final double moveSpeed = 250.0;
 }
