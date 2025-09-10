@@ -28,7 +28,55 @@ public class Room1 extends Room {
         setupPlayButton(button1);
 
         //在 (300, 20) 处显示数字，电子显像管风格
+        digitView=createDigitImageView(currentNumber);//初始化为0
+        addUiNode(digitView, 300, 20);
+
+        //添加点击加一的按钮（测试用
+        Button incrementButton = new Button("数字+1");
+        incrementButton.setOnAction(e -> incrementNumber());
+        addUiNode(incrementButton, 300, 80);
     }
+    private final ImageView digitView; // 用于更新显示的数字
+    private int currentNumber = 0; // 当前显示的数字
+
+    /**
+     * 数字加一
+     */
+    private void incrementNumber() {
+        currentNumber = (currentNumber + 1) % 8; // 0-7循环
+        updateDigitImage(currentNumber);
+    }
+
+    /**
+     * 创建数字图片视图
+     */
+    private ImageView createDigitImageView(int number) {
+        String imagePath = "/digital_" + number + ".png";
+        try {
+            Image digitImage = new Image(Objects.requireNonNull(getClass().getResource(imagePath)).toExternalForm());
+            ImageView imageView = new ImageView(digitImage);
+            imageView.setPreserveRatio(true);
+            imageView.setFitWidth(30);
+            return imageView;
+        } catch (Exception e) {
+            System.err.println("无法加载数字图片: " + imagePath);
+            return new ImageView(); // 返回空ImageView
+        }
+    }
+
+    /**
+     * 更新数字图片
+     */
+    private void updateDigitImage(int number) {
+        String imagePath = "/digital_" + number + ".png";
+        try {
+            Image digitImage = new Image(Objects.requireNonNull(getClass().getResource(imagePath)).toExternalForm());
+            digitView.setImage(digitImage);
+        } catch (Exception e) {
+            System.err.println("无法更新数字图片: " + imagePath);
+        }
+    }
+
 
     private void setupPlayButton(Button button) {
         //常态图片样式
