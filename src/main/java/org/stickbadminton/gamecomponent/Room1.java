@@ -18,8 +18,7 @@ public class Room1 extends Room {
         //火柴人(未完成)
         addObject(new StickMan()).setPosition(700,300);
         //羽毛球(未完成)
-        addObject(new Badminton()).setPosition(100, 100);
-
+        addObject(new Badminton()).setPosition(100, 300);
         //ui按钮，需css改样式
         Button button1 = new Button("下一房间");
         button1.setOnAction(e -> {Room2 room2 = new Room2(); this.leave(); room2.enter();});
