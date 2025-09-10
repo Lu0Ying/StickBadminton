@@ -35,6 +35,7 @@ public class Room1 extends Room {
         Button incrementButton = new Button("数字+1");
         incrementButton.setOnAction(e -> incrementNumber());
         addUiNode(incrementButton, 300, 80);
+
         //添加重置按钮
         Button reloadButton = new Button("重置");
         reloadButton.setOnAction(e -> reloadNumber());
