@@ -22,15 +22,14 @@ public class Room1 extends Room {
         //羽毛球(未完成)
         addObject(new Badminton()).setPosition(100, 300);
         //ui按钮，需css改样式
-        Button button1 = new Button("下一房间");
+        UITextButton button1 = new UITextButton("button_start.png");
         button1.setOnAction(e -> {
             Room2 room2 = new Room2();
             this.leave();
             room2.enter();
         });
-        addUiNode(button1, 300, 400);
+        addUiObject(button1, 300, 400);
         //测试黄色按钮
-        setupPlayButton(button1);
 
         //在 (300, 20) 处显示数字，电子显像管风格
         UIDigitView digitView = new UIDigitView(0);
@@ -46,26 +45,5 @@ public class Room1 extends Room {
         Button reloadButton = new Button("重置");
         reloadButton.setOnAction(e -> digitView.setCurrentNumber(0));
         addUiNode(reloadButton, 300, 100);
-    }
-
-    private void setupPlayButton(Button button) {
-        //常态图片样式
-        Image imgNormal = new Image(Objects.requireNonNull(getClass().getResource("/button_play.png")).toExternalForm());
-        //鼠标悬停时图片样式
-        Image imgHover = new Image(Objects.requireNonNull(getClass().getResource("/button_play_hover.png")).toExternalForm());
-        //默认常态
-        ImageView iv = new ImageView(imgNormal);
-
-        iv.setPreserveRatio(true);
-        iv.setFitHeight(48);
-
-        button.setText(null);
-        button.setGraphic(iv);
-        button.setBackground(Background.EMPTY);
-        button.setPadding(Insets.EMPTY);
-
-        // 添加悬停效果
-        button.setOnMouseEntered(e -> iv.setImage(imgHover));
-        button.setOnMouseExited(e -> iv.setImage(imgNormal));
     }
 }

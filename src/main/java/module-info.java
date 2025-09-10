@@ -8,6 +8,7 @@ module org.example.stickbadminton {
     requires javafx.media;
     requires javafx.graphics;
     requires javafx.base;
+    requires java.desktop;
 
     opens org.stickbadminton to javafx.fxml;
     exports org.stickbadminton;
