@@ -13,11 +13,21 @@ public class StickMan extends GameObject {
     private GameObject bodyMoving;
     private GameObject rightHand;
     private GameObject leftHandIdle;
-    public int side = 1; // 1->Right -1->Left
+    private int side = 1; // 1->Right -1->Left
+    int getSide() { return side; }
 
-    public StickMan() {
+    public boolean isMoving = false;
+    public boolean isJumping = false;
+    private int jumpCooldownTimer = 0;
+    public boolean isShotting = false;
+    private int shotCooldownTimer = 0;
+
+    public StickMan(int side) {
         super("stickman1", new Image("stickman_head1.png")); //head
-        this.entity.setScaleOrigin(new Point2D(10, 0));
+
+        this.side = side;
+
+        setCenterPosition(10, 10);
 
         bodyIdle = new GameObject("bodyIdle", new Image("stickman_body_idle.png"));
         bodyIdle.getEntity().setScaleOrigin(new Point2D(12, 0));
@@ -31,15 +41,7 @@ public class StickMan extends GameObject {
         leftHandIdle.setCenterPosition(1, 1);
     }
 
-    @Override
-    public void onUpdate() {
-        if (keys.contains(KeyCode.LEFT)) {
-            side = -1;
-        }
-        else
-            side = 1;
-
-
+    private void bindBodyPart() { //显示层面
         if (side < 0) {
             this.entity.setScaleX(-1);
             bodyIdle.getEntity().setScaleX(-1);
@@ -66,12 +68,32 @@ public class StickMan extends GameObject {
 
         leftHandIdle.setX(x + 9 - 3 * side);
         leftHandIdle.setY(y + 25);
+
+        if (isMoving) {
+            bodyIdle.setVisible(false);
+            bodyMoving.setVisible(true);
+        }
+        else {
+            bodyIdle.setVisible(true);
+            bodyMoving.setVisible(false);
+        }
+    }
+
+    @Override
+    public void onUpdate() {
+        isMoving = false;
+        if (keys.contains(KeyCode.LEFT)) {
+            isMoving = true;
+        }
+
+
+        bindBodyPart();
     }
 
     @Override
     public void activate() {
         super.activate();
-        //bodyIdle.activate();
+        bodyIdle.activate();
         bodyMoving.activate();
         rightHand.activate();
         leftHandIdle.activate();
