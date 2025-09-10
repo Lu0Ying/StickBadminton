@@ -1,12 +1,14 @@
 package org.stickbadminton.gamecomponent;
 
 public class GameProperties {
+    // 每帧的时间，即 fps 帧率的倒数
+    public static final double frameTime = 1 / 60.0;
     // 房间尺寸，也为窗口尺寸
     public static final double roomWidth = 900.0;
     public static final double roomHeight = 600.0;
     // 左右空气墙的位置，羽毛球碰空气墙反弹，火柴人移动受空气墙阻挡
-    public static final double playFieldLeft = 50.0;
-    public static final double playFieldRight = 850.0;
+    public static final double playFieldLeft = 70.0;
+    public static final double playFieldRight = 830.0;
     // 人物的碰撞箱宽度
     // 即人物的移动范围为：左边火柴人 (playFieldLeft + playerWidth/2) ~ (netPosition - playerWidth/2)
     //                 右边火柴人 (netPosition + playerWidth/2) ~ (playFieldRight - playerWidth/2)
@@ -32,11 +34,11 @@ public class GameProperties {
     // 击球冷却时间（单位：秒）
     public static final double shotCooldown = 0.5;
     // 跳跃冷却时间（单位：秒）
-    public static final double jumpCooldown = 0.5;
+    public static final double jumpCooldown = 0.67;
     // 人物跳跃的初速度
-    public static final double jumpSpeedY = 150.0;
+    public static final double jumpSpeedY = 600.0;
     // 人物在跳跃过程中受到的重力
-    public static final double jumpGravity = 10.0;
+    public static final double jumpGravity = 30.0;
     // 人物移动速度
     public static final double moveSpeed = 250.0;
 }

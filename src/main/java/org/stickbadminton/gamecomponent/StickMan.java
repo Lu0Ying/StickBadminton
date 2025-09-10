@@ -18,9 +18,9 @@ public class StickMan extends GameObject {
 
     public boolean isMoving = false;
     public boolean isJumping = false;
-    private int jumpCooldownTimer = 0;
+    private double jumpCooldownTimer = 0;
     public boolean isShotting = false;
-    private int shotCooldownTimer = 0;
+    private double shotCooldownTimer = 0;
 
     public StickMan(int side) {
         super("stickman1", new Image("stickman_head1.png")); //head
@@ -89,19 +89,62 @@ public class StickMan extends GameObject {
 
     @Override
     public void onUpdate() {
+        // 水平移动相关
         isMoving = false;
         speedX = 0;
         if (keys.contains(KeyCode.RIGHT)) {
-            isMoving = true;
+            if (getCenterY() + GameProperties.playerHeight >= GameProperties.floorY)
+                isMoving = true;
             speedX = GameProperties.moveSpeed;
         }
         else if (keys.contains(KeyCode.LEFT)) {
-            isMoving = true;
+            if (getCenterY() + GameProperties.playerHeight >= GameProperties.floorY)
+                isMoving = true;
             speedX = -GameProperties.moveSpeed;
         }
+        if (side == 1) { // 左半场
+            if (speedX < 0 && getCenterX() + speedX * GameProperties.frameTime <= GameProperties.playFieldLeft + GameProperties.playerWidth/2) {
+                speedX = 0;
+                x = GameProperties.playFieldLeft + GameProperties.playerWidth/2 - spriteCenterX;
+            }
+            else if (speedX > 0 && getCenterX() + speedX * GameProperties.frameTime >= GameProperties.netPosition - GameProperties.playerWidth/2) {
+                speedX = 0;
+                x = GameProperties.netPosition - GameProperties.playerWidth/2 - spriteCenterX;
+            }
+        }
+        else { // 右半场
+            if (speedX < 0 && getCenterX() + speedX * GameProperties.frameTime <= GameProperties.netPosition + GameProperties.playerWidth/2) {
+                speedX = 0;
+                x = GameProperties.playFieldLeft + GameProperties.playerWidth/2 - spriteCenterX;
+            }
+            else if (speedX > 0 && getCenterX() + speedX * GameProperties.frameTime >= GameProperties.playFieldRight - GameProperties.playerWidth/2) {
+                speedX = 0;
+                x = GameProperties.netPosition - GameProperties.playerWidth/2 - spriteCenterX;
+            }
+        }
 
+        // 竖直移动相关
+        if (isJumping) {
+            jumpCooldownTimer -= GameProperties.frameTime;
+            if (jumpCooldownTimer <= 0) {
+                isJumping = false;
+                jumpCooldownTimer = 0;
+            }
+        }
+        else if (keys.contains(KeyCode.UP)) {
+            isJumping = true;
+            jumpCooldownTimer = GameProperties.jumpCooldown;
+            speedY = -GameProperties.jumpSpeedY;
+        }
 
+        if (getCenterY() + GameProperties.playerHeight + speedY * GameProperties.frameTime >= GameProperties.floorY) {
+            speedY = 0;
+            y = GameProperties.floorY - GameProperties.playerHeight - spriteCenterY;
+        }
+        else
+            speedY += GameProperties.jumpGravity;
 
+        // 身体部件和头绑定
         bindBodyPart();
     }
 
