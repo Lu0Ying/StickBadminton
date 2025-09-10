@@ -35,15 +35,22 @@ public class Room1 extends Room {
         Button incrementButton = new Button("数字+1");
         incrementButton.setOnAction(e -> incrementNumber());
         addUiNode(incrementButton, 300, 80);
+        //添加重置按钮
+        Button reloadButton = new Button("重置");
+        reloadButton.setOnAction(e -> reloadNumber());
+        addUiNode(reloadButton, 300, 100);
     }
     private final ImageView digitView; // 用于更新显示的数字
     private int currentNumber = 0; // 当前显示的数字
 
-    /**
-     * 数字加一
-     */
+    //数字加一
     private void incrementNumber() {
-        currentNumber = (currentNumber + 1) % 8; // 0-7循环
+        currentNumber = (currentNumber + 1) % 10; // 0-9循环
+        updateDigitImage(currentNumber);
+    }
+    //数字重置
+    private void reloadNumber() {
+        currentNumber = 0;
         updateDigitImage(currentNumber);
     }
 
