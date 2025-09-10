@@ -7,6 +7,7 @@ import com.almasb.fxgl.texture.AnimatedTexture;
 import javafx.geometry.Point2D;
 import javafx.scene.image.Image;
 import javafx.util.Duration;
+import org.stickbadminton.gamecomponent.GameProperties;
 
 public class GameObject {
 
@@ -101,14 +102,13 @@ class ObjectControl extends Component {
     public ObjectControl(GameObject target) {
         this.target = target;
     }
-    public final double FRAME_TIME = 1 / 60.0;
 
     @Override
     public void onUpdate(double tpf) {
         target.onUpdate();
-        target.x += target.speedX * FRAME_TIME;
-        target.y += target.speedY * FRAME_TIME;
-        target.rotation += target.speedRotation * FRAME_TIME;
+        target.x += target.speedX * GameProperties.frameTime;
+        target.y += target.speedY * GameProperties.frameTime;
+        target.rotation += target.speedRotation * GameProperties.frameTime;
         target.entity.setX(target.x);
         target.entity.setY(target.y);
         target.entity.setRotation(target.rotation);

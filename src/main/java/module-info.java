@@ -6,6 +6,8 @@ module org.example.stickbadminton {
     requires com.almasb.fxgl.core;
     requires annotations;
     requires javafx.media;
+    requires javafx.graphics;
+    requires javafx.base;
 
     opens org.stickbadminton to javafx.fxml;
     exports org.stickbadminton;

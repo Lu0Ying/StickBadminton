@@ -60,6 +60,17 @@ public class Room {
         });
     }
 
+    public void addUiObject(UIObject uiObject, int x, int y) {
+        addUiNode(uiObject.getUINode(), x, y);
+        uiObject.setX(x);
+        uiObject.setY(y);
+        uiObject.setParentRoom(this);
+    }
+
+    public void removeUiObject(UIObject uiObject) {
+        removeUiNode(uiObject.getUINode());
+    }
+
     public void enter() {
         objects.forEach(o -> o.activate());
         isActive = true;
