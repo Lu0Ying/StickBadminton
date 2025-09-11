@@ -11,10 +11,10 @@ import org.stickbadminton.Room;
 public class RoomTitle extends Room{
     public RoomTitle() {
         // 背景: title_background.png
-        addObject(new GameObject("title_background", new Image("title_background.png")));
-
         // 游玩按钮: play.png
         // 双人 / 单人游戏按钮：暂无 自己再整个资源
+        // 开始按钮: button_titlestart.png
+        // 双人游戏按钮：button_2player.png
         // 重要：现在按钮 UI 物体已被封装进入 UIImageButton 类中，用这个类来做按钮，具体用法见 Room1 中的 “ui 按钮” (19行起)
 
     }
