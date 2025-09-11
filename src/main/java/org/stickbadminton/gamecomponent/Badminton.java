@@ -15,7 +15,7 @@ public class Badminton extends GameObject {
     public boolean isHitted = false;
     public Badminton() {
         super("badminton", new Image("badminton.png"));
-        speedX= 1000; //测试代码
+        speedX= 500; //测试代码
         speedY= -500;
         setCenterPosition(10.5, 3);
         setRotation(180);
@@ -27,7 +27,6 @@ public class Badminton extends GameObject {
             // 这块先不碰，等火柴人代码写好
         }
         // 测试轻击重击用代码，以后版本会删除
-
         if (keys.contains(KeyCode.Z)) {
             lightHit(x > 450 ? -45.0 : 45.0);
         }
@@ -110,20 +109,16 @@ public class Badminton extends GameObject {
             onNetCrashed();   //调用播放触网动画方法
             if(y< GameProperties.floorY-GameProperties.netHeight+30) {
                 y=GameProperties.floorY-GameProperties.netHeight+27;
-                System.out.println(1);     //测试代码
                 speedY = speedY * 0.1;
                 speedX = speedX * 0.8;
             }
             else {
                 if(speedX>0) {
-                    System.out.println(2);
                     x = GameProperties.netPosition - 23;
                 }
                 else {
-                    System.out.println(3);
                     x = GameProperties.netPosition - 3;
                 }
-                //System.out.println(2);      //测试代码
                 speedY = speedY * 0.4;
                 speedX = -speedX * 0.4;
             }
