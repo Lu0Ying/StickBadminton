@@ -15,7 +15,7 @@ public class Badminton extends GameObject {
     public boolean isHitted = false;
     public Badminton() {
         super("badminton", new Image("badminton.png"));
-        speedX= 500; //测试代码
+        speedX= 300; //测试代码
         speedY= -500;
         setCenterPosition(10.5, 3);
         setRotation(180);
@@ -195,7 +195,10 @@ public class Badminton extends GameObject {
     }
     //播放触网动画，在触网判断中被调用
     public void onNetCrashed() {
-
+        NetAnimation net = (NetAnimation) inRoom.getObject("net");
+        if (net != null && !net.isAnimating()) {
+            net.playCrashAnimation();
+        }
     }
     //播放击球特效
     public void onHit(){

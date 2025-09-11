@@ -40,5 +40,11 @@ public class Room1 extends Room {
         Button reloadButton = new Button("重置");
         reloadButton.setOnAction(e -> digitView.setCurrentNumber(0));
         addUiNode(reloadButton, 300, 100);
+
+        //添加触网
+        NetAnimation net = new NetAnimation();
+        addObject(net, "net");
+
+
     }
 }
