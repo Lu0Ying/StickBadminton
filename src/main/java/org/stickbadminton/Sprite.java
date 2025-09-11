@@ -45,15 +45,15 @@ public class Sprite {
         this.texture = animatedTexture;
     }
 
-    void activate() {
+    public void activate() {
         parent.getViewComponent().clearChildren();
         parent.getViewComponent().addChild(texture);
     }
-    void playWithoutLoop() {
+    public void playWithoutLoop() {
         texture.play();
     }
-    void play() {
+    public void play() {
         texture.loop();
     }
-    void stop() { texture.stop(); }
+    public void stop() { texture.stop(); }
 }

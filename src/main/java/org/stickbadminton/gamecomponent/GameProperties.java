@@ -27,8 +27,8 @@ public class GameProperties {
     // 圆环的内半径和外半径
     public static final double hitAreaRadiusOuter = 67.0;
     public static final double hitAreaRadiusInner = 42.0;
-    // 上方击球的圆心角的一半（竖直方向为对称轴）
-    public static final double hitAreaAngleUp = 90.0;
+    // 上方击球的圆心角 - 45°（面前的一段扇形 + 身后的 45° 扇形）
+    public static final double hitAreaAngleUp = 60.0;
     // 下方击球的圆心角（面前的一段扇形）
     public static final double hitAreaAngleDown = 45.0;
     // 上方击球动画时长（单位：秒）

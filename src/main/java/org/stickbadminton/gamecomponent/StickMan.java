@@ -27,7 +27,6 @@ public class StickMan extends GameObject {
 
     public StickMan(int side) {
         super("stickman1", new Image("stickman_head1.png")); //head
-
         this.side = side;
 
         setCenterPosition(10, 10);
@@ -86,7 +85,15 @@ public class StickMan extends GameObject {
                 rightHand.setRotation(nowAngle * side);
             }
             else { // 下方击球
-
+                double deltaT = GameProperties.shotCooldown - shotCooldownTimer;
+                double nowAngle;
+                if (deltaT < GameProperties.shotAnimationTime2)
+                    nowAngle = 180 - deltaT * (135 + GameProperties.hitAreaAngleDown / GameProperties.shotAnimationTime2);
+                else if (deltaT < 2 * GameProperties.shotAnimationTime2)
+                    nowAngle = 180 - 135 - GameProperties.hitAreaAngleDown + (deltaT - GameProperties.shotAnimationTime2)
+                            * (GameProperties.hitAreaAngleUp / GameProperties.shotAnimationTime2);
+                else nowAngle = 180;
+                rightHand.setRotation(nowAngle * side);
             }
         }
         else
