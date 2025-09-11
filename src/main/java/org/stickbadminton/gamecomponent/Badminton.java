@@ -196,7 +196,7 @@ public class Badminton extends GameObject {
     //播放触网动画，在触网判断中被调用
     public void onNetCrashed() {
         NetAnimation net = (NetAnimation) inRoom.getObject("net");
-        if (net != null && !net.isAnimating()) {
+        if (net != null) {
             net.playCrashAnimation();
         }
     }
