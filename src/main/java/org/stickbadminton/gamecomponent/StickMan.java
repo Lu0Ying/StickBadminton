@@ -23,6 +23,8 @@ public class StickMan extends GameObject {
     private double jumpCooldownTimer = 0;
     public boolean isShotting = false;
     public boolean shotType = false; // false -> 上方击球, true -> 下方击球
+    public boolean isHeavyShort = false;
+    public boolean hasShotted = false; // 自本次击球动画开始以来是否打过球
     public static final boolean shotTypeUp = false;
     public static final boolean shotTypeDown = true;
     private double shotCooldownTimer = 0;
@@ -179,15 +181,71 @@ public class StickMan extends GameObject {
             speedY += GameProperties.jumpGravity;
 
         // 击球相关
-        if (isShotting) {
+        if (isShotting) { // 击球动画中
             shotCooldownTimer -= GameProperties.frameTime;
             if (shotCooldownTimer <= 0) {
                 isShotting = false;
                 shotCooldownTimer = 0;
             }
+            else if (hasShotted == false){
+                if (shotType == shotTypeUp) { // 上方击球
+                    double deltaT = GameProperties.shotCooldown - shotCooldownTimer;
+                    if (deltaT < GameProperties.shotAnimationTime)
+                    {
+                        double targetAngle = 180 + 45 + GameProperties.hitAreaAngleUp;
+                        double nowAngle = 180 + deltaT * ((targetAngle - 180) / GameProperties.shotAnimationTime);
+                        nowAngle = nowAngle + 45;
+                        if (side == -1)
+                            nowAngle = 180 - nowAngle;
+                        GameObject badmintonObj = inRoom.getObject("badminton");
+                        if (badmintonObj != null) {
+                            Badminton badminton = (Badminton) badmintonObj;
+                            double racketX = getCenterX() + Math.cos(Math.toRadians(nowAngle)) * GameProperties.hitAreaRadius;
+                            double racketY = getCenterY() + GameProperties.playerHeight - GameProperties.hitAreaCenterHeight
+                                    + Math.sin(Math.toRadians(nowAngle)) * GameProperties.hitAreaRadius;
+                            if (Math.pow(badminton.getX() - racketX, 2) + Math.pow(badminton.getY() - racketY, 2)
+                                    <= Math.pow(GameProperties.racketRadius, 2)) {
+                                // 判定为打到球
+                                badminton.lightHit(nowAngle + (side == sideRight ? 180 : 0));
+                                hasShotted = true;
+                            }
+                        }
+                    }
+                }
+                else { // 下方击球
+                    double deltaT = GameProperties.shotCooldown - shotCooldownTimer;
+                    if (deltaT < GameProperties.shotAnimationTime2) {
+                        double targetAngle = 180 - 145 - GameProperties.hitAreaAngleDown;
+                        double nowAngle = 180 + deltaT * ((targetAngle - 180) / GameProperties.shotAnimationTime2);
+                        nowAngle = nowAngle + 45;
+                        if (side == -1)
+                            nowAngle = 180 - nowAngle;
+                        while (nowAngle < 0)
+                            nowAngle += 360;
+                        while (nowAngle > 360)
+                            nowAngle -= 360;
+                        if ((side == sideRight && nowAngle < 90)||(side == sideLeft && nowAngle > 90)) {
+                            GameObject badmintonObj = inRoom.getObject("badminton");
+                            if (badmintonObj != null) {
+                                Badminton badminton = (Badminton) badmintonObj;
+                                double racketX = getCenterX() + Math.cos(Math.toRadians(nowAngle)) * GameProperties.hitAreaRadius;
+                                double racketY = getCenterY() + GameProperties.playerHeight - GameProperties.hitAreaCenterHeight
+                                        + Math.sin(Math.toRadians(nowAngle)) * GameProperties.hitAreaRadius;
+                                if (Math.pow(badminton.getX() - racketX, 2) + Math.pow(badminton.getY() - racketY, 2)
+                                        <= Math.pow(GameProperties.racketRadius, 2)) {
+                                    // 判定为打到球
+                                    badminton.lightHit(nowAngle + (side == sideLeft ? 180 : 0));
+                                    hasShotted = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
         else if ((keys.contains(KeyCode.S) && side == sideRight) || (keys.contains(KeyCode.DOWN) && side == sideLeft)) {
             isShotting = true;
+            hasShotted = false;
             shotCooldownTimer = GameProperties.shotCooldown;
             shotType = shotTypeUp;
             GameObject badminton = inRoom.getObject("badminton");

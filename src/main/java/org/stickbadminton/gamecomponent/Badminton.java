@@ -16,8 +16,7 @@ public class Badminton extends GameObject {
     public boolean isHitted = false;
     public Badminton() {
         super("badminton", new Image("badminton.png"));
-        speedX= 1000; //测试代码
-        speedY= -500;
+        speedY = -100;
         setCenterPosition(10.5, 3);
         setRotation(180);
     }
@@ -27,43 +26,11 @@ public class Badminton extends GameObject {
         if (isFrozen) {
             // 这块先不碰，等火柴人代码写好
         }
-        // 测试轻击重击用代码，以后版本会删除
-
-        if (keys.contains(KeyCode.Z)) {
-            lightHit(x > 450 ? -45.0 : 45.0);
-        }
-        if (keys.contains(KeyCode.X)) {
-            heavyHit(x > 450 ? -45.0 : 45.0);
-        }
-        if (keys.contains(KeyCode.A)) {
-            lightHit(x > 450 ? -30.0 : 30.0);
-        }
-        if (keys.contains(KeyCode.S)) {
-            heavyHit(x > 450 ? -30.0 : 30.0);
-        }
         if (keys.contains(KeyCode.Q)) {
             kickOffLight();
         }
         if (keys.contains(KeyCode.W)) {
             kickOffHeavy();
-        }
-        if (keys.contains(KeyCode.N)) {
-            lightHit(x > 450 ? -60.0 : 60.0);
-        }
-        if (keys.contains(KeyCode.M)) {
-            heavyHit(x > 450 ? -60.0 : 60.0);
-        }
-        if (keys.contains(KeyCode.J)) {
-            lightHit(x > 450 ? -75.0 : 75.0);
-        }
-        if (keys.contains(KeyCode.K)) {
-            heavyHit(x > 450 ? -75.0 : 75.0);
-        }
-        if (keys.contains(KeyCode.U)) {
-            lightHit(x > 450 ? -120.0 : 120.0);
-        }
-        if (keys.contains(KeyCode.I)) {
-            heavyHit(x > 450 ? -120.0 : 120.0);
         }
         // 注意球的贴图会随着运动方向而进行旋转
         // 在空中运动状态
@@ -111,20 +78,16 @@ public class Badminton extends GameObject {
             onNetCrashed();   //调用播放触网动画方法
             if(y< GameProperties.floorY-GameProperties.netHeight+30) {
                 y=GameProperties.floorY-GameProperties.netHeight+27;
-                System.out.println(1);     //测试代码
                 speedY = speedY * 0.1;
                 speedX = speedX * 0.8;
             }
             else {
                 if(speedX>0) {
-                    System.out.println(2);
                     x = GameProperties.netPosition - 23;
                 }
                 else {
-                    System.out.println(3);
                     x = GameProperties.netPosition - 3;
                 }
-                //System.out.println(2);      //测试代码
                 speedY = speedY * 0.4;
                 speedX = -speedX * 0.4;
             }
@@ -201,7 +164,10 @@ public class Badminton extends GameObject {
     }
     //播放触网动画，在触网判断中被调用
     public void onNetCrashed() {
-
+        NetAnimation net = (NetAnimation) inRoom.getObject("net");
+        if (net != null) {
+            net.playCrashAnimation();
+        }
     }
     //播放击球特效
     public void onHit(){
