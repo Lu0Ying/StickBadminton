@@ -3,6 +3,7 @@ package org.stickbadminton.gamecomponent;
 import javafx.scene.image.Image;
 import javafx.scene.input.KeyCode;
 import org.stickbadminton.GameObject;
+import org.stickbadminton.Room;
 import org.stickbadminton.Sprite;
 import org.stickbadminton.gamecomponent.GameProperties;
 
@@ -149,28 +150,27 @@ public class Badminton extends GameObject {
 
     public void kickOffHeavy() {
         // 开球..（自由落体）
-        onHit();
+        double angle = x > 450 ? -45 : 45;
         isHitted = true;
         isFrozen = false;
-        double angle = x > 450 ? -45 : 45;
         double speed = 900;
         speedY = -speed * Math.cos(Math.toRadians(angle));
         speedX = speed * Math.sin(Math.toRadians(angle));
+        onHit();
     }
     public void kickOffLight() {
         // 开球..（自由落体）
-        onHit();
+        double angle = x > 450 ? -58 : 58;
         isHitted = true;
         isFrozen = false;
-        double angle = x > 450 ? -58 : 58;
         double speed = 700;
         speedY = -speed * Math.cos(Math.toRadians(angle));
         speedX = speed * Math.sin(Math.toRadians(angle));
+        onHit();
     }
     public void lightHit(double angle) {
         // angle: 击打角度
         // 被击打（力度小)
-        onHit();
         isHitted = true;
         double speed;
         if(Math.cos(Math.toRadians(angle))<-0.2)
@@ -181,12 +181,12 @@ public class Badminton extends GameObject {
             speed= 800;
         speedY = -speed * Math.cos(Math.toRadians(angle));
         speedX = speed * Math.sin(Math.toRadians(angle));
+        onHit();
     }
 
     public void heavyHit(double angle) {
         // angle: 击打角度
         // 被击打（力度大）
-        onHit();
         isHitted = true;
         double speed;
         if(Math.cos(Math.toRadians(angle))<-0.2)
@@ -197,6 +197,7 @@ public class Badminton extends GameObject {
             speed= 1200;
         speedY = -speed * Math.cos(Math.toRadians(angle));
         speedX = speed * Math.sin(Math.toRadians(angle));
+        onHit();
     }
     //播放触网动画，在触网判断中被调用
     public void onNetCrashed() {
@@ -204,6 +205,15 @@ public class Badminton extends GameObject {
     }
     //播放击球特效
     public void onHit(){
-
+        double FXRotation;
+        HittingFX hf = new HittingFX();
+        hf.setX(getCenterX() - hf.getCenterX());
+        hf.setY(getCenterY() - hf.getCenterY());
+        if (speedX > 0)
+            FXRotation = Math.toDegrees(Math.atan(speedY / speedX)) - 90;
+        else
+            FXRotation = Math.toDegrees(Math.atan(speedY / speedX)) + 90;
+        inRoom.addObject(hf);
+        hf.setRotation(FXRotation);
     }
 }
