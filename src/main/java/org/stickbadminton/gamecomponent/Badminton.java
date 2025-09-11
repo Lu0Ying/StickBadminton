@@ -26,6 +26,44 @@ public class Badminton extends GameObject {
         if (isFrozen) {
             // 这块先不碰，等火柴人代码写好
         }
+        // 测试轻击重击用代码，以后版本会删除
+
+        if (keys.contains(KeyCode.Z)) {
+            lightHit(x > 450 ? -45.0 : 45.0);
+        }
+        if (keys.contains(KeyCode.X)) {
+            heavyHit(x > 450 ? -45.0 : 45.0);
+        }
+        if (keys.contains(KeyCode.A)) {
+            lightHit(x > 450 ? -30.0 : 30.0);
+        }
+        if (keys.contains(KeyCode.S)) {
+            heavyHit(x > 450 ? -30.0 : 30.0);
+        }
+        if (keys.contains(KeyCode.Q)) {
+            kickOffLight();
+        }
+        if (keys.contains(KeyCode.W)) {
+            kickOffHeavy();
+        }
+        if (keys.contains(KeyCode.N)) {
+            lightHit(x > 450 ? -60.0 : 60.0);
+        }
+        if (keys.contains(KeyCode.M)) {
+            heavyHit(x > 450 ? -60.0 : 60.0);
+        }
+        if (keys.contains(KeyCode.J)) {
+            lightHit(x > 450 ? -75.0 : 75.0);
+        }
+        if (keys.contains(KeyCode.K)) {
+            heavyHit(x > 450 ? -75.0 : 75.0);
+        }
+        if (keys.contains(KeyCode.U)) {
+            lightHit(x > 450 ? -120.0 : 120.0);
+        }
+        if (keys.contains(KeyCode.I)) {
+            heavyHit(x > 450 ? -120.0 : 120.0);
+        }
         // 注意球的贴图会随着运动方向而进行旋转
         // 在空中运动状态
         // 操作 speedX, speedY 等
@@ -67,8 +105,8 @@ public class Badminton extends GameObject {
         }
         //触网判断
         if(y + speedY * GameProperties.frameTime>= GameProperties.floorY-GameProperties.netHeight+20
-                && Math.pow(x + speedX * GameProperties.frameTime-(GameProperties.netPosition-13),2)<20
-            /*&& (centerX-GameProperties.netPosition)*speedX > 0*/) {
+                && (x+ speedX * GameProperties.frameTime >=GameProperties.netPosition-18 && x<= GameProperties.netPosition-18
+                || x+speedX * GameProperties.frameTime <= GameProperties.netPosition-8 && x>= GameProperties.netPosition-8)) {
             onNetCrashed();   //调用播放触网动画方法
             if(y< GameProperties.floorY-GameProperties.netHeight+30) {
                 y=GameProperties.floorY-GameProperties.netHeight+27;
@@ -79,11 +117,11 @@ public class Badminton extends GameObject {
             else {
                 if(speedX>0) {
                     System.out.println(2);
-                    x = GameProperties.netPosition - 25;
+                    x = GameProperties.netPosition - 23;
                 }
                 else {
                     System.out.println(3);
-                    x = GameProperties.netPosition + 25;
+                    x = GameProperties.netPosition - 3;
                 }
                 //System.out.println(2);      //测试代码
                 speedY = speedY * 0.4;
@@ -106,53 +144,29 @@ public class Badminton extends GameObject {
             }
             else
                 rotation = targetRotation * p + rotation * (1 - p);
-            // 测试轻击重击用代码，以后版本会删除
-            /*
-            if (keys.contains(KeyCode.Z)) {
-                lightHit(x > 450 ? -45.0 : 45.0);
-            }
-            if (keys.contains(KeyCode.X)) {
-                heavyHit(x > 450 ? -45.0 : 45.0);
-            }
-            if (keys.contains(KeyCode.A)) {
-                lightHit(x > 450 ? -30.0 : 30.0);
-            }
-            if (keys.contains(KeyCode.S)) {
-                heavyHit(x > 450 ? -30.0 : 30.0);
-            }
-            if (keys.contains(KeyCode.Q)) {
-                lightHit(x > 450 ? -15.0 : 15.0);
-            }
-            if (keys.contains(KeyCode.W)) {
-                heavyHit(x > 450 ? -15.0 : 15.0);
-            }
-            if (keys.contains(KeyCode.N)) {
-                lightHit(x > 450 ? -60.0 : 60.0);
-            }
-            if (keys.contains(KeyCode.M)) {
-                heavyHit(x > 450 ? -60.0 : 60.0);
-            }
-            if (keys.contains(KeyCode.J)) {
-                lightHit(x > 450 ? -75.0 : 75.0);
-            }
-            if (keys.contains(KeyCode.K)) {
-                heavyHit(x > 450 ? -75.0 : 75.0);
-            }
-            if (keys.contains(KeyCode.U)) {
-                lightHit(x > 450 ? -120.0 : 120.0);
-            }
-            if (keys.contains(KeyCode.I)) {
-                heavyHit(x > 450 ? -120.0 : 120.0);
-            }*/
         }
     }
 
-    public void kickOff() {
+    public void kickOffHeavy() {
         // 开球..（自由落体）
         onHit();
         isHitted = true;
+        isFrozen = false;
+        double angle = x > 450 ? -45 : 45;
+        double speed = 900;
+        speedY = -speed * Math.cos(Math.toRadians(angle));
+        speedX = speed * Math.sin(Math.toRadians(angle));
     }
-
+    public void kickOffLight() {
+        // 开球..（自由落体）
+        onHit();
+        isHitted = true;
+        isFrozen = false;
+        double angle = x > 450 ? -58 : 58;
+        double speed = 700;
+        speedY = -speed * Math.cos(Math.toRadians(angle));
+        speedX = speed * Math.sin(Math.toRadians(angle));
+    }
     public void lightHit(double angle) {
         // angle: 击打角度
         // 被击打（力度小)
@@ -161,10 +175,10 @@ public class Badminton extends GameObject {
         double speed;
         if(Math.cos(Math.toRadians(angle))<-0.2)
             speed = 1200;
-        else if(getCenterX()>=320 && getCenterX()<=580)
+        else if(getCenterX()>=350 && getCenterX()<=550)
             speed= 500;
         else
-            speed= 700;
+            speed= 800;
         speedY = -speed * Math.cos(Math.toRadians(angle));
         speedX = speed * Math.sin(Math.toRadians(angle));
     }
@@ -178,9 +192,9 @@ public class Badminton extends GameObject {
         if(Math.cos(Math.toRadians(angle))<-0.2)
             speed= 2500;
         else if(getCenterX()>=320 && getCenterX()<=680)
-            speed= 850;
+            speed= 950;
         else
-            speed= 1000;
+            speed= 1200;
         speedY = -speed * Math.cos(Math.toRadians(angle));
         speedX = speed * Math.sin(Math.toRadians(angle));
     }
