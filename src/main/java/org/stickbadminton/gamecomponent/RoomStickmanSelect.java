@@ -88,4 +88,10 @@ public class RoomStickmanSelect extends Room{
         view1.setCurrentNumber(team1);
         view2.setCurrentNumber(team2);
     }
+    public int getTeam1(){
+        return team1;
+    }
+    public int getTeam2(){
+        return team2;
+    }
 }
