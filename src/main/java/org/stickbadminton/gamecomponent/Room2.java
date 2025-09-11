@@ -16,9 +16,9 @@ public class Room2 extends Room{
         addUiNode(button1, 300, 400);
         Button button2 = new Button("选人界面");
         button2.setOnAction(e -> {RoomStickmanSelect room = new RoomStickmanSelect(); this.leave(); room.enter();});
-        addUiNode(button2, 600, 400);
+        addUiNode(button2, 700, 400);
         Button button3 = new Button("标题界面");
         button3.setOnAction(e -> {RoomTitle room = new RoomTitle(); this.leave(); room.enter();});
-        addUiNode(button3, 600, 400);
+        addUiNode(button3, 600, 200);
     }
 }

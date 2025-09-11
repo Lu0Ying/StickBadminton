@@ -35,6 +35,7 @@ public class GameObject {
     public double getRotation() { return rotation; }
     public Sprite getSprite() { return sprite; }
     public Entity getEntity() { return entity; }
+    public void setName(String name) { this.name = name; }
     public void setX(double x) { this.x = x; entity.setX(x); }
     public void setY(double y) { this.y = y; entity.setY(y); }
     public void setPosition(double x, double y) {setX(x);setY(y);}
