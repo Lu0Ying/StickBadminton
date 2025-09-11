@@ -117,19 +117,16 @@ public class NetAnimation extends GameObject {
 
     //播放触网动画
     public void playCrashAnimation() {
-        // 确保不会重复播放动画
-        if (!isAnimating) {
-            // 设置动画状态
-            isAnimating = true;
-            // 重置动画计时器
-            animationTime = 0;
-            // 隐藏静态网
-            netStatic.setVisible(false);
-            // 显示动画网
-            netAnimation.setVisible(true);
-            // 从头开始播放6帧动画
-            netAnimation.getSprite().playWithoutLoop();
-        }
+        // 设置动画状态
+        isAnimating = true;
+        // 重置动画计时器
+        animationTime = 0;
+        // 隐藏静态网
+        netStatic.setVisible(false);
+        // 显示动画网
+        netAnimation.setVisible(true);
+        // 从头开始播放6帧动画
+        netAnimation.getSprite().playWithoutLoop();
     }
 
     //停止动画并重置状态
