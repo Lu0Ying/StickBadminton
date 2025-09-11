@@ -79,10 +79,21 @@ public class ComputerDecision {
     private boolean isBallComingToMySide(int side) {
         boolean ballInMyArea = (side == 1 && badmintonX < GameProperties.netPosition) || 
                               (side == -1 && badmintonX > GameProperties.netPosition);
-        
-        // 球在我方区域且高度合适
-        return ballInMyArea && badmintonY > GameProperties.netHeight && 
-               badmintonY < GameProperties.floorY - 30;
+
+        // 关键修复：判断球是否正在向我方飞来
+        boolean ballComingToMe = false;
+        if (side == 1) {
+            // 左侧玩家：球应该从右向左飞来（badmintonSpeedX < 0）
+            ballComingToMe = badmintonSpeedX < 0;
+        } else if (side == -1) {
+            // 右侧玩家：球应该从左向右飞来（badmintonSpeedX > 0）
+            ballComingToMe = badmintonSpeedX > 0;
+        }
+
+        // 球在我方区域、正在向我方飞来、且高度合适
+        return ballInMyArea && ballComingToMe &&
+                badmintonY > GameProperties.netHeight &&
+                badmintonY < GameProperties.floorY - 30;
     }
     
     /**
@@ -278,8 +289,15 @@ public class ComputerDecision {
         double vx = badmintonSpeedX;
         double vy = badmintonSpeedY;
 
-        // 3. 判断球是否向我方飞来
-        boolean ballComingToMe = (computerX < netX && vx > 0) || (computerX > netX && vx < 0);
+        // 3. 判断球是否向我方飞来 - 修复逻辑
+        boolean ballComingToMe = false;
+        if (computerX < netX) {
+        // 左侧玩家：球应该从右向左飞来（vx < 0）
+            ballComingToMe = vx < 0;
+        } else if (computerX > netX) {
+        // 右侧玩家：球应该从左向右飞来（vx > 0）
+            ballComingToMe = vx > 0;
+        }
         if (!ballComingToMe) {
             return;
         }
@@ -292,7 +310,7 @@ public class ComputerDecision {
             isJump = true;
         }
     }
-    
+
     /**
      * 计算球到达球网的时间
      */
@@ -378,54 +396,10 @@ public class ComputerDecision {
         isLighthit = true;
         isHeavyhit = false;
     }
-    
-    /**
-     * 获取AI难度等级
-     */
-    public static double getDifficultyLevel() {
-        return DIFFICULTY_LEVEL;
-    }
-    
-    /**
-     * 设置AI难度等级 (0.0-1.0)
-     */
-    public static void setDifficultyLevel(double level) {
-        if (level >= 0.0 && level <= 1.0) {
-            // 注意：这里需要修改为实例变量或使用其他方式存储
-            // 当前是静态常量，无法直接修改
-        }
-    }
-    
-    /**
-     * 检查位置是否在有效范围内
-     */
-    private boolean isValidPosition(double x, double y) {
-        return x >= GameProperties.playFieldLeft && 
-               x <= GameProperties.playFieldRight &&
-               y >= 0 && 
-               y <= GameProperties.floorY;
-    }
-    
-    /**
-     * 计算两点之间的距离
-     */
-    private double calculateDistance(double x1, double y1, double x2, double y2) {
-        return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
-    }
-    
     /**
      * 获取球的当前速度大小
      */
     private double getBallSpeed() {
         return Math.sqrt(badmintonSpeedX * badmintonSpeedX + badmintonSpeedY * badmintonSpeedY);
-    }
-    
-    /**
-     * 判断球是否在击球范围内
-     */
-    private boolean isInHitRange() {
-        double distance = calculateDistance(computerX, computerY, badmintonX, badmintonY);
-        return distance <= GameProperties.hitAreaRadiusOuter && 
-               distance >= GameProperties.hitAreaRadiusInner;
     }
 }
