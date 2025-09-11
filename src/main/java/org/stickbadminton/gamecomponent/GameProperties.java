@@ -24,9 +24,10 @@ public class GameProperties {
     // 击球时，判定区域为以肩膀为圆心的圆环区域的两段（上方击球分一段扇形，下方捞球分一段扇形）
     // 肩膀（圆心）到火柴人脚的高度
     public static final double hitAreaCenterHeight = 56.0;
-    // 圆环的内半径和外半径
-    public static final double hitAreaRadiusOuter = 67.0;
-    public static final double hitAreaRadiusInner = 42.0;
+    // 圆环的基础半径
+    public static final double hitAreaRadius = 70.0;
+    // 球拍半径
+    public static final double racketRadius = 30.0;
     // 上方击球的圆心角 - 45°（面前的一段扇形 + 身后的 45° 扇形）
     public static final double hitAreaAngleUp = 75.0;
     // 下方击球的圆心角（面前的一段扇形）

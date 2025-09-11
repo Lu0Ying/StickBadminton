@@ -425,7 +425,7 @@ public class ComputerDecision {
      */
     private boolean isInHitRange() {
         double distance = calculateDistance(computerX, computerY, badmintonX, badmintonY);
-        return distance <= GameProperties.hitAreaRadiusOuter && 
-               distance >= GameProperties.hitAreaRadiusInner;
+        return distance <= GameProperties.hitAreaRadius + GameProperties.racketRadius &&
+               distance >= GameProperties.hitAreaRadius - GameProperties.racketRadius;
     }
 }
