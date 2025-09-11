@@ -16,7 +16,7 @@ public class Room1 extends Room {
         addObject(new StickMan(1)).setPosition(200, 300);
         //羽毛球(未完成)
         addObject(new Badminton()).setPosition(100, 100);
-        //ui按钮，需css改样式
+        //ui按钮
         UIImageButton button1 = new UIImageButton("button_start.png");
         button1.setOnAction(e -> {
             Room2 room2 = new Room2();
