@@ -12,7 +12,7 @@ public class GameProperties {
     // 人物的碰撞箱宽度
     // 即人物的移动范围为：左边火柴人 (playFieldLeft + playerWidth/2) ~ (netPosition - playerWidth/2)
     //                 右边火柴人 (netPosition + playerWidth/2) ~ (playFieldRight - playerWidth/2)
-    public static final double playerWidth = 24.0;
+    public static final double playerWidth = 42.0;
     // 人物的高度 (站立时头的中心距离地板的高度)
     public static final double playerHeight = 72.0;
     // 地板的 y 坐标，人物站立在地板上，羽毛球碰到地板则丢分
