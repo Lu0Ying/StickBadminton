@@ -1,27 +1,23 @@
 package org.stickbadminton.gamecomponent;
 
-import javafx.collections.FXCollections;
 import javafx.event.EventHandler;
 import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
-import javafx.scene.control.ComboBox;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.Background;
 import org.stickbadminton.UIObject;
 
-import java.util.Objects;
-
-public class UITextButton extends UIObject {
+public class UIImageButton extends UIObject {
     private Button button;
     @Override
     public Node getUINode() {
         return button;
     }
 
-    public UITextButton(String sourceUrl) {
+    public UIImageButton(String sourceUrl) {
         button = new Button(sourceUrl);
         //常态图片样式
         Image imgNormal = new Image(sourceUrl);

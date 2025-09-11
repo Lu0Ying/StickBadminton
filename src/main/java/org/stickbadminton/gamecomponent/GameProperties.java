@@ -12,7 +12,7 @@ public class GameProperties {
     // 人物的碰撞箱宽度
     // 即人物的移动范围为：左边火柴人 (playFieldLeft + playerWidth/2) ~ (netPosition - playerWidth/2)
     //                 右边火柴人 (netPosition + playerWidth/2) ~ (playFieldRight - playerWidth/2)
-    public static final double playerWidth = 24.0;
+    public static final double playerWidth = 42.0;
     // 人物的高度 (站立时头的中心距离地板的高度)
     public static final double playerHeight = 72.0;
     // 地板的 y 坐标，人物站立在地板上，羽毛球碰到地板则丢分
@@ -27,10 +27,14 @@ public class GameProperties {
     // 圆环的内半径和外半径
     public static final double hitAreaRadiusOuter = 67.0;
     public static final double hitAreaRadiusInner = 42.0;
-    // 上方击球的圆心角的一半（竖直方向为对称轴）
-    public static final double hitAreaAngleUp = 90.0;
+    // 上方击球的圆心角 - 45°（面前的一段扇形 + 身后的 45° 扇形）
+    public static final double hitAreaAngleUp = 60.0;
     // 下方击球的圆心角（面前的一段扇形）
     public static final double hitAreaAngleDown = 45.0;
+    // 上方击球动画时长（单位：秒）
+    public static final double shotAnimationTime = 0.15;
+    // 下方击球动画时长（单位：秒）
+    public static final double shotAnimationTime2 = 0.2;
     // 击球冷却时间（单位：秒）
     public static final double shotCooldown = 0.5;
     // 跳跃冷却时间（单位：秒）
