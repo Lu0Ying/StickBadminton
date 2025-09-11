@@ -1,15 +1,9 @@
 package org.stickbadminton.gamecomponent;
 
-import javafx.collections.FXCollections;
 import javafx.scene.control.Button;
-import javafx.scene.control.ComboBox;
 import javafx.scene.image.Image;
 import org.stickbadminton.GameObject;
 import org.stickbadminton.Room;
-import javafx.scene.image.ImageView;
-import java.util.Objects;
-import javafx.geometry.Insets;
-import javafx.scene.layout.Background;
 
 public class Room1 extends Room {
     public Room1() {
@@ -23,7 +17,7 @@ public class Room1 extends Room {
         //羽毛球(未完成)
         addObject(new Badminton()).setPosition(100, 100);
         //ui按钮，需css改样式
-        UITextButton button1 = new UITextButton("button_start.png");
+        UIImageButton button1 = new UIImageButton("button_start.png");
         button1.setOnAction(e -> {
             Room2 room2 = new Room2();
             this.leave();

@@ -20,7 +20,10 @@ public class StickMan extends GameObject {
     public boolean isJumping = false;
     private double jumpCooldownTimer = 0;
     public boolean isShotting = false;
+    public boolean shotType = false; // false -> 上方击球, true -> 下方击球
     private double shotCooldownTimer = 0;
+    public boolean isReadyingKickOff = false;
+    private double kickedOffTimer = 0;
 
     public StickMan(int side) {
         super("stickman1", new Image("stickman_head1.png")); //head
@@ -68,7 +71,26 @@ public class StickMan extends GameObject {
 
         rightHand.setX(x + 9 - 3 * side);
         rightHand.setY(y + 25);
-        rightHand.setRotation(90 * side);
+        if (isReadyingKickOff)
+            rightHand.setRotation(90 * side);
+        else if (isShotting) {
+            if (shotType == false) { // 上方击球
+                double deltaT = GameProperties.shotCooldown - shotCooldownTimer;
+                double nowAngle;
+                if (deltaT < GameProperties.shotAnimationTime)
+                    nowAngle = 180 + deltaT * (GameProperties.hitAreaAngleUp / GameProperties.shotAnimationTime);
+                else if (deltaT < 2 * GameProperties.shotAnimationTime)
+                    nowAngle = 180 + 90 - (deltaT - GameProperties.shotAnimationTime)
+                            * (GameProperties.hitAreaAngleUp / GameProperties.shotAnimationTime);
+                else nowAngle = 180;
+                rightHand.setRotation(nowAngle * side);
+            }
+            else { // 下方击球
+
+            }
+        }
+        else
+            rightHand.setRotation(180 * side);
         rightHand.speedX = speedX;
         rightHand.speedY = speedY;
 
@@ -142,6 +164,20 @@ public class StickMan extends GameObject {
         }
         else
             speedY += GameProperties.jumpGravity;
+
+        // 击球相关
+        if (isShotting) {
+            shotCooldownTimer -= GameProperties.frameTime;
+            if (shotCooldownTimer <= 0) {
+                isShotting = false;
+                shotCooldownTimer = 0;
+            }
+        }
+        else if ((keys.contains(KeyCode.S) && side == 1) || (keys.contains(KeyCode.DOWN) && side == -1)) {
+            isShotting = true;
+            shotCooldownTimer = GameProperties.shotCooldown;
+            shotType = false;
+        }
 
         // 身体部件和头绑定
         bindBodyPart();
