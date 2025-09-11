@@ -3,10 +3,9 @@ package org.stickbadminton.gamecomponent;
 import javafx.scene.image.Image;
 import javafx.scene.input.KeyCode;
 import org.stickbadminton.GameObject;
+import org.stickbadminton.KeyInput;
 import org.stickbadminton.Sprite;
 import org.stickbadminton.gamecomponent.GameProperties;
-
-import static org.stickbadminton.KeyInput.keys;
 
 public class Badminton extends GameObject {
     public static double airResistance = 0;  //空气阻力加速度
@@ -24,12 +23,6 @@ public class Badminton extends GameObject {
     public void onUpdate() {
         if (isFrozen) {
             // 这块先不碰，等火柴人代码写好
-        }
-        if (keys.contains(KeyCode.Q)) {
-            kickOffLight();
-        }
-        if (keys.contains(KeyCode.W)) {
-            kickOffHeavy();
         }
         // 注意球的贴图会随着运动方向而进行旋转
         // 在空中运动状态
@@ -139,7 +132,7 @@ public class Badminton extends GameObject {
         if(Math.cos(Math.toRadians(angle))<-0.2)
             speed = 1200;
         else if(getCenterX()>=350 && getCenterX()<=550)
-            speed= 500;
+            speed= 600;
         else
             speed= 800;
         speedY = -speed * Math.cos(Math.toRadians(angle));
@@ -155,9 +148,9 @@ public class Badminton extends GameObject {
         if(Math.cos(Math.toRadians(angle))<-0.2)
             speed= 2500;
         else if(getCenterX()>=320 && getCenterX()<=680)
-            speed= 950;
+            speed= 1300;
         else
-            speed= 1200;
+            speed= 1300;
         speedY = -speed * Math.cos(Math.toRadians(angle));
         speedX = speed * Math.sin(Math.toRadians(angle));
     }

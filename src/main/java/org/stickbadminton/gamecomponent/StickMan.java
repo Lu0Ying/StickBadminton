@@ -5,8 +5,8 @@ import javafx.scene.image.Image;
 import javafx.scene.input.KeyCode;
 import javafx.util.Duration;
 import org.stickbadminton.GameObject;
-
-import static org.stickbadminton.KeyInput.keys;
+import org.stickbadminton.KeyInput;
+import org.stickbadminton.SoundPlay;
 
 public class StickMan extends GameObject {
     private GameObject bodyIdle;
@@ -23,7 +23,7 @@ public class StickMan extends GameObject {
     private double jumpCooldownTimer = 0;
     public boolean isShotting = false;
     public boolean shotType = false; // false -> 上方击球, true -> 下方击球
-    public boolean isHeavyShort = false;
+    public boolean isHeavyShot = false;
     public boolean hasShotted = false; // 自本次击球动画开始以来是否打过球
     public static final boolean shotTypeUp = false;
     public static final boolean shotTypeDown = true;
@@ -129,11 +129,11 @@ public class StickMan extends GameObject {
         // 水平移动相关
         isMoving = false;
         speedX = 0;
-        if ((keys.contains(KeyCode.D) && side == sideRight) || (keys.contains(KeyCode.RIGHT) && side == sideLeft)) {
+        if ((KeyInput.isKeyHolding(KeyCode.D) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.L) && side == sideLeft)) {
             if (getCenterY() + GameProperties.playerHeight >= GameProperties.floorY)
                 isMoving = true;
             speedX = GameProperties.moveSpeed;
-        } else if ((keys.contains(KeyCode.A) && side == sideRight) || (keys.contains(KeyCode.LEFT) && side == sideLeft)) {
+        } else if ((KeyInput.isKeyHolding(KeyCode.A) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.J) && side == sideLeft)) {
             if (getCenterY() + GameProperties.playerHeight >= GameProperties.floorY)
                 isMoving = true;
             speedX = -GameProperties.moveSpeed;
@@ -167,7 +167,7 @@ public class StickMan extends GameObject {
                 jumpCooldownTimer = 0;
             }
         }
-        else if ((keys.contains(KeyCode.W) && side == sideRight) || (keys.contains(KeyCode.UP) && side == sideLeft)) {
+        else if ((KeyInput.isKeyHolding(KeyCode.W) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.I) && side == sideLeft)) {
             isJumping = true;
             jumpCooldownTimer = GameProperties.jumpCooldown;
             speedY = -GameProperties.jumpSpeedY;
@@ -206,7 +206,10 @@ public class StickMan extends GameObject {
                             if (Math.pow(badminton.getX() - racketX, 2) + Math.pow(badminton.getY() - racketY, 2)
                                     <= Math.pow(GameProperties.racketRadius, 2)) {
                                 // 判定为打到球
-                                badminton.lightHit(nowAngle + (side == sideRight ? 180 : 0));
+                                if (isHeavyShot)
+                                    badminton.heavyHit(nowAngle + (side == sideRight ? 180 - 20 : 20));
+                                else
+                                    badminton.lightHit(nowAngle + (side == sideRight ? 180 - 20 : 20));
                                 hasShotted = true;
                             }
                         }
@@ -224,7 +227,7 @@ public class StickMan extends GameObject {
                             nowAngle += 360;
                         while (nowAngle > 360)
                             nowAngle -= 360;
-                        if ((side == sideRight && nowAngle < 90)||(side == sideLeft && nowAngle > 90)) {
+                        if ((side == sideRight && nowAngle < 110)||(side == sideLeft && nowAngle > 70)) {
                             GameObject badmintonObj = inRoom.getObject("badminton");
                             if (badmintonObj != null) {
                                 Badminton badminton = (Badminton) badmintonObj;
@@ -233,8 +236,15 @@ public class StickMan extends GameObject {
                                         + Math.sin(Math.toRadians(nowAngle)) * GameProperties.hitAreaRadius;
                                 if (Math.pow(badminton.getX() - racketX, 2) + Math.pow(badminton.getY() - racketY, 2)
                                         <= Math.pow(GameProperties.racketRadius, 2)) {
-                                    // 判定为打到球
-                                    badminton.lightHit(nowAngle + (side == sideLeft ? 180 : 0));
+                                    double ballAngle = nowAngle + (side == sideRight ?  -30 : 180 + 30);
+                                    if (side == sideRight && nowAngle > 90 && nowAngle < 300)
+                                        ballAngle = 300;
+                                    if (side == sideLeft && nowAngle > 240)
+                                        ballAngle = 240;
+                                    if (isHeavyShot)
+                                        badminton.heavyHit(ballAngle);
+                                    else
+                                        badminton.lightHit(ballAngle);
                                     hasShotted = true;
                                 }
                             }
@@ -243,14 +253,19 @@ public class StickMan extends GameObject {
                 }
             }
         }
-        else if ((keys.contains(KeyCode.S) && side == sideRight) || (keys.contains(KeyCode.DOWN) && side == sideLeft)) {
+        else if ((KeyInput.isKeyHolding(KeyCode.Q) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.U) && side == sideLeft)
+            || (KeyInput.isKeyHolding(KeyCode.E) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.O) && side == sideLeft)) {
             isShotting = true;
             hasShotted = false;
+            if ((KeyInput.isKeyHolding(KeyCode.Q) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.U) && side == sideLeft))
+                isHeavyShot = false;
+            else if ((KeyInput.isKeyHolding(KeyCode.E) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.O) && side == sideLeft))
+                isHeavyShot = true;
             shotCooldownTimer = GameProperties.shotCooldown;
             shotType = shotTypeUp;
             GameObject badminton = inRoom.getObject("badminton");
             if (badminton != null) {
-                if ((badminton.getCenterX() - 400) * side < 0 // 轮到本方击球
+                if ((badminton.getCenterX() - 450) * side < 0 // 轮到本方击球
                         && badminton.getCenterY() > getCenterY())
                     shotType = shotTypeDown;
                 else

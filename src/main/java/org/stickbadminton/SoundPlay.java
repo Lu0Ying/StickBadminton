@@ -58,7 +58,7 @@ public class SoundPlay {
         }
 
     }
-    public static void playSound(String sourceUrl, double volume) throws MalformedURLException {
+    public static void playSound(String sourceUrl, double volume) {
         // 播放指定的音效，以给定的音量
         // volume 范围：0为静音，1为原音量
         try {

@@ -9,7 +9,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 public class KeyInput {
-    public static Set<KeyCode> keys = new HashSet<KeyCode>();
+    private static Set<KeyCode> keys = new HashSet<KeyCode>();
 
     public static void initInput() {
         FXGL.getPrimaryStage().getScene().addEventFilter(KeyEvent.KEY_PRESSED,e -> {
@@ -19,5 +19,9 @@ public class KeyInput {
         FXGL.getPrimaryStage().getScene().addEventFilter(KeyEvent.KEY_RELEASED,e -> {
             keys.remove(e.getCode());
         });
+    }
+
+    public static boolean isKeyHolding(KeyCode keyCode) {
+        return keys.contains(keyCode);
     }
 }

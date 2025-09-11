@@ -27,11 +27,11 @@ public class GameProperties {
     // 圆环的基础半径
     public static final double hitAreaRadius = 70.0;
     // 球拍半径
-    public static final double racketRadius = 30.0;
+    public static final double racketRadius = 35.0;
     // 上方击球的圆心角 - 45°（面前的一段扇形 + 身后的 45° 扇形）
     public static final double hitAreaAngleUp = 75.0;
-    // 下方击球的圆心角（面前的一段扇形）
-    public static final double hitAreaAngleDown = 45.0;
+    // 下方击球的圆心角 - 20°（面前的一段扇形 + 身后的 20° 扇形）
+    public static final double hitAreaAngleDown = 75.0;
     // 上方击球动画时长（单位：秒）
     public static final double shotAnimationTime = 0.15;
     // 下方击球动画时长（单位：秒）
