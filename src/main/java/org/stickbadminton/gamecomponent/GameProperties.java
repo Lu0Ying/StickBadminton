@@ -28,13 +28,13 @@ public class GameProperties {
     public static final double hitAreaRadiusOuter = 67.0;
     public static final double hitAreaRadiusInner = 42.0;
     // 上方击球的圆心角 - 45°（面前的一段扇形 + 身后的 45° 扇形）
-    public static final double hitAreaAngleUp = 60.0;
+    public static final double hitAreaAngleUp = 75.0;
     // 下方击球的圆心角（面前的一段扇形）
     public static final double hitAreaAngleDown = 45.0;
     // 上方击球动画时长（单位：秒）
     public static final double shotAnimationTime = 0.15;
     // 下方击球动画时长（单位：秒）
-    public static final double shotAnimationTime2 = 0.2;
+    public static final double shotAnimationTime2 = 0.17;
     // 击球冷却时间（单位：秒）
     public static final double shotCooldown = 0.5;
     // 跳跃冷却时间（单位：秒）
