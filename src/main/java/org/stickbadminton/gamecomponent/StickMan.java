@@ -9,12 +9,12 @@ import org.stickbadminton.KeyInput;
 
 public class StickMan extends GameObject {
     public int characterType = 0; // 1 ~ 5
-    public int isAIControlled = 0;
+    public boolean isAIControlled = false;
     private GameObject bodyIdle;
     private GameObject bodyMoving;
     private GameObject rightHand;
     private GameObject leftHandIdle;
-    private int side; // 1->Right -1->Left
+    private int side; // 1->（画面左侧）朝向右边; -1->（画面右侧）朝向左边
     public static final int sideLeft = -1;
     public static final int sideRight = 1;
     int getSide() { return side; }
@@ -127,18 +127,53 @@ public class StickMan extends GameObject {
 
     @Override
     public void onUpdate() {
-        // 水平移动相关
         isMoving = false;
         speedX = 0;
-        if ((KeyInput.isKeyHolding(KeyCode.D) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.L) && side == sideLeft)) {
-            if (getCenterY() + GameProperties.playerHeight >= GameProperties.floorY)
-                isMoving = true;
-            speedX = GameProperties.moveSpeed;
-        } else if ((KeyInput.isKeyHolding(KeyCode.A) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.J) && side == sideLeft)) {
-            if (getCenterY() + GameProperties.playerHeight >= GameProperties.floorY)
-                isMoving = true;
-            speedX = -GameProperties.moveSpeed;
+        GameObject badmintonObj = inRoom.getObject("badminton");
+        Badminton badminton = null;
+        if (badmintonObj != null) {
+            badminton = (Badminton) badmintonObj;
         }
+        GameObject opponentObj = null;
+        if (side == sideLeft) { // 右半场
+            opponentObj = inRoom.getObject("stickman_left");
+        }
+        else { // 左半场
+            opponentObj = inRoom.getObject("stickman_right");
+        }
+        ComputerDecision decision;
+        if (isAIControlled && badminton != null && opponentObj != null) {
+            decision = new ComputerDecision(side, getCenterX(), getCenterY() + GameProperties.playerHeight - GameProperties.hitAreaCenterHeight,
+                    isShotting, isJumping, badminton.getCenterX(), badminton.getCenterY(), badminton.speedX, badminton.speedY, opponentObj.getCenterX(), opponentObj.getCenterY());
+        }
+        else decision = new ComputerDecision();
+
+        // 水平移动相关
+        if (isAIControlled) {
+            if (decision.isMoveRight == true) {
+                if (getCenterY() + GameProperties.playerHeight >= GameProperties.floorY)
+                    isMoving = true;
+                speedX = GameProperties.moveSpeed;
+            } else if (decision.isMoveLeft == true) {
+                if (getCenterY() + GameProperties.playerHeight >= GameProperties.floorY)
+                    isMoving = true;
+                speedX = -GameProperties.moveSpeed;
+            }
+        }
+        else {
+            if ((KeyInput.isKeyHolding(KeyCode.D) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.L) && side == sideLeft)) {
+                if (getCenterY() + GameProperties.playerHeight >= GameProperties.floorY)
+                    isMoving = true;
+                speedX = GameProperties.moveSpeed;
+            } else if ((KeyInput.isKeyHolding(KeyCode.A) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.J) && side == sideLeft)) {
+                if (getCenterY() + GameProperties.playerHeight >= GameProperties.floorY)
+                    isMoving = true;
+                speedX = -GameProperties.moveSpeed;
+            }
+        }
+
+
+
         if (side == 1) { // 左半场
             if (speedX < 0 && getCenterX() + speedX * GameProperties.frameTime <= GameProperties.playFieldLeft + GameProperties.playerWidth/2) {
                 speedX = 0;
@@ -166,6 +201,13 @@ public class StickMan extends GameObject {
             if (jumpCooldownTimer <= 0) {
                 isJumping = false;
                 jumpCooldownTimer = 0;
+            }
+        }
+        else if (isAIControlled) {
+            if (decision.isJump == true) {
+                isJumping = true;
+                jumpCooldownTimer = GameProperties.jumpCooldown;
+                speedY = -GameProperties.jumpSpeedY;
             }
         }
         else if ((KeyInput.isKeyHolding(KeyCode.W) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.I) && side == sideLeft)) {
@@ -198,19 +240,36 @@ public class StickMan extends GameObject {
                         nowAngle = nowAngle + 45;
                         if (side == -1)
                             nowAngle = 180 - nowAngle;
-                        GameObject badmintonObj = inRoom.getObject("badminton");
+                        while (nowAngle < 0)
+                            nowAngle += 360;
+                        while (nowAngle > 360)
+                            nowAngle -= 360;
                         if (badmintonObj != null) {
-                            Badminton badminton = (Badminton) badmintonObj;
                             double racketX = getCenterX() + Math.cos(Math.toRadians(nowAngle)) * GameProperties.hitAreaRadius;
                             double racketY = getCenterY() + GameProperties.playerHeight - GameProperties.hitAreaCenterHeight
                                     + Math.sin(Math.toRadians(nowAngle)) * GameProperties.hitAreaRadius;
                             if (Math.pow(badminton.getX() - racketX, 2) + Math.pow(badminton.getY() - racketY, 2)
                                     <= Math.pow(GameProperties.racketRadius, 2)) {
                                 // 判定为打到球
+                                double hitAngle = nowAngle;
+                                if (side == sideRight) {
+                                    hitAngle += 90;
+                                    if (hitAngle > 360)
+                                        hitAngle -= 360;
+                                    if (hitAngle > 340 && getCenterY() > GameProperties.floorY - GameProperties.netHeight - 60)
+                                        hitAngle = 340;
+                                }
+                                else {
+                                    hitAngle -= 90;
+                                    if (hitAngle < 0)
+                                        hitAngle += 360;
+                                    if (hitAngle > 180 && hitAngle < 200 && getCenterY() > GameProperties.floorY - GameProperties.netHeight - 60)
+                                        hitAngle = 200;
+                                }
                                 if (isHeavyShot)
-                                    badminton.heavyHit(nowAngle + (side == sideRight ? 90 - 20 : -90 + 20));
+                                    badminton.heavyHit(hitAngle);
                                 else
-                                    badminton.lightHit(nowAngle + (side == sideRight ? 90 - 20 : -90 + 20));
+                                    badminton.lightHit(hitAngle);
                                 hasShotted = true;
                             }
                         }
@@ -229,23 +288,35 @@ public class StickMan extends GameObject {
                         while (nowAngle > 360)
                             nowAngle -= 360;
                         if ((side == sideRight && nowAngle < 110)||(side == sideLeft && nowAngle > 70)) {
-                            GameObject badmintonObj = inRoom.getObject("badminton");
                             if (badmintonObj != null) {
-                                Badminton badminton = (Badminton) badmintonObj;
                                 double racketX = getCenterX() + Math.cos(Math.toRadians(nowAngle)) * GameProperties.hitAreaRadius;
                                 double racketY = getCenterY() + GameProperties.playerHeight - GameProperties.hitAreaCenterHeight
                                         + Math.sin(Math.toRadians(nowAngle)) * GameProperties.hitAreaRadius;
                                 if (Math.pow(badminton.getX() - racketX, 2) + Math.pow(badminton.getY() - racketY, 2)
                                         <= Math.pow(GameProperties.racketRadius, 2)) {
-                                    double ballAngle = nowAngle + (side == sideRight ?  - 90 - 30 : 90 + 30);
-                                    if (side == sideRight && nowAngle > 260 && nowAngle < 300)
-                                        ballAngle = 300;
-                                    if (side == sideLeft && nowAngle > 240)
-                                        ballAngle = 240;
+                                    double hitAngle = nowAngle;
+                                    if (side == sideRight) {
+                                        hitAngle -= 90;
+                                        if (hitAngle < 0)
+                                            hitAngle += 360;
+                                        if (hitAngle < 90 || hitAngle > 330)
+                                            hitAngle = 330;
+                                        else if (hitAngle < 290)
+                                            hitAngle = 290;
+                                    }
+                                    else {
+                                        hitAngle += 90;
+                                        if (hitAngle > 360)
+                                            hitAngle -= 360;
+                                        if (hitAngle < 210)
+                                            hitAngle = 210;
+                                        else if (hitAngle > 250)
+                                            hitAngle = 250;
+                                    }
                                     if (isHeavyShot)
-                                        badminton.heavyHit(ballAngle);
+                                        badminton.heavyHit(hitAngle);
                                     else
-                                        badminton.lightHit(ballAngle);
+                                        badminton.lightHit(hitAngle);
                                     hasShotted = true;
                                 }
                             }
@@ -254,23 +325,40 @@ public class StickMan extends GameObject {
                 }
             }
         }
-        else if ((KeyInput.isKeyHolding(KeyCode.Q) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.U) && side == sideLeft)
-            || (KeyInput.isKeyHolding(KeyCode.E) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.O) && side == sideLeft)) {
-            isShotting = true;
-            hasShotted = false;
-            if ((KeyInput.isKeyHolding(KeyCode.Q) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.U) && side == sideLeft))
-                isHeavyShot = false;
-            else if ((KeyInput.isKeyHolding(KeyCode.E) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.O) && side == sideLeft))
-                isHeavyShot = true;
-            shotCooldownTimer = GameProperties.shotCooldown;
-            shotType = shotTypeUp;
-            GameObject badminton = inRoom.getObject("badminton");
-            if (badminton != null) {
-                if ((badminton.getCenterX() - 450) * side < 0 // 轮到本方击球
-                        && badminton.getCenterY() > getCenterY())
-                    shotType = shotTypeDown;
-                else
+        else {
+            if (isAIControlled) {
+                if (decision.isShot == true) {
+                    isShotting = true;
+                    hasShotted = false;
+                    isHeavyShot = decision.isHeavyhit;
+                    shotCooldownTimer = GameProperties.shotCooldown;
                     shotType = shotTypeUp;
+                    if (badminton != null) {
+                        if ((badminton.getCenterX() - 450) * side < 0 // 轮到本方击球
+                                && badminton.getCenterY() > getCenterY() - 30)
+                            shotType = shotTypeDown;
+                        else
+                            shotType = shotTypeUp;
+                    }
+                }
+            }
+            else if ((KeyInput.isKeyHolding(KeyCode.Q) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.U) && side == sideLeft)
+                    || (KeyInput.isKeyHolding(KeyCode.E) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.O) && side == sideLeft)) {
+                isShotting = true;
+                hasShotted = false;
+                if ((KeyInput.isKeyHolding(KeyCode.Q) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.U) && side == sideLeft))
+                    isHeavyShot = false;
+                else if ((KeyInput.isKeyHolding(KeyCode.E) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.O) && side == sideLeft))
+                    isHeavyShot = true;
+                shotCooldownTimer = GameProperties.shotCooldown;
+                shotType = shotTypeUp;
+                if (badminton != null) {
+                    if ((badminton.getCenterX() - 450) * side < 0 // 轮到本方击球
+                            && badminton.getCenterY() > getCenterY() - 30)
+                        shotType = shotTypeDown;
+                    else
+                        shotType = shotTypeUp;
+                }
             }
         }
 

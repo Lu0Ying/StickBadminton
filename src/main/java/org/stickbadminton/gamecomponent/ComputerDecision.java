@@ -11,17 +11,17 @@ public class ComputerDecision {
     public boolean isMoveRight = false;
     public boolean isJump = false;
     public boolean isShot = false;
-    public boolean isJumpCooldown;
+    public boolean isJumpCooldown = false;
 
     // 位置和状态信息
     public double computerX = 0.0;
     public double computerY = 0.0;
-    public double badmintonX;
-    public double badmintonY;
-    public double badmintonSpeedX;
-    public double badmintonSpeedY;
-    public double opponentX;
-    public double opponentY;
+    public double badmintonX = 0.0;
+    public double badmintonY = 0.0;
+    public double badmintonSpeedX = 0.0;
+    public double badmintonSpeedY = 0.0;
+    public double opponentX = 0.0;
+    public double opponentY = 0.0;
 
     // AI难度和反应时间控制
     private static final double REACTION_TIME_MIN = 0.05; // 最小反应时间（秒）
@@ -33,6 +33,7 @@ public class ComputerDecision {
     private double predictedLandingY;
     private boolean isBallApproaching = false;
     private Random random = new Random();
+    public ComputerDecision() { }
     public ComputerDecision(int side,
                             double hitCenterX, double hitCenterY, boolean isShotCooldown, boolean isJumpCooldown,
                             double badmintonX, double badmintonY, double badmintonSpeedX, double badmintonSpeedY,
@@ -69,8 +70,8 @@ public class ComputerDecision {
      * 预判球的落点
      */
     private void predictBallLanding() {
-        predictedLandingX = preLanding(GameProperties.floorY);
-        predictedLandingY = GameProperties.floorY;
+        predictedLandingX = preLanding(GameProperties.floorBallY);
+        predictedLandingY = GameProperties.floorBallY;
     }
 
     /**
@@ -93,7 +94,7 @@ public class ComputerDecision {
         // 球在我方区域、正在向我方飞来、且高度合适
         return ballInMyArea && ballComingToMe &&
                 badmintonY > GameProperties.netHeight &&
-                badmintonY < GameProperties.floorY - 30;
+                badmintonY < GameProperties.floorBallY - 30;
     }
 
     /**
@@ -216,7 +217,10 @@ public class ComputerDecision {
         double x = badmintonX;
         double y = y0;
 
-        while (y > targetY) {
+        int steps = 0;
+        int maxSteps = 300;
+
+        while (y > targetY && steps < maxSteps) {
             double airResistance = 0.00001 * (Math.pow(vx, 2) + Math.pow(vy, 2));
             double ax = -2.7 * airResistance * (vx / Math.sqrt(Math.pow(vx, 2) + Math.pow(vy, 2)));
             double ay = g - 0.5 * airResistance * (vy / Math.sqrt(Math.pow(vx, 2) + Math.pow(vy, 2)));
@@ -227,6 +231,7 @@ public class ComputerDecision {
             if (y <= targetY) {
                 break;
             }
+            steps++;
         }
 
         return x;
