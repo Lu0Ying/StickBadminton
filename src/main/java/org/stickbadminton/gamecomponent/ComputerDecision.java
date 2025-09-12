@@ -24,7 +24,8 @@ public class ComputerDecision {
     public double opponentY = 0.0;
     public double racketRadius;
     public double hitAreaRadius;
-
+    public double highShotDistance = 150.0;
+    public double defenceOpponentDistance = 100.0;
     // AI难度和反应时间控制
     private static final double REACTION_TIME_MIN = 0.05; // 最小反应时间（秒）
     private static final double REACTION_TIME_MAX = 0.1; // 最大反应时间（秒）
@@ -193,15 +194,15 @@ public class ComputerDecision {
         double ballSpeed = getBallSpeed();
 
         // 最高难度下的智能击球策略
-        if (opponentDistance > 400 && GameProperties.netPosition - opponentX < 150) {
+        if (opponentDistance > 400 && GameProperties.netPosition - opponentX < defenceOpponentDistance) {
             // 对手距离较远，优先选择杀球
-            if (ballHeight < computerY - GameProperties.hitAreaCenterHeight/2)
+            if (ballHeight < computerY+racketRadius+hitAreaRadius - racketRadius/3)
             {
                 //(hitAreaRadius+2.0/3*racketRadius)*0.866
                 moveHorizontal((hitAreaRadius+2.0/3*racketRadius)*0.866);
                 superShot();
             }
-            else if(computerX - GameProperties.netPosition < 200)
+            else if(computerX - GameProperties.netPosition < highShotDistance)
             {
                 moveHorizontal(-hitAreaRadius);
                 highShot();
@@ -216,14 +217,14 @@ public class ComputerDecision {
                 moveHorizontal(-hitAreaRadius);
                 highShot();
             }
-        } else if (opponentDistance > 200 && GameProperties.netPosition - opponentX < 150) {
+        } else if (opponentDistance > 200 && GameProperties.netPosition - opponentX < defenceOpponentDistance) {
             // 中等距离，根据球速和高度选择策略
-            if(computerX - GameProperties.netPosition < 200)
+            if(computerX - GameProperties.netPosition < highShotDistance)
             {
                 moveHorizontal(-hitAreaRadius);
                 highShot();
             }
-            else if (ballHeight < computerY - GameProperties.hitAreaCenterHeight/3) {
+            else if (ballHeight < computerY+hitAreaRadius) {
                 moveHorizontal(GameProperties.hitAreaCenterHeight/2);
                 superShot();
             } else {
@@ -232,7 +233,7 @@ public class ComputerDecision {
             }
         } else {
             // 对手距离较近，选择高球或快速中场球
-            if(computerX - GameProperties.netPosition < 200|| GameProperties.netPosition - opponentX < 150)
+            if(computerX - GameProperties.netPosition < 200|| GameProperties.netPosition - opponentX < defenceOpponentDistance)
             {
                 moveHorizontal(-hitAreaRadius);
                 highShot();
@@ -429,9 +430,30 @@ public class ComputerDecision {
     /**
      * 杀球 - 重击
      */
-    public void superShot() {
+    public void superShot()
+    {
+        // 标记这是一次“重击型”出球（延续原有语义）
         isHeavyhit = true;
-        isLighthit = false;
+        isShot = true;
+        double netY = GameProperties.floorBallY - GameProperties.netHeight + 20;
+        // 基础数据
+        double g = GameProperties.badmintonGravity;
+        double x0 = badmintonX;
+        double y0 = badmintonY;
+        double xNet = GameProperties.netPosition;
+        double vx = badmintonSpeedX;
+        double vy = badmintonSpeedY;
+        double approachNetTime = calculateTimeToNet(xNet,x0,vx,vy);
+        // 请用你工程中的“网顶世界坐标”替换此字段名（若没有，可据实际计算）
+        double netTopY = GameProperties.floorBallY - GameProperties.netHeight; // TODO: 若命名不同请替换
+        double clearance = 6.0;                  // “擦网”余量（像素，可调 3~10）
+        double yAtNet = netTopY + clearance;
+
+        // 判断出球方向（站在网左打向右，或相反）
+        final int dir = (computerX < xNet) ? +1 : -1;
+
+        // 到网的水平距离（保证为正）
+
     }
 
     /**
@@ -458,6 +480,23 @@ public class ComputerDecision {
             isLighthit = false;
         }
 
+    }
+    public double getAngle() {
+        // 速度为 0 时，返回上一次角度或默认值
+        if (Math.abs(badmintonSpeedX) < 1e-6 && Math.abs(badmintonY) < 1e-6) {
+            return 0; // 或返回 0，或缓存 lastAngle
+        }
+
+        // 使用 Math.atan2(dy, dx) 计算弧度
+        // 注意：Math.atan2(y, x) 返回的是 (-π, π] 弧度
+        double radians = Math.atan2(badmintonSpeedX, badmintonY);
+
+        // 转为角度，并转为 [0, 360)
+        double degrees = Math.toDegrees(radians);
+        if (degrees < 0) {
+            degrees += 360;
+        }
+        return degrees;
     }
     /**
      * 获取球的当前速度大小
