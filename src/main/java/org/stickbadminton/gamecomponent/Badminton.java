@@ -129,12 +129,12 @@ public class Badminton extends GameObject {
         onHit();
         isHitted = true;
         double speed;
-        if(Math.cos(Math.toRadians(angle))<-0.2)
+        if(Math.sin(Math.toRadians(angle))>0.2)
             speed = 1200;
         else if(getCenterX()>=350 && getCenterX()<=550)
-            speed= 600;
+            speed= 300;
         else
-            speed= 800;
+            speed= 500;
         speedY = speed * Math.sin(Math.toRadians(angle));
         speedX = speed * Math.cos(Math.toRadians(angle));
     }
@@ -145,12 +145,12 @@ public class Badminton extends GameObject {
         onHit();
         isHitted = true;
         double speed;
-        if(Math.cos(Math.toRadians(angle))<-0.2)
+        if(Math.sin(Math.toRadians(angle))>0.2)
             speed= 2500;
         else if(getCenterX()>=320 && getCenterX()<=680)
-            speed= 1300;
+            speed= 700;
         else
-            speed= 1300;
+            speed= 900;
         speedY = speed * Math.sin(Math.toRadians(angle));
         speedX = speed * Math.cos(Math.toRadians(angle));
     }
