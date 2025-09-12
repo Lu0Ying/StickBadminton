@@ -31,6 +31,7 @@ public class GameApp extends GameApplication {
 
     @Override
     protected void initGame() {
+        SoundPlay.initSoundPool();
         Room1 room1 = new Room1();
         room1.enter();
         KeyInput.initInput();
