@@ -163,11 +163,11 @@ public class Badminton extends GameObject {
         double speed;
         if (angle < 180) // 扣球
             speed = 1200;
-        else if (getCenterX() >= GameProperties.netPosition - GameProperties.serveLineDistance
-                && getCenterX() <= GameProperties.netPosition + GameProperties.serveLineDistance) // 近场
+        else if (getCenterX() >= GameProperties.netPosition - GameProperties.powerDistance
+                && getCenterX() <= GameProperties.netPosition + GameProperties.powerDistance) // 近场
             speed = 500;
-        else if (getCenterX() <= GameProperties.netPosition - GameProperties.serveLineDistance * 2
-                || getCenterX() >= GameProperties.netPosition + GameProperties.serveLineDistance * 2) // 远场
+        else if (getCenterX() <= GameProperties.netPosition - GameProperties.powerDistance * 2
+                || getCenterX() >= GameProperties.netPosition + GameProperties.powerDistance * 2) // 远场
             speed = 900;
         else
             speed = 700;
@@ -188,11 +188,11 @@ public class Badminton extends GameObject {
         double speed;
         if (angle < 180) // 扣球
             speed = 2500;
-        else if (getCenterX() >= GameProperties.netPosition - GameProperties.serveLineDistance
-                && getCenterX() <= GameProperties.netPosition + GameProperties.serveLineDistance) // 近场
+        else if (getCenterX() >= GameProperties.netPosition - GameProperties.powerDistance
+                && getCenterX() <= GameProperties.netPosition + GameProperties.powerDistance) // 近场
             speed = 900;
-        else if (getCenterX() <= GameProperties.netPosition - GameProperties.serveLineDistance * 2
-                || getCenterX() >= GameProperties.netPosition + GameProperties.serveLineDistance * 2) // 远场
+        else if (getCenterX() <= GameProperties.netPosition - GameProperties.powerDistance * 2
+                || getCenterX() >= GameProperties.netPosition + GameProperties.powerDistance * 2) // 远场
             speed = 1300;
         else
             speed = 1100;

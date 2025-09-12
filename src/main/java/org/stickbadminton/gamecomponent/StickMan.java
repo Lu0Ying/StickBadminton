@@ -314,8 +314,8 @@ public class StickMan extends GameObject {
                                         hitAngle -= 90;
                                         if (hitAngle < 0)
                                             hitAngle += 360;
-                                        if (hitAngle < 90 || hitAngle > 330)
-                                            hitAngle = 330;
+                                        if (hitAngle < 90 || hitAngle > 320)
+                                            hitAngle = 320;
                                         else if (hitAngle < 290)
                                             hitAngle = 290;
                                     }
@@ -323,8 +323,8 @@ public class StickMan extends GameObject {
                                         hitAngle += 90;
                                         if (hitAngle > 360)
                                             hitAngle -= 360;
-                                        if (hitAngle < 210)
-                                            hitAngle = 210;
+                                        if (hitAngle < 220)
+                                            hitAngle = 220;
                                         else if (hitAngle > 250)
                                             hitAngle = 250;
                                     }
