@@ -2,21 +2,12 @@ package org.stickbadminton.gamecomponent;
 
 import com.almasb.fxgl.dsl.FXGL;
 import javafx.geometry.Point2D;
-import com.almasb.fxgl.entity.component.Component;
 import com.almasb.fxgl.particle.ParticleComponent;
 import com.almasb.fxgl.particle.ParticleEmitter;
-import com.almasb.fxgl.particle.ParticleEmitters;
 import javafx.scene.image.Image;
 import javafx.scene.input.KeyCode;
 import org.stickbadminton.GameObject;
 import org.stickbadminton.KeyInput;
-import org.stickbadminton.Sprite;
-import org.stickbadminton.UIObject;
-import org.stickbadminton.gamecomponent.GameProperties;
-
-import java.security.Key;
-import java.util.ArrayList;
-import java.util.List;
 
 public class Badminton extends GameObject {
     public static int sideServe = 0; // 当前发球人
@@ -198,11 +189,11 @@ public class Badminton extends GameObject {
         double speed;
         if (angle < 180) // 扣球
             speed = 1200;
-        else if (getCenterX() >= GameProperties.netPosition - GameProperties.serveLineDistance
-                && getCenterX() <= GameProperties.netPosition + GameProperties.serveLineDistance) // 近场
+        else if (getCenterX() >= GameProperties.netPosition - GameProperties.powerDistance
+                && getCenterX() <= GameProperties.netPosition + GameProperties.powerDistance) // 近场
             speed = 500;
-        else if (getCenterX() <= GameProperties.netPosition - GameProperties.serveLineDistance * 2
-                || getCenterX() >= GameProperties.netPosition + GameProperties.serveLineDistance * 2) // 远场
+        else if (getCenterX() <= GameProperties.netPosition - GameProperties.powerDistance * 2
+                || getCenterX() >= GameProperties.netPosition + GameProperties.powerDistance * 2) // 远场
             speed = 900;
         else
             speed = 700;
@@ -222,11 +213,11 @@ public class Badminton extends GameObject {
         double speed;
         if (angle < 180) // 扣球
             speed = 2500;
-        else if (getCenterX() >= GameProperties.netPosition - GameProperties.serveLineDistance
-                && getCenterX() <= GameProperties.netPosition + GameProperties.serveLineDistance) // 近场
+        else if (getCenterX() >= GameProperties.netPosition - GameProperties.powerDistance
+                && getCenterX() <= GameProperties.netPosition + GameProperties.powerDistance) // 近场
             speed = 900;
-        else if (getCenterX() <= GameProperties.netPosition - GameProperties.serveLineDistance * 2
-                || getCenterX() >= GameProperties.netPosition + GameProperties.serveLineDistance * 2) // 远场
+        else if (getCenterX() <= GameProperties.netPosition - GameProperties.powerDistance * 2
+                || getCenterX() >= GameProperties.netPosition + GameProperties.powerDistance * 2) // 远场
             speed = 1300;
         else
             speed = 1100;

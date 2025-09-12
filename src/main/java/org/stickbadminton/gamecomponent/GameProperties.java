@@ -24,6 +24,8 @@ public class GameProperties {
     public static final double netHeight = 120.0;
     // 发球线到球网的距离
     public static final double serveLineDistance = 150.0;
+    // 远近判定的距离
+    public static final double powerDistance = 50.0;
     // 击球时，判定区域为以肩膀为圆心的圆环区域的两段（上方击球分一段扇形，下方捞球分一段扇形）
     // 肩膀（圆心）到火柴人脚的高度
     public static final double hitAreaCenterHeight = 56.0;
