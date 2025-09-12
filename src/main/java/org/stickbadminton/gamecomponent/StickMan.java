@@ -9,7 +9,8 @@ import org.stickbadminton.KeyInput;
 import org.stickbadminton.SoundPlay;
 
 public class StickMan extends GameObject {
-    public int character = 0; // 1 ~ 5
+    public int characterType = 0; // 1 ~ 5
+    public int isAIControlled = 0;
     private GameObject bodyIdle;
     private GameObject bodyMoving;
     private GameObject rightHand;

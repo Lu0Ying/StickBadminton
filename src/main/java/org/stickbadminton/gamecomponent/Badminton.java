@@ -5,6 +5,7 @@ import javafx.scene.input.KeyCode;
 import org.stickbadminton.GameObject;
 import org.stickbadminton.KeyInput;
 import org.stickbadminton.Sprite;
+import org.stickbadminton.UIObject;
 import org.stickbadminton.gamecomponent.GameProperties;
 
 public class Badminton extends GameObject {
@@ -30,8 +31,10 @@ public class Badminton extends GameObject {
         //落地判断
         double centerX = getCenterX();
         double centerY = getCenterY();
-        if(y+ speedY * GameProperties.frameTime >=GameProperties.floorY)
+        if(y+ speedY * GameProperties.frameTime >=GameProperties.floorY) {
             isTouchedGround = true;
+            onHitGround();
+        }
         else
             isTouchedGround = false;
         if(isTouchedGround) {
@@ -162,7 +165,19 @@ public class Badminton extends GameObject {
         }
     }
     //播放击球特效
-    public void onHit(){
+    public void onHit() {
 
+    }
+    //触地判断
+    public void onHitGround() {
+        if (inRoom != null) {
+            UIObject score = inRoom.getUiObject("score_left");
+            if (score != null) {
+                UIDigitView scoreView = (UIDigitView) score;
+                scoreView.setCurrentNumber((scoreView.getCurrentNumber() + 1) % 10);
+            }
+        }
+        inRoom.addObject(new Badminton()).setPosition(100, 100);
+        deactivate();
     }
 }

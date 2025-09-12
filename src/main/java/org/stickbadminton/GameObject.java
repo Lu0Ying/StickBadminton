@@ -94,7 +94,10 @@ public class GameObject {
     }
 
     public void deactivate() {
+        if (inRoom != null)
+            inRoom.removeObjectCallback(this);
         FXGL.getGameWorld().removeEntity(entity);
+        inRoom = null;
     }
 }
 
