@@ -26,6 +26,11 @@ public class ComputerDecision {
     public double hitAreaRadius;
     public double highShotDistance = 150.0;
     public double defenceOpponentDistance = 100.0;
+
+    // superShot 计算出的目标角度（单位：度）。如你的 Badminton 类需要角度，可读取此字段。
+    // angle < 180 会被 Badminton 识别为“扣球”，并固定速度为 2500。
+    public double superShotAngleDeg = -1.0;
+
     // AI难度和反应时间控制
     private static final double REACTION_TIME_MIN = 0.05; // 最小反应时间（秒）
     private static final double REACTION_TIME_MAX = 0.1; // 最大反应时间（秒）
@@ -88,7 +93,7 @@ public class ComputerDecision {
      */
     private boolean isBallComingToMySide(int side) {
         boolean ballInMyArea = (side == 1 && badmintonX < GameProperties.netPosition) ||
-                              (side == -1 && badmintonX > GameProperties.netPosition);
+                (side == -1 && badmintonX > GameProperties.netPosition);
 
         // 关键修复：判断球是否正在向我方飞来
         boolean ballComingToMe = false;
@@ -112,7 +117,7 @@ public class ComputerDecision {
     private boolean shouldReact() {
         // 最高难度下，AI几乎总是能及时反应
         double reactionTime = REACTION_TIME_MIN +
-                            (REACTION_TIME_MAX - REACTION_TIME_MIN) * (1.0 - DIFFICULTY_LEVEL);
+                (REACTION_TIME_MAX - REACTION_TIME_MIN) * (1.0 - DIFFICULTY_LEVEL);
         return random.nextDouble() > reactionTime * 0.1; // 最高难度下反应时间极短
     }
 
@@ -346,10 +351,10 @@ public class ComputerDecision {
         // 3. 判断球是否向我方飞来 - 修复逻辑
         boolean ballComingToMe = false;
         if (computerX < netX) {
-        // 左侧玩家：球应该从右向左飞来（vx < 0）
+            // 左侧玩家：球应该从右向左飞来（vx < 0）
             ballComingToMe = vx < 0;
         } else if (computerX > netX) {
-        // 右侧玩家：球应该从左向右飞来（vx > 0）
+            // 右侧玩家：球应该从左向右飞来（vx > 0）
             ballComingToMe = vx > 0;
         }
         if (!ballComingToMe) {
@@ -417,7 +422,7 @@ public class ComputerDecision {
 
         // 防守性跳跃 - 当球已经过网且高度合适时
         boolean defensiveJump = (currentX > GameProperties.netPosition &&
-                               badmintonY < computerY - 100 && vy > 0);
+                badmintonY < computerY - 100 && vy > 0);
 
         // 根据难度调整跳跃概率 - 最高难度下几乎不会失误
         double jumpProbability = DIFFICULTY_LEVEL;
@@ -427,33 +432,130 @@ public class ComputerDecision {
 
         return (basicJumpCondition && heightCondition) || aggressiveJump || defensiveJump;
     }
+
     /**
-     * 杀球 - 重击
+     * 杀球 - 重击（重写）
+     * 说明：
+     * - 这里仅计算“角度”并写入 superShotAngleDeg。
+     * - 你的 Badminton 类里会在 angle < 180 时把合速度固定为 2500，并据此计算分量。
      */
-    public void superShot()
-    {
-        // 标记这是一次“重击型”出球（延续原有语义）
+    /**
+     * 杀球 - 重击（重写）
+     * 说明：
+     * - 这里仅计算"角度"并写入 superShotAngleDeg。
+     * - 你的 Badminton 类里会在 angle < 180 时把合速度固定为 2500，并据此计算分量。
+     */
+    public void superShot() {
+        // 标记这是一次"重击型"出球
         isHeavyhit = true;
         isShot = true;
-        double netY = GameProperties.floorBallY - GameProperties.netHeight + 20;
-        // 基础数据
-        double g = GameProperties.badmintonGravity;
-        double x0 = badmintonX;
-        double y0 = badmintonY;
-        double xNet = GameProperties.netPosition;
-        double vx = badmintonSpeedX;
-        double vy = badmintonSpeedY;
-        double approachNetTime = calculateTimeToNet(xNet,x0,vx,vy);
-        // 请用你工程中的“网顶世界坐标”替换此字段名（若没有，可据实际计算）
-        double netTopY = GameProperties.floorBallY - GameProperties.netHeight; // TODO: 若命名不同请替换
-        double clearance = 6.0;                  // “擦网”余量（像素，可调 3~10）
-        double yAtNet = netTopY + clearance;
 
-        // 判断出球方向（站在网左打向右，或相反）
-        final int dir = (computerX < xNet) ? +1 : -1;
+        // 读取基本数据
+        final double g = GameProperties.badmintonGravity; // y 向下为正
+        final double x0 = badmintonX;
+        final double y0 = badmintonY;
+        final double xNet = GameProperties.netPosition;
+        final double netY = GameProperties.floorBallY - GameProperties.netHeight + 20; // 球网判定的 Y 坐标
+        final double clearance = 10.0;                          // 过网裕量
+        final double netYSafe = netY - clearance;
+        final double s = 2500.0;                                // 扣球固定合速度（angle < 180）
 
-        // 到网的水平距离（保证为正）
+        // 目标落点（对方半场接近地面）
+        final double targetYOffset = 6.0;                       // 落地与地面距离
+        final double yTargetBase = GameProperties.floorBallY - targetYOffset;
 
+        // 确定对方半场的目标X坐标
+        double targetX;
+        if (computerX < xNet) {
+            // AI在左侧，目标是右侧半场
+            if (opponentX > xNet + 150) {
+                // 对手在右后场，打近网
+                targetX = xNet + 80 + random.nextDouble() * 70;
+            } else {
+                // 对手在前场，打后场
+                targetX = GameProperties.playFieldRight - 100 + random.nextDouble() * 50;
+            }
+        } else {
+            // AI在右侧，目标是左侧半场
+            if (opponentX < xNet - 150) {
+                // 对手在左后场，打近网
+                targetX = xNet - 80 - random.nextDouble() * 70;
+            } else {
+                // 对手在前场，打后场
+                targetX = GameProperties.playFieldLeft + 100 - random.nextDouble() * 50;
+            }
+        }
+
+        // 计算水平和垂直距离
+        double deltaX = targetX - x0;
+        double deltaY = yTargetBase - y0;
+
+        // 使用物理公式计算最优角度
+        // 考虑空气阻力的简化处理：使用稍大的发射角度来补偿
+        double angle = calculateOptimalAngle(deltaX, deltaY, s, g);
+
+        // 确保角度在合理范围内（10度到80度之间的扣球角度）
+        angle = Math.max(10, Math.min(80, angle));
+
+        // 根据战术需要微调角度
+        if (Math.abs(opponentX - targetX) < 100) {
+            // 对手距离目标较近，增加角度使球更陡峭
+            angle += 5 + random.nextDouble() * 10;
+        }
+
+        // 添加一点随机性，避免过于机械化
+        angle += (random.nextDouble() - 0.5) * 5;
+
+        // 最终角度限制在扣球范围内（小于180度）
+        angle = Math.max(5, Math.min(175, angle));
+
+        // 保存计算出的角度
+        superShotAngleDeg = angle;
+    }
+
+    /**
+     * 计算最优发射角度
+     * @param deltaX 水平距离
+     * @param deltaY 垂直距离（向下为正）
+     * @param speed 发射速度
+     * @param gravity 重力加速度
+     * @return 最优角度（度）
+     */
+    private double calculateOptimalAngle(double deltaX, double deltaY, double speed, double gravity) {
+        // 使用抛物运动公式计算理论角度
+        double v2 = speed * speed;
+        double gx = Math.abs(deltaX);
+
+        // 计算判别式
+        double discriminant = v2 * v2 - gravity * (gravity * gx * gx + 2 * deltaY * v2);
+
+        if (discriminant < 0) {
+            // 无解情况，使用45度作为默认角度
+            return 45.0;
+        }
+
+        // 计算两个可能的角度
+        double sqrt_discriminant = Math.sqrt(discriminant);
+        double tan_theta1 = (v2 + sqrt_discriminant) / (gravity * gx);
+        double tan_theta2 = (v2 - sqrt_discriminant) / (gravity * gx);
+
+        double angle1 = Math.toDegrees(Math.atan(tan_theta1));
+        double angle2 = Math.toDegrees(Math.atan(tan_theta2));
+
+        // 选择较小的角度（更平的轨迹，适合扣球）
+        double selectedAngle = Math.min(angle1, angle2);
+
+        // 如果计算角度过小或过大，使用经验值
+        if (selectedAngle < 10 || selectedAngle > 80) {
+            // 根据距离选择合适的角度
+            if (Math.abs(deltaX) < 200) {
+                return 25 + random.nextDouble() * 10; // 近距离陡一点
+            } else {
+                return 35 + random.nextDouble() * 15; // 远距离平一点
+            }
+        }
+
+        return selectedAngle;
     }
 
     /**
