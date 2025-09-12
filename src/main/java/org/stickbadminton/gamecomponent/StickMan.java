@@ -193,11 +193,13 @@ public class StickMan extends GameObject {
         }
 
         if (isReadyingServe) {
-            if (side == 1 && x >= GameProperties.netPosition - GameProperties.serveLineDistance - GameProperties.playerWidth/2 - spriteCenterX) { // 左半场
+            if (side == 1 && x + speedX * GameProperties.frameTime
+                    >= GameProperties.netPosition - GameProperties.serveLineDistance - GameProperties.playerWidth/2 - spriteCenterX) { // 左半场
                 x = GameProperties.netPosition - GameProperties.serveLineDistance - GameProperties.playerWidth/2 - spriteCenterX;
                 speedX = 0;
             }
-            else if (side == -1 && x <= GameProperties.netPosition + GameProperties.serveLineDistance - 10 + GameProperties.playerWidth/2 - spriteCenterX){ // 右半场
+            else if (side == -1 && x + speedX * GameProperties.frameTime
+                    <= GameProperties.netPosition + GameProperties.serveLineDistance - 10 + GameProperties.playerWidth/2 - spriteCenterX){ // 右半场
                 x = GameProperties.netPosition + GameProperties.serveLineDistance - 10 + GameProperties.playerWidth/2 - spriteCenterX;
                 speedX = 0;
             }
