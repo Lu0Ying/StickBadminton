@@ -1,21 +1,15 @@
 package org.stickbadminton.gamecomponent;
 
-import javafx.scene.control.Button;
 import javafx.scene.image.Image;
-import javafx.scene.paint.Color;
-import javafx.scene.shape.Rectangle;
-import javafx.util.Duration;
 import org.stickbadminton.GameObject;
 import org.stickbadminton.Room;
-
-import java.util.List;
 
 public class RoomStickmanSelect extends Room{
     private int team1;
     private int team2;
 
-    private UIDigitView view1;
-    private UIDigitView view2;
+    private UIStickmanPlayer view1;
+    private UIStickmanPlayer view2;
 
     // 当前选择的队伍
     private boolean isTeam1Selecting = true;
@@ -29,7 +23,7 @@ public class RoomStickmanSelect extends Room{
         // start按钮(放屏幕中下位置): button_start.png
         // undo按钮(放start按钮上面，和start按钮居中对齐):button_undo.png
         // 按钮物件用写好的 UIImageButton 类，具体用法见 Room1
-        // 先别管选好的人怎么显示，两边用 UIDigitView 代替，显示数字编号 1 到 5
+
         addObject(new GameObject("background",new Image("stickmanselect_background.png")));
         UIImageButton startButton=new UIImageButton("button_start.png");
         addUiObject(startButton, 380, 480);
@@ -50,10 +44,13 @@ public class RoomStickmanSelect extends Room{
         addCharacterButton(5,470,220);
 
 
-        view1=new UIDigitView();
-        view2=new UIDigitView();
-        addUiObject(view1,150,400);
-        addUiObject(view2,720,400);
+        view1=new UIStickmanPlayer();
+        view2=new UIStickmanPlayer();
+
+        // 设置第二个角色图片反转（面向左边）
+        view2.setFlipped(true);
+        addUiObject(view1,65,320);
+        addUiObject(view2,840,320);
 
 
     }
@@ -67,10 +64,10 @@ public class RoomStickmanSelect extends Room{
         if (isTeam1Selecting) {
             team1=characterId;
             isTeam1Selecting=false;
-            updateDigitViews();
-        } else {
+            updatePlayerViews();
+        } else if (team2 == 0){
             team2=characterId;
-            updateDigitViews();
+            updatePlayerViews();
         }
     }
     //撤销上一次
@@ -78,15 +75,16 @@ public class RoomStickmanSelect extends Room{
         if (!isTeam1Selecting && team2 != 0) {
             team2 = 0;
             isTeam1Selecting=false;
-            updateDigitViews();
+            updatePlayerViews();
         } else if (!isTeam1Selecting && team1 != 0) {
             team1 = 0;
             isTeam1Selecting=true;
-            updateDigitViews();
+            updatePlayerViews();
         }
     }
-    private void updateDigitViews(){
+    private void updatePlayerViews(){
         view1.setCurrentNumber(team1);
+        view2.setFlipped(true);
         view2.setCurrentNumber(team2);
     }
     public int getTeam1(){

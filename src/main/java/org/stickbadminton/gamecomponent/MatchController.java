@@ -1,12 +1,7 @@
 package org.stickbadminton.gamecomponent;
 
 import javafx.scene.image.Image;
-import javafx.scene.input.KeyCode;
 import org.stickbadminton.GameObject;
-import org.stickbadminton.KeyInput;
-import org.stickbadminton.Sprite;
-import org.stickbadminton.UIObject;
-import org.stickbadminton.gamecomponent.GameProperties;
 
 
 public class MatchController extends GameObject{

@@ -256,7 +256,7 @@ public class Badminton extends GameObject {
 
                 if (leftView.getCurrentNumber() >= 9 || rightView.getCurrentNumber() >= 9) {
                     // 游戏结束，显示结果
-                    showGameResult(leftView.getCurrentNumber() >= 9 ? "Player1" : "Player2");
+                    showGameResult(leftView.getCurrentNumber() >= 9 ? "Player1" : "YBox");
                     deactivate();
                     return;
                 }
