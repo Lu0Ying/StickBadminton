@@ -4,6 +4,13 @@ import javafx.scene.Node;
 
 public abstract class UIObject {
     public abstract Node getUINode();
+    private String name;
+    public String getName() {
+        return name;
+    }
+    public void setName(String name) {
+        this.name = name;
+    }
     private Room parentRoom;
     private int x;
     private int y;

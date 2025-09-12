@@ -10,8 +10,11 @@ import java.util.List;
 
 public class Room {
     private List<GameObject> objects = new ArrayList<>();
+    private List<UIObject> uiObjects = new ArrayList<>();
     private List<Pair<Node, Pair<Integer, Integer>>> uiNodes =  new ArrayList<>();
     private boolean isActive = false;
+    private boolean isClearing;
+    public boolean isClearing() { return isClearing; }
 
     public Room() {}
 
@@ -42,6 +45,10 @@ public class Room {
         gameObject.inRoom = null;
     }
 
+    public void removeObjectFromList(GameObject gameObject) {
+        objects.remove(gameObject);
+    }
+
     public void addUiNode(Node node, int x, int y) {
         uiNodes.add(new Pair(node, new Pair<>(x, y)));
         if (isActive) {
@@ -60,15 +67,18 @@ public class Room {
         });
     }
 
-    public void addUiObject(UIObject uiObject, int x, int y) {
+    public UIObject addUiObject(UIObject uiObject, int x, int y) {
         addUiNode(uiObject.getUINode(), x, y);
         uiObject.setX(x);
         uiObject.setY(y);
         uiObject.setParentRoom(this);
+        uiObjects.add(uiObject);
+        return uiObject;
     }
 
     public void removeUiObject(UIObject uiObject) {
         removeUiNode(uiObject.getUINode());
+        uiObjects.remove(uiObject);
     }
 
     public void enter() {
@@ -79,16 +89,28 @@ public class Room {
     }
 
     public void leave() {
+        isClearing = true;
         objects.forEach(o -> o.deactivate());
-        isActive = false;
         uiNodes.forEach( pack -> FXGL.removeUINode(pack.getKey()));
+        isActive = false;
+        isClearing = false;
     }
 
     @Nullable
     public GameObject getObject(String name) {
         for (GameObject o : objects) {
-            if (o.name.equals(name)) {
+            if (o.name != null && o.name.equals(name)) {
                 return o;
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    public UIObject getUiObject(String name) {
+        for (UIObject uiObject : uiObjects) {
+            if (uiObject.getName() != null && uiObject.getName().equals(name)) {
+                return uiObject;
             }
         }
         return null;
@@ -102,5 +124,12 @@ public class Room {
             }
         }
         return result;
+    }
+
+    public void refresh() {
+        for (GameObject o : objects) {
+            if (o.isActive == false)
+                objects.remove(o);
+        }
     }
 }

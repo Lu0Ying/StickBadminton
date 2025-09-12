@@ -16,6 +16,7 @@ public class GameObject {
 
     protected Sprite sprite;
     protected Entity entity;
+    protected boolean isActive = false;
     protected double x;
     protected double y;
     protected double rotation;
@@ -91,10 +92,14 @@ public class GameObject {
 
     public void activate() {
         FXGL.getGameWorld().addEntity(entity);
+        isActive = true;
     }
 
     public void deactivate() {
         FXGL.getGameWorld().removeEntity(entity);
+        isActive = false;
+        if (inRoom != null && inRoom.isClearing() == false)
+            inRoom.removeObjectFromList(this);
     }
 }
 

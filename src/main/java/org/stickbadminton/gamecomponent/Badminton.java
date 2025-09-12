@@ -1,13 +1,22 @@
 package org.stickbadminton.gamecomponent;
 
+import com.almasb.fxgl.entity.component.Component;
+import com.almasb.fxgl.particle.ParticleComponent;
+import com.almasb.fxgl.particle.ParticleEmitter;
+import com.almasb.fxgl.particle.ParticleEmitters;
 import javafx.scene.image.Image;
 import javafx.scene.input.KeyCode;
 import org.stickbadminton.GameObject;
 import org.stickbadminton.KeyInput;
 import org.stickbadminton.Sprite;
+import org.stickbadminton.UIObject;
 import org.stickbadminton.gamecomponent.GameProperties;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Badminton extends GameObject {
+    //ParticleEmitter emitter = ParticleEmitters.newFireEmitter(); //火焰附加粒子发射器
+    //private ParticleComponent pc = new ParticleComponent(emitter); //火焰发射器的载体，要通过这个载体来更变发射器的位置
     public static double airResistance = 0;  //空气阻力加速度
     public boolean isFrozen = false; // 待发球状态时为 false，开球后能够自由移动，设为 true
     public boolean isTouchedGround = false; // 球是否落地
@@ -17,6 +26,7 @@ public class Badminton extends GameObject {
         speedY = -100;
         setCenterPosition(10.5, 3);
         setRotation(180);
+        //emitter.setNumParticles(0); // 默认不发射
     }
 
     @Override
@@ -30,8 +40,10 @@ public class Badminton extends GameObject {
         //落地判断
         double centerX = getCenterX();
         double centerY = getCenterY();
-        if(y+ speedY * GameProperties.frameTime >=GameProperties.floorY)
+        if(y+ speedY * GameProperties.frameTime >=GameProperties.floorY) {
             isTouchedGround = true;
+            onHitGround();
+        }
         else
             isTouchedGround = false;
         if(isTouchedGround) {
@@ -101,58 +113,68 @@ public class Badminton extends GameObject {
             else
                 rotation = targetRotation * p + rotation * (1 - p);
         }
+        /*扣杀火焰附加
+        emitter.setSpawnPoint(badminton.getCenter());;
+        if(Math.sqrt(Math.pow(speedX,2)+Math.pow(speedY,2))>=2000)
+            emitter.setNumParticles(30);
+        else
+            emitter.setNumParticles(0);
+         */
+        //测试代码
+        /*if(KeyInput.isKeyHolding(KeyCode.T))
+            lightHit(x >=450 ? -135 :-45);*/
     }
 
     public void kickOffHeavy() {
         // 开球..（自由落体）
-        onHit();
         isHitted = true;
         isFrozen = false;
         double angle = x > 450 ? -45 : 45;
         double speed = 900;
         speedY = -speed * Math.cos(Math.toRadians(angle));
         speedX = speed * Math.sin(Math.toRadians(angle));
+        onHit();
     }
     public void kickOffLight() {
         // 开球..（自由落体）
-        onHit();
         isHitted = true;
         isFrozen = false;
         double angle = x > 450 ? -58 : 58;
         double speed = 700;
         speedY = -speed * Math.cos(Math.toRadians(angle));
         speedX = speed * Math.sin(Math.toRadians(angle));
+        onHit();
     }
     public void lightHit(double angle) {
         // angle: 击打角度
         // 被击打（力度小)
-        onHit();
         isHitted = true;
         double speed;
-        if(Math.cos(Math.toRadians(angle))<-0.2)
+        if(Math.sin(Math.toRadians(angle))>0.2)
             speed = 1200;
         else if(getCenterX()>=350 && getCenterX()<=550)
-            speed= 600;
+            speed= 300;
         else
-            speed= 800;
+            speed= 500;
         speedY = speed * Math.sin(Math.toRadians(angle));
         speedX = speed * Math.cos(Math.toRadians(angle));
+        onHit();
     }
 
     public void heavyHit(double angle) {
         // angle: 击打角度
         // 被击打（力度大）
-        onHit();
         isHitted = true;
         double speed;
-        if(Math.cos(Math.toRadians(angle))<-0.2)
+        if(Math.sin(Math.toRadians(angle))>0.2)
             speed= 2500;
         else if(getCenterX()>=320 && getCenterX()<=680)
-            speed= 1300;
+            speed= 700;
         else
-            speed= 1300;
+            speed= 900;
         speedY = speed * Math.sin(Math.toRadians(angle));
         speedX = speed * Math.cos(Math.toRadians(angle));
+        onHit();
     }
     //播放触网动画，在触网判断中被调用
     public void onNetCrashed() {
@@ -162,7 +184,33 @@ public class Badminton extends GameObject {
         }
     }
     //播放击球特效
-    public void onHit(){
+    public void onHit() {
+        double FXRotation;
+        HittingFX hf = new HittingFX();
+        hf.setX(getCenterX() - hf.getCenterX());
+        hf.setY(getCenterY() - hf.getCenterY());
+        if (speedX > 0)
+            FXRotation = Math.toDegrees(Math.atan(speedY / speedX)) + 90;
+        else
+            FXRotation = Math.toDegrees(Math.atan(speedY / speedX)) - 90;
+        inRoom.addObject(hf);
+        hf.setRotation(FXRotation);
+    }
+    //触地判断
+    public void onHitGround() {
+        if (inRoom != null) {
+            if (getCenterX() < 450) {
 
+            }
+            else { // getCenterX() >= 450
+            }
+            UIObject score = inRoom.getUiObject("score_left");
+            if (score != null) {
+                UIDigitView scoreView = (UIDigitView) score;
+                scoreView.setCurrentNumber((scoreView.getCurrentNumber() + 1) % 10);
+            }
+            inRoom.addObject(new Badminton()).setPosition(100, 100);
+            deactivate();
+        }
     }
 }

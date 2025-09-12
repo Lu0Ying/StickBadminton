@@ -6,10 +6,10 @@ import javafx.scene.input.KeyCode;
 import javafx.util.Duration;
 import org.stickbadminton.GameObject;
 import org.stickbadminton.KeyInput;
-import org.stickbadminton.SoundPlay;
 
 public class StickMan extends GameObject {
-    public int character = 0; // 1 ~ 5
+    public int characterType = 0; // 1 ~ 5
+    public int isAIControlled = 0;
     private GameObject bodyIdle;
     private GameObject bodyMoving;
     private GameObject rightHand;
@@ -238,7 +238,7 @@ public class StickMan extends GameObject {
                                 if (Math.pow(badminton.getX() - racketX, 2) + Math.pow(badminton.getY() - racketY, 2)
                                         <= Math.pow(GameProperties.racketRadius, 2)) {
                                     double ballAngle = nowAngle + (side == sideRight ?  - 90 - 30 : 90 + 30);
-                                    if (side == sideRight && nowAngle > 90 && nowAngle < 300)
+                                    if (side == sideRight && nowAngle > 260 && nowAngle < 300)
                                         ballAngle = 300;
                                     if (side == sideLeft && nowAngle > 240)
                                         ballAngle = 240;
@@ -289,10 +289,10 @@ public class StickMan extends GameObject {
 
     @Override
     public void deactivate() {
-        super.deactivate();
         bodyIdle.deactivate();
         bodyMoving.deactivate();
         rightHand.deactivate();
         leftHandIdle.deactivate();
+        super.deactivate();
     }
 }

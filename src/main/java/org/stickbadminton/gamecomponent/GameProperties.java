@@ -25,9 +25,9 @@ public class GameProperties {
     // 肩膀（圆心）到火柴人脚的高度
     public static final double hitAreaCenterHeight = 56.0;
     // 圆环的基础半径
-    public static final double hitAreaRadius = 70.0;
+    public static final double hitAreaRadius = 60.0;
     // 球拍半径
-    public static final double racketRadius = 35.0;
+    public static final double racketRadius = 45.0;
     // 上方击球的圆心角 - 45°（面前的一段扇形 + 身后的 45° 扇形）
     public static final double hitAreaAngleUp = 75.0;
     // 下方击球的圆心角 - 20°（面前的一段扇形 + 身后的 20° 扇形）

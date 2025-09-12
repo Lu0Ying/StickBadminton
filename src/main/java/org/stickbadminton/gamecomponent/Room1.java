@@ -28,7 +28,7 @@ public class Room1 extends Room {
 
         //在 (300, 20) 处显示数字，电子显像管风格
         UIDigitView digitView = new UIDigitView(0);
-        addUiObject(digitView, 300, 20);
+        addUiObject(digitView, 300, 20).setName("score_left");
         /*
          *（测试用）
          */
