@@ -135,8 +135,8 @@ public class Badminton extends GameObject {
             speed= 600;
         else
             speed= 800;
-        speedY = -speed * Math.cos(Math.toRadians(angle));
-        speedX = speed * Math.sin(Math.toRadians(angle));
+        speedY = speed * Math.sin(Math.toRadians(angle));
+        speedX = speed * Math.cos(Math.toRadians(angle));
     }
 
     public void heavyHit(double angle) {
@@ -151,8 +151,8 @@ public class Badminton extends GameObject {
             speed= 1300;
         else
             speed= 1300;
-        speedY = -speed * Math.cos(Math.toRadians(angle));
-        speedX = speed * Math.sin(Math.toRadians(angle));
+        speedY = speed * Math.sin(Math.toRadians(angle));
+        speedX = speed * Math.cos(Math.toRadians(angle));
     }
     //播放触网动画，在触网判断中被调用
     public void onNetCrashed() {

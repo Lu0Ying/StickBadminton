@@ -70,22 +70,20 @@ public class RoomStickmanSelect extends Room{
             updateDigitViews();
         } else {
             team2=characterId;
-            isTeam1Selecting=true;
             updateDigitViews();
         }
     }
     //撤销上一次
     private  void onUndoButtonClick() {
-        if (!isTeam1Selecting && team1 != 0) {
-            team1 = 0;
-            isTeam1Selecting=true;
-            updateDigitViews();
-        } else if (isTeam1Selecting && team2 != 0) {
+        if (!isTeam1Selecting && team2 != 0) {
             team2 = 0;
             isTeam1Selecting=false;
             updateDigitViews();
+        } else if (!isTeam1Selecting && team1 != 0) {
+            team1 = 0;
+            isTeam1Selecting=true;
+            updateDigitViews();
         }
-
     }
     private void updateDigitViews(){
         view1.setCurrentNumber(team1);

@@ -9,6 +9,7 @@ import org.stickbadminton.KeyInput;
 import org.stickbadminton.SoundPlay;
 
 public class StickMan extends GameObject {
+    public int character = 0; // 1 ~ 5
     private GameObject bodyIdle;
     private GameObject bodyMoving;
     private GameObject rightHand;
@@ -207,9 +208,9 @@ public class StickMan extends GameObject {
                                     <= Math.pow(GameProperties.racketRadius, 2)) {
                                 // 判定为打到球
                                 if (isHeavyShot)
-                                    badminton.heavyHit(nowAngle + (side == sideRight ? 180 - 20 : 20));
+                                    badminton.heavyHit(nowAngle + (side == sideRight ? 90 - 20 : -90 + 20));
                                 else
-                                    badminton.lightHit(nowAngle + (side == sideRight ? 180 - 20 : 20));
+                                    badminton.lightHit(nowAngle + (side == sideRight ? 90 - 20 : -90 + 20));
                                 hasShotted = true;
                             }
                         }
@@ -236,7 +237,7 @@ public class StickMan extends GameObject {
                                         + Math.sin(Math.toRadians(nowAngle)) * GameProperties.hitAreaRadius;
                                 if (Math.pow(badminton.getX() - racketX, 2) + Math.pow(badminton.getY() - racketY, 2)
                                         <= Math.pow(GameProperties.racketRadius, 2)) {
-                                    double ballAngle = nowAngle + (side == sideRight ?  -30 : 180 + 30);
+                                    double ballAngle = nowAngle + (side == sideRight ?  - 90 - 30 : 90 + 30);
                                     if (side == sideRight && nowAngle > 90 && nowAngle < 300)
                                         ballAngle = 300;
                                     if (side == sideLeft && nowAngle > 240)

@@ -11,6 +11,19 @@ import java.nio.file.Paths;
 public class SoundPlay {
     private static MediaPlayer backgroundPlayer;
     private static double backgroundVolume = 1;
+
+    // 初始化音频池
+    public static void initSoundPool() {
+        // 加载所有资源
+        // loadSound("title_bgm.mp3")
+        // loadSound("ingame_bgm.mp3")
+        // ... ...
+    }
+
+    private static void loadSound(String sourceUrl) {
+        // 加载某个资源到音频池
+    }
+
     // 播放音频相关的函数
     public static String getAbsolutePath(String relativePath) {
        //如果为绝对路径，返回
