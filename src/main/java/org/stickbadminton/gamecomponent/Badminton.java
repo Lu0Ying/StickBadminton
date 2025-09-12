@@ -1,10 +1,11 @@
 package org.stickbadminton.gamecomponent;
 
+import com.almasb.fxgl.dsl.FXGL;
+import javafx.geometry.Point2D;
 import com.almasb.fxgl.entity.component.Component;
 import com.almasb.fxgl.particle.ParticleComponent;
 import com.almasb.fxgl.particle.ParticleEmitter;
 import com.almasb.fxgl.particle.ParticleEmitters;
-import javafx.scene.control.Label;
 import javafx.scene.image.Image;
 import javafx.scene.input.KeyCode;
 import org.stickbadminton.GameObject;
@@ -22,13 +23,16 @@ public class Badminton extends GameObject {
     public boolean isFrozen = false; // 待发球状态时为 false，开球后能够自由移动，设为 true
     public boolean isTouchedGround = false; // 球是否落地
     public boolean isHitted = false;
-
+    ParticleEmitter emitter;
+    ParticleComponent component;
     public Badminton() {
         super("badminton", new Image("badminton.png"));
         speedY = -100;
         setCenterPosition(10.5, 3);
         setRotation(180);
-        //emitter.setNumParticles(0); // 默认不发射
+        emitter = ParticleFX.fire();
+        component = new ParticleComponent(emitter);
+        entity.addComponent(component);
     }
 
     @Override
@@ -108,16 +112,29 @@ public class Badminton extends GameObject {
             } else
                 rotation = targetRotation * p + rotation * (1 - p);
         }
-        /*扣杀火焰附加
-        emitter.setSpawnPoint(badminton.getCenter());;
-        if(Math.sqrt(Math.pow(speedX,2)+Math.pow(speedY,2))>=2000)
-            emitter.setNumParticles(30);
+        //扣杀火焰附加
+        if(Math.sqrt(Math.pow(speedX,2)+Math.pow(speedY,2))>=1400) {
+            emitter.setNumParticles(20); // 打开发射
+            emitter.setVelocityFunction(i -> {
+                double angle = FXGL.random(-10.0, 10.0);
+                double speed = FXGL.random(100, 250);
+                double dirX = (speedX/Math.sqrt(speedX*speedX+speedY*speedY));
+                double dirY = (speedY/Math.sqrt(speedX*speedX+speedY*speedY));
+                double finalX = dirX * Math.cos(Math.toRadians(angle)) - dirY * Math.sin(Math.toRadians(angle));
+                double finalY = dirX * Math.sin(Math.toRadians(angle)) + dirY * Math.cos(Math.toRadians(angle));
+                return new Point2D(
+                        -speed * finalX,
+                        -speed * finalY
+                );
+            });
+        }
         else
             emitter.setNumParticles(0);
-         */
         //测试代码
-        /*if(KeyInput.isKeyHolding(KeyCode.T))
-            lightHit(x >=450 ? -135 :-45);*/
+        if(KeyInput.isKeyHolding(KeyCode.T))
+            heavyHit(x >=450 ? -135 :-45);
+        if(KeyInput.isKeyHolding(KeyCode.Y))
+            heavyHit(x >=450 ? 165 :15);
     }
 
     public void kickOffHeavy() {
