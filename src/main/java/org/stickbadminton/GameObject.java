@@ -40,6 +40,7 @@ public class GameObject {
     public void setX(double x) { this.x = x; entity.setX(x); }
     public void setY(double y) { this.y = y; entity.setY(y); }
     public void setPosition(double x, double y) {setX(x);setY(y);}
+    public void setPositionWithCenter(double x, double y) {setX(x - spriteCenterX);setY(y - spriteCenterY);}
     public void setCenterPosition(double spriteCenterX, double spriteCenterY) {
         this.spriteCenterX = spriteCenterX;
         this.spriteCenterY = spriteCenterY;

@@ -13,16 +13,18 @@ import org.stickbadminton.KeyInput;
 import org.stickbadminton.Sprite;
 import org.stickbadminton.UIObject;
 import org.stickbadminton.gamecomponent.GameProperties;
+
+import java.security.Key;
 import java.util.ArrayList;
 import java.util.List;
 
 public class Badminton extends GameObject {
-    //ParticleEmitter emitter = ParticleEmitters.newFireEmitter(); //火焰附加粒子发射器
-    //private ParticleComponent pc = new ParticleComponent(emitter); //火焰发射器的载体，要通过这个载体来更变发射器的位置
+    public static int sideServe = 0; // 当前发球人
     public static double airResistance = 0;  //空气阻力加速度
-    public boolean isFrozen = false; // 待发球状态时为 false，开球后能够自由移动，设为 true
+    public boolean isFrozen = true; // 待发球状态时为 false，开球后能够自由移动，设为 true
     public boolean isTouchedGround = false; // 球是否落地
     public boolean isHitted = false;
+    public boolean isShotable = true; // 是否能被打出
     ParticleEmitter emitter;
     ParticleComponent component;
     public Badminton() {
@@ -35,10 +37,36 @@ public class Badminton extends GameObject {
         entity.addComponent(component);
     }
 
+    public Badminton(int sideServe) {
+        super("badminton", new Image("badminton.png"));
+        speedY = -100;
+        setCenterPosition(10.5, 3);
+        setRotation(180);
+        emitter = ParticleFX.fire();
+        component = new ParticleComponent(emitter);
+        entity.addComponent(component);
+        this.sideServe = sideServe;
+        setRotation(sideServe == 1 ? 225: -225);
+    }
+
     @Override
     public void onUpdate() {
         if (isFrozen) {
-            // 这块先不碰，等火柴人代码写好
+            if (sideServe == StickMan.sideLeft) { // 右侧火柴人
+                StickMan stickmanRight = (StickMan) inRoom.getObject("stickman_right");
+                setPositionWithCenter(stickmanRight.getX(), stickmanRight.getY() + 30);
+            }
+            if (sideServe == StickMan.sideRight) { // 左侧火柴人
+                StickMan stickManLeft = (StickMan) inRoom.getObject("stickman_left");
+                setPositionWithCenter(stickManLeft.getX() + 21, stickManLeft.getY() + 30);
+            }
+            if (((sideServe == StickMan.sideRight) && (KeyInput.isKeyHolding(KeyCode.Q) || KeyInput.isKeyHolding(KeyCode.E)))
+                    || ((sideServe == StickMan.sideLeft) && (KeyInput.isKeyHolding(KeyCode.U) || KeyInput.isKeyHolding(KeyCode.O)))) {
+                isFrozen = false;
+                speedX = 250 * sideServe;
+                speedY = 300;
+            }
+            return;
         }
         // 注意球的贴图会随着运动方向而进行旋转
         // 在空中运动状态
@@ -231,56 +259,11 @@ public class Badminton extends GameObject {
 
     //触地判断
     public void onHitGround() {
-        if (inRoom != null) {
-            if (getCenterX() < GameProperties.netPosition) {
-                UIObject scoreRight = inRoom.getUiObject("score_right");
-                if (scoreRight instanceof UIDigitView) {
-                    UIDigitView scoreView = (UIDigitView) scoreRight;
-                    scoreView.setCurrentNumber((scoreView.getCurrentNumber() + 1) % 10);
-                }
-            } else {
-                UIObject scoreLeft = inRoom.getUiObject("score_left");
-                if (scoreLeft instanceof UIDigitView) {
-                    UIDigitView scoreView = (UIDigitView) scoreLeft;
-                    scoreView.setCurrentNumber((scoreView.getCurrentNumber() + 1) % 10);
-                }
+        if (isShotable) {
+            isShotable = false;
+            if (inRoom != null) {
+                ((MatchController) inRoom.getObject("controller")).onBallGroundHit();
             }
-
-            //判断获胜
-            UIObject scoreLeft = inRoom.getUiObject("score_left");
-            UIObject scoreRight = inRoom.getUiObject("score_right");
-
-            if (scoreLeft instanceof UIDigitView && scoreRight instanceof UIDigitView) {
-                UIDigitView leftView = (UIDigitView) scoreLeft;
-                UIDigitView rightView = (UIDigitView) scoreRight;
-
-                if (leftView.getCurrentNumber() >= 9 || rightView.getCurrentNumber() >= 9) {
-                    // 游戏结束，显示结果
-                    showGameResult(leftView.getCurrentNumber() >= 9 ? "Player1" : "YBox");
-                    deactivate();
-                    return;
-                }
-            }
-
-            inRoom.addObject(new Badminton()).setPosition(100, 100);
-            deactivate();
-        }
-    }
-
-    private void showGameResult(String winner) {
-        // 创建游戏结束UI
-        UIGameOver gameOverUI = new UIGameOver(winner);
-
-        // 将UI添加到当前房间
-        if (inRoom != null) {
-            // 居中显示
-            double centerX = (GameProperties.roomWidth - 300) / 2; // 假设UI宽度为300
-            double centerY = (GameProperties.roomHeight - 200) / 2; // 假设UI高度为200
-
-            inRoom.addUiObject(gameOverUI, (int) centerX, (int) centerY);
-
-            // 暂停游戏逻辑
-            // 可以添加一个游戏暂停的状态变量来控制更新逻辑
         }
     }
 }

@@ -230,7 +230,7 @@ public class StickMan extends GameObject {
                 isShotting = false;
                 shotCooldownTimer = 0;
             }
-            else if (hasShotted == false){
+            else if (hasShotted == false && badminton.isShotable){
                 if (shotType == shotTypeUp) { // 上方击球
                     double deltaT = GameProperties.shotCooldown - shotCooldownTimer;
                     if (deltaT < GameProperties.shotAnimationTime)
