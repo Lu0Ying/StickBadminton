@@ -2,6 +2,7 @@ package org.stickbadminton.gamecomponent.network;
 
 import com.almasb.fxgl.dsl.FXGL;
 import javafx.application.Platform;
+import javafx.event.Event;
 import javafx.scene.Scene;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
@@ -13,31 +14,17 @@ import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
-import java.util.EnumMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 通过 TCP 连接 Server，接收行分隔文本指令，并把指令转换为本地键盘事件或动作，驱动 KeyInput/角色行为。
+ * 基于行文本协议的客户端：
+ * - 接收 KEY:/ACTION: 指令并转换成 JavaFX KeyEvent 注入到 FXGL Scene，
+ *   由仓库中的 KeyInput 统一捕获，从而驱动 StickMan 的行为。
  *
- * 协议（每行一条）:
- *   - KEY:PRESS:<KEYCODE>
- *   - KEY:RELEASE:<KEYCODE>
- *     例如: KEY:PRESS:LEFT   KEY:RELEASE:LEFT
- *
- *   - ACTION:<playerId>:<COMMAND>
- *     COMMAND ∈ {
- *       MOVE_LEFT_ON, MOVE_LEFT_OFF, MOVE_RIGHT_ON, MOVE_RIGHT_OFF,
- *       JUMP, LIGHT_HIT_UP, LIGHT_HIT_DOWN, HEAVY_HIT_UP, HEAVY_HIT_DOWN
- *     }
- *     例如: ACTION:p1:MOVE_LEFT_ON
- *
- * 说明：
- *   - 与仓库里的 KeyInput 完全兼容：本类向 FXGL 的 Scene 注入 KeyEvent（PRESS/RELEASE）来“模拟按键”，
- *     StickMan 若通过 KeyInput 查询按键状态，就能像本地玩家一样被驱动。
- *   - ACTION 指令会映射到具体按键，可用 setActionKeyMapping 调整以匹配你项目中的键位。
+ * 默认玩家键位（与仓库 StickMan 逻辑保持一致）：
+ * - p1（左侧玩家，side==1）：W/A/D 跳/左/右，Q/E 轻/重击
+ * - p2（右侧玩家，side==-1）：I/J/L 跳/左/右，U/O 轻/重击
  */
 public class NetworkClient {
 
@@ -45,8 +32,7 @@ public class NetworkClient {
         MOVE_LEFT_ON, MOVE_LEFT_OFF,
         MOVE_RIGHT_ON, MOVE_RIGHT_OFF,
         JUMP,
-        LIGHT_HIT_UP, LIGHT_HIT_DOWN,
-        HEAVY_HIT_UP, HEAVY_HIT_DOWN
+        LIGHT_HIT, HEAVY_HIT
     }
 
     private final String host;
@@ -58,31 +44,62 @@ public class NetworkClient {
     private BufferedReader in;
     private PrintWriter out;
 
-    // 已经由本客户端“按下”的按键集合（用于避免重复注入 PRESS）
+    // 我们模拟按下的按键集合，避免重复注入 PRESS
     private final Set<KeyCode> pressedByClient = Collections.synchronizedSet(new HashSet<>());
 
-    // 动作到按键的映射（用于把 ACTION 转为 KEY 事件）
-    private final Map<Action, KeyCode> actionKeyMap = Collections.synchronizedMap(defaultActionKeyMap());
+    // 每个玩家的动作到按键映射
+    private final Map<String, Map<Action, KeyCode>> perPlayerKeyMap = new ConcurrentHashMap<>();
 
     public NetworkClient(String host, int port) {
         this.host = host;
         this.port = port;
+        initDefaultKeyMaps();
+    }
+
+    private void initDefaultKeyMaps() {
+        Map<Action, KeyCode> p1 = new EnumMap<>(Action.class);
+        p1.put(Action.MOVE_LEFT_ON, KeyCode.A);
+        p1.put(Action.MOVE_LEFT_OFF, KeyCode.A);
+        p1.put(Action.MOVE_RIGHT_ON, KeyCode.D);
+        p1.put(Action.MOVE_RIGHT_OFF, KeyCode.D);
+        p1.put(Action.JUMP, KeyCode.W);
+        p1.put(Action.LIGHT_HIT, KeyCode.Q);
+        p1.put(Action.HEAVY_HIT, KeyCode.E);
+
+        Map<Action, KeyCode> p2 = new EnumMap<>(Action.class);
+        p2.put(Action.MOVE_LEFT_ON, KeyCode.J);
+        p2.put(Action.MOVE_LEFT_OFF, KeyCode.J);
+        p2.put(Action.MOVE_RIGHT_ON, KeyCode.L);
+        p2.put(Action.MOVE_RIGHT_OFF, KeyCode.L);
+        p2.put(Action.JUMP, KeyCode.I);
+        p2.put(Action.LIGHT_HIT, KeyCode.U);
+        p2.put(Action.HEAVY_HIT, KeyCode.O);
+
+        perPlayerKeyMap.put("p1", p1);
+        perPlayerKeyMap.put("p2", p2);
     }
 
     /**
-     * 启动网络线程并尝试连接。
+     * 自定义某个玩家的键位映射
+     */
+    public void setPlayerKeyMap(String playerId, Map<Action, KeyCode> map) {
+        if (playerId == null || map == null) return;
+        perPlayerKeyMap.put(playerId, new EnumMap<>(map));
+    }
+
+    /**
+     * 启动网络线程并连接服务器
      */
     public synchronized void start() {
         if (running) return;
         running = true;
-
         ioThread = new Thread(this::runLoop, "NetworkClient-IO");
         ioThread.setDaemon(true);
         ioThread.start();
     }
 
     /**
-     * 停止网络线程并断开连接，释放所有由本客户端模拟按下的按键。
+     * 停止客户端并释放我们模拟按下的按键
      */
     public synchronized void stop() {
         running = false;
@@ -92,21 +109,11 @@ public class NetworkClient {
         if (ioThread != null) {
             try { ioThread.join(1000); } catch (InterruptedException ignored) {}
         }
-        // 释放被我们按下但尚未释放的键
         flushAllPressedKeys();
     }
 
     /**
-     * 外部可自定义动作->按键的映射（确保与本地玩家的按键绑定一致）。
-     */
-    public void setActionKeyMapping(java.util.function.Consumer<Map<Action, KeyCode>> customizer) {
-        synchronized (actionKeyMap) {
-            customizer.accept(actionKeyMap);
-        }
-    }
-
-    /**
-     * 向服务器发送一行消息（可选）。
+     * 发送一行协议到服务器（可选）
      */
     public void sendLine(String line) {
         PrintWriter writer = out;
@@ -116,22 +123,19 @@ public class NetworkClient {
         }
     }
 
-    // ============== 核心 I/O 循环 ==============
-
     private void runLoop() {
         while (running) {
             try {
                 connect();
                 String line;
                 while (running && (line = in.readLine()) != null) {
-                    final String msg = line.trim();
-                    if (!msg.isEmpty()) {
-                        dispatch(msg);
+                    line = line.trim();
+                    if (!line.isEmpty()) {
+                        handleLine(line);
                     }
                 }
             } catch (IOException e) {
-                // 简单重连策略：稍等再试
-                sleepSilently(1000);
+                sleep(1000); // 简单重连
             } finally {
                 closeSilently();
             }
@@ -154,53 +158,39 @@ public class NetworkClient {
         socket = null;
     }
 
-    // ============== 消息分发与执行 ==============
-
-    private void dispatch(String line) {
-        // 允许的格式：
-        // KEY:PRESS:<KEYCODE>
-        // KEY:RELEASE:<KEYCODE>
-        // ACTION:<playerId>:<COMMAND>
+    // 处理协议行
+    private void handleLine(String line) {
         try {
             if (line.startsWith("KEY:")) {
-                handleKeyCommand(line);
+                handleKeyLine(line);
             } else if (line.startsWith("ACTION:")) {
-                handleActionCommand(line);
-            } else {
-                // 兼容极简格式：PRESS LEFT / RELEASE LEFT
-                String[] parts = line.split("\\s+");
-                if (parts.length == 2 && ("PRESS".equalsIgnoreCase(parts[0]) || "RELEASE".equalsIgnoreCase(parts[0]))) {
-                    boolean press = "PRESS".equalsIgnoreCase(parts[0]);
-                    KeyCode code = KeyCode.valueOf(parts[1].toUpperCase());
-                    if (press) simulateKeyPress(code); else simulateKeyRelease(code);
-                }
+                handleActionLine(line);
+            } else if (line.startsWith("ASSIGN:")) {
+                // 服务器分配的玩家 ID（如需的话可记录/回显）
+                // String assigned = line.substring("ASSIGN:".length()).trim();
             }
         } catch (Exception ignored) {
-            // 对不合法指令容错
+            // 对异常/不合法数据容错
         }
     }
 
-    private void handleKeyCommand(String line) {
-        // KEY:PRESS:LEFT
-        // KEY:RELEASE:LEFT
+    private void handleKeyLine(String line) {
+        // KEY:PRESS:<KEYCODE> / KEY:RELEASE:<KEYCODE>
         String[] parts = line.split(":");
         if (parts.length != 3) return;
         String op = parts[1].trim().toUpperCase();
         String keyName = parts[2].trim().toUpperCase();
         KeyCode code = KeyCode.valueOf(keyName);
-        if ("PRESS".equals(op)) {
-            simulateKeyPress(code);
-        } else if ("RELEASE".equals(op)) {
-            simulateKeyRelease(code);
-        }
+
+        if ("PRESS".equals(op)) simulateKeyPress(code);
+        else if ("RELEASE".equals(op)) simulateKeyRelease(code);
     }
 
-    private void handleActionCommand(String line) {
+    private void handleActionLine(String line) {
         // ACTION:<playerId>:<COMMAND>
-        // 示例：ACTION:p1:MOVE_LEFT_ON
         String[] parts = line.split(":");
         if (parts.length < 3) return;
-        // String playerId = parts[1].trim(); // 预留：如需区分不同玩家，可在这里使用 playerId
+        String playerId = parts[1].trim();
         String cmd = parts[2].trim().toUpperCase();
 
         Action action;
@@ -210,65 +200,57 @@ public class NetworkClient {
             return;
         }
 
-        KeyCode mapped = actionKeyMap.get(action);
-        if (mapped == null) return;
+        Map<Action, KeyCode> map = perPlayerKeyMap.get(playerId);
+        if (map == null) return;
+
+        KeyCode code = map.get(action);
+        if (code == null) return;
 
         switch (action) {
             case MOVE_LEFT_ON:
             case MOVE_RIGHT_ON:
-                simulateKeyPress(mapped);
+                simulateKeyPress(code);
                 break;
             case MOVE_LEFT_OFF:
             case MOVE_RIGHT_OFF:
-                simulateKeyRelease(mapped);
+                simulateKeyRelease(code);
                 break;
             case JUMP:
-                // 跳跃通常是一次性动作： PRESS 然后短延时 RELEASE
-                simulateKeyPress(mapped);
-                scheduleOnFXThread(() -> simulateKeyRelease(mapped), 30);
-                break;
-            case LIGHT_HIT_UP:
-            case LIGHT_HIT_DOWN:
-            case HEAVY_HIT_UP:
-            case HEAVY_HIT_DOWN:
-                // 同样视为一次性动作
-                simulateKeyPress(mapped);
-                scheduleOnFXThread(() -> simulateKeyRelease(mapped), 30);
+            case LIGHT_HIT:
+            case HEAVY_HIT:
+                // 脉冲型按键：短按后自动释放
+                simulateKeyPress(code);
+                scheduleRelease(code, 30);
                 break;
         }
     }
 
-    // ============== 键盘事件模拟 ==============
-
+    // ========== JavaFX KeyEvent 模拟 ==========
     private void simulateKeyPress(KeyCode code) {
         if (code == null) return;
-        if (pressedByClient.contains(code)) return; // 已经按下则不重复注入
+        if (pressedByClient.contains(code)) return;
         pressedByClient.add(code);
-        Scene scene = getSceneOrNull();
+        Scene scene = getScene();
         if (scene == null) return;
         Platform.runLater(() -> {
             KeyEvent ev = new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, false, false, false, false);
-            scene.fireEvent(ev);
+            Event.fireEvent(scene, ev);
         });
     }
 
     private void simulateKeyRelease(KeyCode code) {
         if (code == null) return;
-        if (!pressedByClient.contains(code)) {
-            // 不是我们按下的，也允许释放一次以保持一致
-        } else {
-            pressedByClient.remove(code);
-        }
-        Scene scene = getSceneOrNull();
+        pressedByClient.remove(code);
+        Scene scene = getScene();
         if (scene == null) return;
         Platform.runLater(() -> {
             KeyEvent ev = new KeyEvent(KeyEvent.KEY_RELEASED, "", "", code, false, false, false, false);
-            scene.fireEvent(ev);
+            Event.fireEvent(scene, ev);
         });
     }
 
     private void flushAllPressedKeys() {
-        Scene scene = getSceneOrNull();
+        Scene scene = getScene();
         if (scene == null) {
             pressedByClient.clear();
             return;
@@ -278,29 +260,12 @@ public class NetworkClient {
         Platform.runLater(() -> {
             for (KeyCode code : snapshot) {
                 KeyEvent ev = new KeyEvent(KeyEvent.KEY_RELEASED, "", "", code, false, false, false, false);
-                scene.fireEvent(ev);
+                Event.fireEvent(scene, ev);
             }
         });
     }
 
-    // ============== 工具方法 ==============
-
-    private static Map<Action, KeyCode> defaultActionKeyMap() {
-        Map<Action, KeyCode> m = new EnumMap<>(Action.class);
-        // 默认用方向键 + 常见击球键位（请按你的项目实际键位修改或在运行时 setActionKeyMapping）
-        m.put(Action.MOVE_LEFT_ON, KeyCode.LEFT);
-        m.put(Action.MOVE_LEFT_OFF, KeyCode.LEFT);
-        m.put(Action.MOVE_RIGHT_ON, KeyCode.RIGHT);
-        m.put(Action.MOVE_RIGHT_OFF, KeyCode.RIGHT);
-        m.put(Action.JUMP, KeyCode.UP);
-        m.put(Action.LIGHT_HIT_UP, KeyCode.J);
-        m.put(Action.LIGHT_HIT_DOWN, KeyCode.K);
-        m.put(Action.HEAVY_HIT_UP, KeyCode.U);
-        m.put(Action.HEAVY_HIT_DOWN, KeyCode.I);
-        return m;
-    }
-
-    private Scene getSceneOrNull() {
+    private Scene getScene() {
         try {
             return FXGL.getPrimaryStage().getScene();
         } catch (Exception e) {
@@ -308,19 +273,14 @@ public class NetworkClient {
         }
     }
 
-    private static void scheduleOnFXThread(Runnable r, int delayMillis) {
-        // 简易延时释放：用 JavaFX 定时，避免阻塞
-        Platform.runLater(() -> {
-            new Thread(() -> {
-                try {
-                    Thread.sleep(delayMillis);
-                } catch (InterruptedException ignored) {}
-                Platform.runLater(r);
-            }, "NetworkClient-Delay").start();
-        });
+    private void scheduleRelease(KeyCode code, int delayMs) {
+        new Thread(() -> {
+            try { Thread.sleep(delayMs); } catch (InterruptedException ignored) {}
+            simulateKeyRelease(code);
+        }, "NetworkClient-ReleaseDelay").start();
     }
 
-    private static void sleepSilently(long ms) {
+    private static void sleep(long ms) {
         try { Thread.sleep(ms); } catch (InterruptedException ignored) {}
     }
 }
