@@ -29,7 +29,7 @@ public class Room1 extends Room {
             this.leave();
             room2.enter();
         });
-        addUiObject(button1, 300, 400);
+        addUiObject(button1, 300, 100);
         //测试黄色按钮
 
         //显示数字，电子显像管风格
