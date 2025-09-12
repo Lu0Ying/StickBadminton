@@ -23,13 +23,13 @@ public class Room1 extends Room {
         stickmanLeft.setPosition(200, 300);
         stickmanLeft.setName("stickman_left");
         //ui按钮
-        UIImageButton button1 = new UIImageButton("button_titlestart. png");
+        UIImageButton button1 = new UIImageButton("button_titlestart.png");
         button1.setOnAction(e -> {
             Room2 room2 = new Room2();
             this.leave();
             room2.enter();
         });
-        addUiObject(button1, 300, 100);
+        addUiObject(button1, 300, 400);
         //测试黄色按钮
 
         //显示数字，电子显像管风格
