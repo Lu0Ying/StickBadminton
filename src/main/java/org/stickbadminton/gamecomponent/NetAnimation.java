@@ -187,7 +187,7 @@ public class NetAnimation extends GameObject {
         }
     }
 
-    //调整大小要调用的函数
+    //可能会用到的函数
     public GameObject getNetStatic() {
         return netStatic;
     }

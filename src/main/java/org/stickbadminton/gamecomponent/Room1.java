@@ -17,7 +17,7 @@ public class Room1 extends Room {
         //羽毛球(未完成)
         addObject(new Badminton()).setPosition(100, 100);
         //ui按钮
-        UIImageButton button1 = new UIImageButton("button_start.png");
+        UIImageButton button1 = new UIImageButton("button_titlestart.png");
         button1.setOnAction(e -> {
             Room2 room2 = new Room2();
             this.leave();
@@ -26,9 +26,12 @@ public class Room1 extends Room {
         addUiObject(button1, 300, 400);
         //测试黄色按钮
 
-        //在 (300, 20) 处显示数字，电子显像管风格
+        //显示数字，电子显像管风格
+
         UIDigitView digitView = new UIDigitView(0);
-        addUiObject(digitView, 300, 20).setName("score_left");
+        addUiObject(digitView, 390, 21).setName("score_left");
+        UIDigitView digitView2 = new UIDigitView(0);
+        addUiObject(digitView2, 484, 21).setName("score_right");
         /*
          *（测试用）
          */
