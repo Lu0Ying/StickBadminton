@@ -16,7 +16,8 @@ public class MatchController extends GameObject{
         setVisible(false);
     }
     public void matchStart() {
-        inRoom.addObject(new Badminton(serveSide)).setPosition(-100, 100);
+        ballHitGroundTimer = 0.0;
+        scoreChangeTimer = 0.01;
     }
     public void onBallGroundHit(int winner) {
         ballHitGroundTimer = 1.0;
@@ -47,15 +48,16 @@ public class MatchController extends GameObject{
 
             if (leftView.getCurrentNumber() >= 9 || rightView.getCurrentNumber() >= 9) {
                 // 游戏结束，显示结果
-                showGameResult(leftView.getCurrentNumber() >= 9 ? "Player1" : "YBox");
+                showGameResult(leftView.getCurrentNumber() >= 9 ? "Player1" : "Player2");
                 deactivate();
                 return;
             }
         }
     }
+    
     public void resetBall() {
-        serveSide *= -1;
-        inRoom.removeObject(inRoom.getObject("badminton"));
+        if (inRoom.getObject("badminton") != null)
+            inRoom.removeObject(inRoom.getObject("badminton"));
         inRoom.addObject(new Badminton(serveSide)).setPosition(-100, -100);
     }
 
@@ -83,13 +85,32 @@ public class MatchController extends GameObject{
                 changeScore();
                 ballHitGroundTimer = 0.0;
                 scoreChangeTimer = 2.0;
+                serveSide = lastPointWinner;
             }
         }
         else if (scoreChangeTimer > 0.0) { // 记分牌改变后到重置玩家和球的位置等待时间
             scoreChangeTimer -= GameProperties.frameTime;
             if (scoreChangeTimer < 0.0) {
-                resetBall();
-                scoreChangeTimer = 0.0;
+                if (serveSide == StickMan.sideLeft) {
+                    StickMan stickmanRight = (StickMan) inRoom.getObject("stickman_right");
+                    if (stickmanRight.isShotting)
+                        scoreChangeTimer = 0.01;
+                    else {
+                        scoreChangeTimer = 0.0;
+                        stickmanRight.isReadyingServe = true;
+                        resetBall();
+                    }
+                }
+                else {
+                    StickMan stickmanLeft = (StickMan) inRoom.getObject("stickman_left");
+                    if (stickmanLeft.isShotting)
+                        scoreChangeTimer = 0.01;
+                    else {
+                        scoreChangeTimer = 0.0;
+                        stickmanLeft.isReadyingServe = true;
+                        resetBall();
+                    }
+                }
             }
         }
         else if (isServeReadying) {

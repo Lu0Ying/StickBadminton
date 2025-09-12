@@ -29,8 +29,7 @@ public class StickMan extends GameObject {
     public static final boolean shotTypeUp = false;
     public static final boolean shotTypeDown = true;
     private double shotCooldownTimer = 0;
-    public boolean isReadyingKickOff = false;
-    private double kickedOffTimer = 0;
+    public boolean isReadyingServe = false;
 
     public StickMan(int side) {
         super("stickman1", new Image("stickman_head1.png")); //head
@@ -77,9 +76,7 @@ public class StickMan extends GameObject {
 
         rightHand.setX(x + 9 - 3 * side);
         rightHand.setY(y + 25);
-        if (isReadyingKickOff)
-            rightHand.setRotation(90 * side);
-        else if (isShotting) {
+        if (isShotting) {
             if (shotType == shotTypeUp) { // 上方击球
                 double deltaT = GameProperties.shotCooldown - shotCooldownTimer;
                 double targetAngle = 180 + 45 + GameProperties.hitAreaAngleUp;
@@ -195,6 +192,17 @@ public class StickMan extends GameObject {
             }
         }
 
+        if (isReadyingServe) {
+            if (side == 1 && x >= GameProperties.netPosition - GameProperties.serveLineDistance - GameProperties.playerWidth/2 - spriteCenterX) { // 左半场
+                x = GameProperties.netPosition - GameProperties.serveLineDistance - GameProperties.playerWidth/2 - spriteCenterX;
+                speedX = 0;
+            }
+            else if (side == -1 && x <= GameProperties.netPosition + GameProperties.serveLineDistance - 10 + GameProperties.playerWidth/2 - spriteCenterX){ // 右半场
+                x = GameProperties.netPosition + GameProperties.serveLineDistance - 10 + GameProperties.playerWidth/2 - spriteCenterX;
+                speedX = 0;
+            }
+        }
+
         // 竖直移动相关
         if (isJumping) {
             jumpCooldownTimer -= GameProperties.frameTime;
@@ -202,6 +210,10 @@ public class StickMan extends GameObject {
                 isJumping = false;
                 jumpCooldownTimer = 0;
             }
+        }
+        else if (isReadyingServe) {
+            // 发球时禁用跳跃
+            // do nothing
         }
         else if (isAIControlled) {
             if (decision.isJump == true) {
@@ -271,6 +283,7 @@ public class StickMan extends GameObject {
                                 else
                                     badminton.lightHit(hitAngle);
                                 hasShotted = true;
+                                isReadyingServe = false;
                             }
                         }
                     }
@@ -318,6 +331,7 @@ public class StickMan extends GameObject {
                                     else
                                         badminton.lightHit(hitAngle);
                                     hasShotted = true;
+                                    isReadyingServe = false;
                                 }
                             }
                         }
