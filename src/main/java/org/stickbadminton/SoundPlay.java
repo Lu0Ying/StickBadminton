@@ -46,6 +46,10 @@ public class SoundPlay {
     // 设置背景音乐
     public static void setBackgroundMusic(String sourceUrl) {
        try{
+           if (backgroundPlayer != null) {
+               backgroundPlayer.stop();
+               backgroundPlayer.dispose(); // 释放资源
+           }
            Media media=new Media(new File(getAbsolutePath(sourceUrl)).toURI().toURL().toString());
            backgroundPlayer=new MediaPlayer(media);
 
@@ -103,5 +107,9 @@ public class SoundPlay {
         }catch (MalformedURLException e){
             System.err.println("无效的音频文件路径:"+e.getMessage());
         }
+    }
+    //手动移除不需要的音效
+    public static void removeSoundFromCache(String sourceUrl) {
+        soundCache.remove(sourceUrl);
     }
 }
