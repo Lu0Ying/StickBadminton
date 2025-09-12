@@ -262,7 +262,7 @@ public class Badminton extends GameObject {
         if (isShotable) {
             isShotable = false;
             if (inRoom != null) {
-                ((MatchController) inRoom.getObject("controller")).onBallGroundHit();
+                ((MatchController) inRoom.getObject("controller")).onBallGroundHit(getCenterX() > 450 ? 1 : -1);
             }
         }
     }

@@ -18,11 +18,12 @@ public class MatchController extends GameObject{
     public void matchStart() {
         inRoom.addObject(new Badminton(serveSide)).setPosition(-100, 100);
     }
-    public void onBallGroundHit() {
+    public void onBallGroundHit(int winner) {
         ballHitGroundTimer = 1.0;
+        lastPointWinner = winner;
     }
     public void changeScore() {
-        if (getCenterX() < GameProperties.netPosition) {
+        if (lastPointWinner == -1) {
             UIObject scoreRight = inRoom.getUiObject("score_right");
             if (scoreRight instanceof UIDigitView) {
                 UIDigitView scoreView = (UIDigitView) scoreRight;
