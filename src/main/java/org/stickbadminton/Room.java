@@ -43,7 +43,7 @@ public class Room {
         gameObject.inRoom = null;
     }
 
-    public void removeObjectCallback(GameObject gameObject) {
+    public void removeObjectFromList(GameObject gameObject) {
         objects.remove(gameObject);
     }
 

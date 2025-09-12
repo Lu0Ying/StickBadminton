@@ -171,13 +171,18 @@ public class Badminton extends GameObject {
     //触地判断
     public void onHitGround() {
         if (inRoom != null) {
+            if (getCenterX() < 450) {
+
+            }
+            else { // getCenterX() >= 450
+            }
             UIObject score = inRoom.getUiObject("score_left");
             if (score != null) {
                 UIDigitView scoreView = (UIDigitView) score;
                 scoreView.setCurrentNumber((scoreView.getCurrentNumber() + 1) % 10);
             }
+            inRoom.addObject(new Badminton()).setPosition(100, 100);
+            deactivate();
         }
-        inRoom.addObject(new Badminton()).setPosition(100, 100);
-        deactivate();
     }
 }
