@@ -1,28 +1,43 @@
 package org.stickbadminton.gamecomponent.network;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.HashMap;
+import java.util.HashSet;
 
 /**
- * 简单的多客户端 TCP 服务器：
- * - 行文本协议（与 NetworkClient 配套）
- * - 自动分配玩家 ID（p1/p2；超出则 anonX）
- * - 支持客户端用 HELLO:<playerId> 主动声明玩家 ID
- * - 将收到的 KEY:/ACTION: 指令广播给所有已连接客户端
+ * 行文本协议的多人服务器（与 NetworkClient 匹配）：
  *
- * 协议：
- * - 客户端 -> 服务端：
- *   - HELLO:<playerId>
- *   - KEY:PRESS:<KEYCODE> / KEY:RELEASE:<KEYCODE>
- *   - ACTION:<playerId>:<COMMAND>
- * - 服务端 -> 客户端：
- *   - ASSIGN:<playerId>       分配或确认玩家 ID
- *   - 广播 KEY:/ACTION: 行
+ * 协议（每行一条，UTF-8）:
+ * - 客户端 -> 服务器：
+ *   - HELLO:<playerId>                 请求占用玩家身份（例如 p1 / p2）
+ *   - KEY:PRESS:<KEYCODE>              按键按下
+ *   - KEY:RELEASE:<KEYCODE>            按键松开
+ *   - ACTION:<playerId>:<COMMAND>      动作指令（例如 MOVE_LEFT_ON / JUMP / LIGHT_HIT_UP 等）
+ *
+ * - 服务器 -> 客户端：
+ *   - ASSIGN:<playerId>                通知客户端它被分配/确认的 playerId
+ *   - KEY:/ACTION:                     广播其他客户端的输入指令
+ *   - ERROR:<CODE>                     错误（如 ERROR:PLAYER_TAKEN / ERROR:UNKNOWN_CMD）
+ *
+ * 说明：
+ * - 首次连接会自动分配 playerId：优先 p1、p2，之后为 anonN。
+ * - 客户端可发送 HELLO:p1 或 HELLO:p2 来申请/切换身份；若已被占用，返回 ERROR:PLAYER_TAKEN。
+ * - 收到 KEY:/ACTION: 的任意行会原样广播给所有已连接客户端（包含发送者），便于旁观或镜像输入。
+ * - 控制台支持：
+ *   - 输入 /list 查看连接与占位情况
+ *   - 直接输入 KEY:/ACTION: 行可广播（用于人工测试）
  */
 public class GameServer {
 
@@ -30,10 +45,15 @@ public class GameServer {
     private volatile boolean running;
 
     private ServerSocket serverSocket;
+
     private final List<ClientHandler> clients = new CopyOnWriteArrayList<>();
     private final Map<String, ClientHandler> playerMap = new HashMap<>();
     private final Set<String> reserved = new HashSet<>();
     private final AtomicInteger anonCounter = new AtomicInteger(1);
+
+    public GameServer() {
+        this(9000);
+    }
 
     public GameServer(int port) {
         this.port = port;
@@ -43,11 +63,15 @@ public class GameServer {
         if (running) return;
         running = true;
         serverSocket = new ServerSocket(port);
-        System.out.println("[Server] Listening on " + port);
-        new Thread(this::acceptLoop, "GameServer-Accept").start();
+        log("Listening on " + port);
 
-        // 控制台：直接输入一行即广播；/list 查看状态
-        new Thread(this::consoleLoop, "GameServer-Console").start();
+        Thread acceptThread = new Thread(this::acceptLoop, "GameServer-Accept");
+        acceptThread.setDaemon(true);
+        acceptThread.start();
+
+        Thread consoleThread = new Thread(this::consoleLoop, "GameServer-Console");
+        consoleThread.setDaemon(true);
+        consoleThread.start();
 
         Runtime.getRuntime().addShutdownHook(new Thread(this::stop, "GameServer-Stop"));
     }
@@ -55,14 +79,18 @@ public class GameServer {
     public void stop() {
         if (!running) return;
         running = false;
-        try { if (serverSocket != null) serverSocket.close(); } catch (IOException ignored) {}
+        try {
+            if (serverSocket != null && !serverSocket.isClosed()) {
+                serverSocket.close();
+            }
+        } catch (IOException ignored) {}
         for (ClientHandler ch : clients) ch.close();
         clients.clear();
         synchronized (playerMap) {
             playerMap.clear();
             reserved.clear();
         }
-        System.out.println("[Server] Stopped.");
+        log("Stopped.");
     }
 
     private void acceptLoop() {
@@ -74,7 +102,7 @@ public class GameServer {
                 clients.add(ch);
                 new Thread(ch, "GameServer-Client").start();
             } catch (IOException e) {
-                if (running) System.err.println("[Server] accept error: " + e.getMessage());
+                if (running) err("accept error: " + e.getMessage());
             }
         }
     }
@@ -88,6 +116,7 @@ public class GameServer {
                 if ("/list".equalsIgnoreCase(line)) {
                     printStatus();
                 } else {
+                    // 允许从控制台直接广播 KEY:/ACTION: 进行测试
                     broadcast(line);
                 }
             }
@@ -128,6 +157,9 @@ public class GameServer {
         }
     }
 
+    private void log(String s) { System.out.println("[Server] " + s); }
+    private void err(String s) { System.err.println("[Server] " + s); }
+
     private class ClientHandler implements Runnable {
         private final Socket socket;
         private BufferedReader in;
@@ -153,11 +185,11 @@ public class GameServer {
                 in  = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
                 out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8), true);
 
-                // 初次分配
+                // 初次分配 playerId
                 playerId = autoAssign();
                 synchronized (playerMap) { playerMap.put(playerId, this); }
                 send("ASSIGN:" + playerId);
-                System.out.printf("[Server] Connected %s -> %s%n", remote(), playerId);
+                log("Connected " + remote() + " -> " + playerId);
 
                 String line;
                 while ((line = in.readLine()) != null) {
@@ -179,7 +211,7 @@ public class GameServer {
                                     playerMap.put(playerId, this);
                                     reserved.add(playerId);
                                     send("ASSIGN:" + playerId);
-                                    System.out.printf("[Server] %s reassigned to %s%n", remote(), playerId);
+                                    log(remote() + " reassigned to " + playerId);
                                 } else {
                                     send("ERROR:PLAYER_TAKEN");
                                 }
@@ -188,7 +220,7 @@ public class GameServer {
                         continue;
                     }
 
-                    // 只转发 KEY:/ACTION:
+                    // 只转发 KEY:/ACTION: 开头的协议行，其他报错
                     if (line.startsWith("KEY:") || line.startsWith("ACTION:")) {
                         broadcast(line);
                     } else {
@@ -196,7 +228,7 @@ public class GameServer {
                     }
                 }
             } catch (IOException e) {
-                System.out.printf("[Server] Disconnected %s (%s)%n", remote(), playerId);
+                log("Disconnected " + remote() + " (" + playerId + ")");
             } finally {
                 close();
             }
