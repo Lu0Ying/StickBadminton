@@ -41,5 +41,13 @@ public class RoomTitle extends Room{
             rsr.enter();
         });
         addUiObject(button_players, 650, 470);
+
+        UIImageButton button_net = new UIImageButton("button_netplay.png");
+        button_net.setOnAction(e -> {
+            RoomStickmanSelect rsr = new RoomStickmanSelect();
+            this.leave();
+            rsr.enter();
+        });
+        addUiObject(button_net, 650, 540);
     }
 }

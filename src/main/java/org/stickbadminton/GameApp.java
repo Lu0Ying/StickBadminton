@@ -29,12 +29,20 @@ public class GameApp extends GameApplication {
         settings.setTicksPerSecond(60);
     }
 
+    // 字段保存，方便退出时 stop()
+    //private org.stickbadminton.gamecomponent.network.NetworkClient netClient;
     @Override
     protected void initGame() {
         SoundPlay.initSoundPool();
         Room1 room1 = new Room1();
         room1.enter();
         KeyInput.initInput();
+        // KeyInput.initInput(); 之后
+//        org.stickbadminton.gamecomponent.network.NetworkClient client =
+//                new org.stickbadminton.gamecomponent.network.NetworkClient("127.0.0.1", 9000);
+//        client.start();
+//// 绑定身份（可选，抢占 p1 / p2）
+//        client.sendLine("HELLO:p1"); // 第二个客户端可用 HELLO:p2
     }
 
     public static void main(String[] args) {
