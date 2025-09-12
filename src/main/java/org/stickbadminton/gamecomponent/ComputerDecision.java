@@ -128,19 +128,19 @@ public class ComputerDecision {
         }
 
         // 最后决定是否跳跃
-        if(new Random().nextDouble() < 0.2 && getDistance()<(hitAreaRadius+racketRadius) &&
+        if(new Random().nextDouble() < 0.8 && getDistance()<(hitAreaRadius+racketRadius) &&
                 (computerX-GameProperties.netPosition)>150 &&
                 GameProperties.netPosition - opponentX > 100) {
             moveVertical();
         }
         if(badmintonX < GameProperties.netPosition)
         {
-            if(computerX > 675)
+            if(computerX > 725)
             {
                 isMoveLeft = true;
                 isMoveRight = false;
             }
-            else if(computerX < 675)
+            else if(computerX < 725)
             {
                 isMoveRight = true;
                 isMoveLeft = false;
@@ -193,19 +193,20 @@ public class ComputerDecision {
         double ballSpeed = getBallSpeed();
 
         // 最高难度下的智能击球策略
-        if (opponentDistance > 200) {
+        if (opponentDistance > 400 && GameProperties.netPosition - opponentX < 150) {
             // 对手距离较远，优先选择杀球
-            if(computerX - GameProperties.netPosition < 150 || GameProperties.netPosition - opponentX < 100)
-            {
-                moveHorizontal(-hitAreaRadius);
-                highShot();
-            }
-            else if (ballHeight < computerY - GameProperties.hitAreaCenterHeight/2)
+            if (ballHeight < computerY - GameProperties.hitAreaCenterHeight/2)
             {
                 //(hitAreaRadius+2.0/3*racketRadius)*0.866
                 moveHorizontal((hitAreaRadius+2.0/3*racketRadius)*0.866);
                 superShot();
-            } else if (ballSpeed > 800) {
+            }
+            else if(computerX - GameProperties.netPosition < 200)
+            {
+                moveHorizontal(-hitAreaRadius);
+                highShot();
+            }
+            else if (ballSpeed > 800) {
                 // 高速球时选择中场球
                 //hitAreaRadius/1.414
                 moveHorizontal(hitAreaRadius/1.414);
@@ -215,9 +216,9 @@ public class ComputerDecision {
                 moveHorizontal(-hitAreaRadius);
                 highShot();
             }
-        } else if (opponentDistance > 100) {
+        } else if (opponentDistance > 200 && GameProperties.netPosition - opponentX < 150) {
             // 中等距离，根据球速和高度选择策略
-            if(computerX - GameProperties.netPosition < 150|| GameProperties.netPosition - opponentX < 100)
+            if(computerX - GameProperties.netPosition < 200)
             {
                 moveHorizontal(-hitAreaRadius);
                 highShot();
@@ -231,7 +232,7 @@ public class ComputerDecision {
             }
         } else {
             // 对手距离较近，选择高球或快速中场球
-            if(computerX - GameProperties.netPosition < 150|| GameProperties.netPosition - opponentX < 100)
+            if(computerX - GameProperties.netPosition < 200|| GameProperties.netPosition - opponentX < 150)
             {
                 moveHorizontal(-hitAreaRadius);
                 highShot();
@@ -445,8 +446,18 @@ public class ComputerDecision {
      * 中场球 - 轻击
      */
     public void middleShot() {
-        isLighthit = true;
-        isHeavyhit = false;
+        double distance = computerX -  GameProperties.netPosition;
+        if(new Random().nextDouble() < 0.3 && distance > 200)
+        {
+            isLighthit = true;
+            isHeavyhit = false;
+        }
+        else
+        {
+            isHeavyhit = true;
+            isLighthit = false;
+        }
+
     }
     /**
      * 获取球的当前速度大小
