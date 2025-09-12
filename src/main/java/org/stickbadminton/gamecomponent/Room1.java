@@ -12,8 +12,13 @@ public class Room1 extends Room {
         //测试用物体，以后版本移除
         //addObject(new Box());
         //火柴人(未完成)
-        addObject(new StickMan(-1)).setPosition(700, 300);
-        addObject(new StickMan(1)).setPosition(200, 300);
+        GameObject stickmanRight = addObject(new StickMan(-1));
+        stickmanRight.setPosition(700, 300);
+        stickmanRight.setName("stickman_right");
+        ((StickMan)stickmanRight).isAIControlled = true;
+        GameObject stickmanLeft = addObject(new StickMan(1));
+        stickmanLeft.setPosition(200, 300);
+        stickmanLeft.setName("stickman_left");
         //羽毛球(未完成)
         addObject(new Badminton()).setPosition(100, 100);
         //ui按钮
