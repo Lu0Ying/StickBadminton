@@ -1,13 +1,14 @@
 package org.stickbadminton.gamecomponent;
 
-import com.almasb.fxgl.dsl.FXGL;
-import javafx.geometry.Point2D;
 import com.almasb.fxgl.particle.ParticleComponent;
 import com.almasb.fxgl.particle.ParticleEmitter;
 import javafx.scene.image.Image;
 import javafx.scene.input.KeyCode;
 import org.stickbadminton.GameObject;
 import org.stickbadminton.KeyInput;
+import org.stickbadminton.Sprite;
+import org.stickbadminton.UIObject;
+import org.stickbadminton.gamecomponent.GameProperties;
 
 public class Badminton extends GameObject {
     public static int sideServe = 0; // 当前发球人
@@ -16,16 +17,17 @@ public class Badminton extends GameObject {
     public boolean isTouchedGround = false; // 球是否落地
     public boolean isHitted = false;
     public boolean isShotable = true; // 是否能被打出
-    ParticleEmitter emitter;
-    ParticleComponent component;
+    ParticleEmitter emitter = ParticleFX.fire();
+    ParticleComponent particleComponent = new ParticleComponent(emitter);
     public Badminton() {
         super("badminton", new Image("badminton.png"));
         speedY = -100;
         setCenterPosition(10.5, 3);
         setRotation(180);
-        emitter = ParticleFX.fire();
-        component = new ParticleComponent(emitter);
-        entity.addComponent(component);
+
+        emitter.setNumParticles(0);
+        entity.addComponent(particleComponent);
+
     }
 
     public Badminton(int sideServe) {
@@ -33,11 +35,12 @@ public class Badminton extends GameObject {
         speedY = -100;
         setCenterPosition(10.5, 3);
         setRotation(180);
-        emitter = ParticleFX.fire();
-        component = new ParticleComponent(emitter);
-        entity.addComponent(component);
+
         this.sideServe = sideServe;
         setRotation(sideServe == 1 ? 225: -225);
+
+        emitter.setNumParticles(0);
+        entity.addComponent(particleComponent);
     }
 
     @Override
@@ -101,8 +104,8 @@ public class Badminton extends GameObject {
                 && (x + speedX * GameProperties.frameTime >= GameProperties.netPosition - 18 && x <= GameProperties.netPosition - 18
                 || x + speedX * GameProperties.frameTime <= GameProperties.netPosition - 8 && x >= GameProperties.netPosition - 8)) {
             onNetCrashed();   //调用播放触网动画方法
-            if (y < GameProperties.floorBallY - GameProperties.netHeight + 30) {
-                y = GameProperties.floorBallY - GameProperties.netHeight + 27;
+            if (y < GameProperties.floorBallY - GameProperties.netHeight + 25) {
+                y = GameProperties.floorBallY - GameProperties.netHeight + 20;
                 speedY = speedY * 0.1;
                 speedX = speedX * 0.8;
             } else {
@@ -131,51 +134,22 @@ public class Badminton extends GameObject {
             } else
                 rotation = targetRotation * p + rotation * (1 - p);
         }
-        //扣杀火焰附加
-        if(Math.sqrt(Math.pow(speedX,2)+Math.pow(speedY,2))>=1400) {
-            emitter.setNumParticles(20); // 打开发射
-            emitter.setVelocityFunction(i -> {
-                double angle = FXGL.random(-10.0, 10.0);
-                double speed = FXGL.random(100, 250);
-                double dirX = (speedX/Math.sqrt(speedX*speedX+speedY*speedY));
-                double dirY = (speedY/Math.sqrt(speedX*speedX+speedY*speedY));
-                double finalX = dirX * Math.cos(Math.toRadians(angle)) - dirY * Math.sin(Math.toRadians(angle));
-                double finalY = dirX * Math.sin(Math.toRadians(angle)) + dirY * Math.cos(Math.toRadians(angle));
-                return new Point2D(
-                        -speed * finalX,
-                        -speed * finalY
-                );
-            });
-        }
-        else
+        //拖尾粒子发射
+
+        double speed = Math.sqrt(speedX * speedX + speedY * speedY);
+        if (speed > 1000) {
+            emitter.setNumParticles(8);
+        } else if (speed > 400) {
+            emitter.setNumParticles(4);
+        } else {
             emitter.setNumParticles(0);
+        }
+
         //测试代码
         if(KeyInput.isKeyHolding(KeyCode.T))
-            heavyHit(x >=450 ? -135 :-45);
+            heavyHit(x >=450 ? -155 :-25);
         if(KeyInput.isKeyHolding(KeyCode.Y))
             heavyHit(x >=450 ? 165 :15);
-    }
-
-    public void kickOffHeavy() {
-        // 开球..（自由落体）
-        isHitted = true;
-        isFrozen = false;
-        double angle = getCenterX() > GameProperties.netPosition ? -45 : 45;
-        double speed = 1100;
-        speedY = -speed * Math.cos(Math.toRadians(angle));
-        speedX = speed * Math.sin(Math.toRadians(angle));
-        onHit();
-    }
-
-    public void kickOffLight() {
-        // 开球..（自由落体）
-        isHitted = true;
-        isFrozen = false;
-        double angle = getCenterX() > GameProperties.netPosition ? -58 : 58;
-        double speed = 700;
-        speedY = -speed * Math.cos(Math.toRadians(angle));
-        speedX = speed * Math.sin(Math.toRadians(angle));
-        onHit();
     }
 
     public void lightHit(double angle) {
@@ -189,16 +163,17 @@ public class Badminton extends GameObject {
         double speed;
         if (angle < 180) // 扣球
             speed = 1200;
-        else if (getCenterX() >= GameProperties.netPosition - GameProperties.powerDistance
-                && getCenterX() <= GameProperties.netPosition + GameProperties.powerDistance) // 近场
+        else if (getCenterX() >= GameProperties.netPosition - GameProperties.serveLineDistance
+                && getCenterX() <= GameProperties.netPosition + GameProperties.serveLineDistance) // 近场
             speed = 500;
-        else if (getCenterX() <= GameProperties.netPosition - GameProperties.powerDistance * 2
-                || getCenterX() >= GameProperties.netPosition + GameProperties.powerDistance * 2) // 远场
+        else if (getCenterX() <= GameProperties.netPosition - GameProperties.serveLineDistance * 2
+                || getCenterX() >= GameProperties.netPosition + GameProperties.serveLineDistance * 2) // 远场
             speed = 900;
         else
             speed = 700;
         speedY = speed * Math.sin(Math.toRadians(angle));
         speedX = speed * Math.cos(Math.toRadians(angle));
+        emitter.setNumParticles(4);
         onHit();
     }
 
@@ -213,16 +188,18 @@ public class Badminton extends GameObject {
         double speed;
         if (angle < 180) // 扣球
             speed = 2500;
-        else if (getCenterX() >= GameProperties.netPosition - GameProperties.powerDistance
-                && getCenterX() <= GameProperties.netPosition + GameProperties.powerDistance) // 近场
+        else if (getCenterX() >= GameProperties.netPosition - GameProperties.serveLineDistance
+                && getCenterX() <= GameProperties.netPosition + GameProperties.serveLineDistance) // 近场
             speed = 900;
-        else if (getCenterX() <= GameProperties.netPosition - GameProperties.powerDistance * 2
-                || getCenterX() >= GameProperties.netPosition + GameProperties.powerDistance * 2) // 远场
+        else if (getCenterX() <= GameProperties.netPosition - GameProperties.serveLineDistance * 2
+                || getCenterX() >= GameProperties.netPosition + GameProperties.serveLineDistance * 2) // 远场
             speed = 1300;
         else
             speed = 1100;
         speedY = speed * Math.sin(Math.toRadians(angle));
         speedX = speed * Math.cos(Math.toRadians(angle));
+
+        emitter.setNumParticles(4);
         onHit();
     }
 
