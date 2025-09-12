@@ -26,7 +26,7 @@ public class ComputerDecision {
     public double hitAreaRadius;
     public double highShotDistance = 150.0;
     public double defenceOpponentDistance = 100.0;
-
+    public double superShotPoint;
     // superShot 计算出的目标角度（单位：度）。如你的 Badminton 类需要角度，可读取此字段。
     // angle < 180 会被 Badminton 识别为“扣球”，并固定速度为 2500。
     public double superShotAngleDeg = -1.0;
@@ -57,6 +57,7 @@ public class ComputerDecision {
         this.opponentX = opponentX;
         this.opponentY = opponentY;
         this.isJumpCooldown = isJumpCooldown;
+        this.superShotPoint = computerY -30;
 //        if (random.nextDouble() > 0.95*DIFFICULTY_LEVEL)
 //        {
 //            this.racketRadius = GameProperties.racketRadius*(1.0/DIFFICULTY_LEVEL);
@@ -78,8 +79,42 @@ public class ComputerDecision {
                 executeStrategy(side, isShotCooldown);
             }
         }
+        else if(badmintonSpeedX>0&&badmintonY<GameProperties.floorBallY){
+            // 球在对方半场或未飞向我方：进行“无球/回位”站位
+            offBallPositioning(side);
+        }
     }
+    // 新增：无球时的基础站位逻辑（对称处理左右两侧）
+    private void offBallPositioning(int side) {
+        // 右侧半场的回位锚点，原来你的 725
+        final double anchorRight = 675.0;
+        // 左侧半场的回位锚点，镜像一个位置（可按手感调整，比如 175）
+        final double anchorLeft  = 675.0;
 
+        if (side == -1) {
+            // 我在右侧：当球在左侧半场时回到 725 附近
+            if (badmintonX < GameProperties.netPosition) {
+                if (computerX > anchorRight) {
+                    isMoveLeft = true;  isMoveRight = false;
+                } else if (computerX < anchorRight) {
+                    isMoveRight = true; isMoveLeft  = false;
+                } else {
+                    isMoveRight = false; isMoveLeft = false;
+                }
+            }
+        } else if (side == 1) {
+            // 我在左侧：当球在右侧半场时回到 175 附近
+            if (badmintonX > GameProperties.netPosition) {
+                if (computerX > anchorLeft) {
+                    isMoveLeft = true;  isMoveRight = false;
+                } else if (computerX < anchorLeft) {
+                    isMoveRight = true; isMoveLeft  = false;
+                } else {
+                    isMoveRight = false; isMoveLeft = false;
+                }
+            }
+        }
+    }
     /**
      * 预判球的落点
      */
@@ -125,6 +160,7 @@ public class ComputerDecision {
      * 执行AI策略
      */
     private void executeStrategy(int side, boolean isShotCooldown) {
+
         // 首先进行位置调整
         adjustPosition();
 
@@ -134,13 +170,15 @@ public class ComputerDecision {
         }
 
         // 最后决定是否跳跃
-        if(new Random().nextDouble() < 0.8 && getDistance()<(hitAreaRadius+racketRadius) &&
-                (computerX-GameProperties.netPosition)>150 &&
-                GameProperties.netPosition - opponentX > 100) {
+//
+        if (getDistance()<(100+hitAreaRadius+racketRadius)&&
+                (computerX-GameProperties.netPosition)>150 && GameProperties.netPosition - opponentX > 100)
+                {
             moveVertical();
         }
         if(badmintonX < GameProperties.netPosition)
         {
+            System.out.println("move");
             if(computerX > 725)
             {
                 isMoveLeft = true;
@@ -190,64 +228,185 @@ public class ComputerDecision {
     /**
      * 决定击球策略 - 最高难度优化版本
      */
+//    private void decideShotStrategy() {
+//        isShot = true;
+//
+//        // 根据对手位置和球的位置选择击球策略
+//        double opponentDistance = Math.abs(opponentX - computerX);
+//        double ballHeight = badmintonY;
+//        double ballSpeed = getBallSpeed();
+//
+//        // 最高难度下的智能击球策略
+//        if (opponentDistance > 400 && GameProperties.netPosition - opponentX < defenceOpponentDistance) {
+//            // 对手距离较远，优先选择杀球
+//            if (ballHeight < computerY+racketRadius+hitAreaRadius - racketRadius/3)
+//            {
+//                //(hitAreaRadius+2.0/3*racketRadius)*0.866
+//                moveHorizontal((hitAreaRadius+2.0/3*racketRadius)*0.866);
+//                superShot();
+//            }
+//            else if(computerX - GameProperties.netPosition < highShotDistance)
+//            {
+//                moveHorizontal(-hitAreaRadius);
+//                highShot();
+//            }
+//            else if (ballSpeed > 800) {
+//                // 高速球时选择中场球
+//                //hitAreaRadius/1.414
+//                moveHorizontal(hitAreaRadius/1.414);
+//                middleShot();
+//            } else {
+//                // 低速球时选择高球
+//                moveHorizontal(-hitAreaRadius);
+//                highShot();
+//            }
+//        } else if (opponentDistance > 200 && GameProperties.netPosition - opponentX < defenceOpponentDistance) {
+//            // 中等距离，根据球速和高度选择策略
+//            if(computerX - GameProperties.netPosition < highShotDistance)
+//            {
+//                moveHorizontal(-hitAreaRadius);
+//                highShot();
+//            }
+//            else if (ballHeight < computerY+hitAreaRadius) {
+//                moveHorizontal(GameProperties.hitAreaCenterHeight/2);
+//                superShot();
+//            } else {
+//                moveHorizontal(GameProperties.hitAreaCenterHeight/1.5);
+//                middleShot();
+//            }
+//        } else {
+//            // 对手距离较近，选择高球或快速中场球
+//            if(computerX - GameProperties.netPosition < 200|| GameProperties.netPosition - opponentX < defenceOpponentDistance)
+//            {
+//                moveHorizontal(-hitAreaRadius);
+//                highShot();
+//            }
+//            else if (ballSpeed > 600) {
+//                moveHorizontal(GameProperties.hitAreaCenterHeight/1.2);
+//                middleShot();
+//            } else {
+//                moveHorizontal(-GameProperties.hitAreaCenterHeight/1.5);
+//                highShot();
+//            }
+//        }
+//    }
+    /**
+     * 决定击球策略 - 优化版本
+     */
+//    private void decideShotStrategy() {
+//        isShot = true;
+//        // 基础数据
+//        double opponentDistance = Math.abs(opponentX - computerX);
+//        double ballHeight = badmintonY;
+//        double ballSpeed = getBallSpeed();
+//        double idealSmashHeight = computerY - 40; // 理想扣杀高度
+//
+//        // 判断是否适合扣杀的条件
+//        boolean canSmash = ballHeight < idealSmashHeight && // 球在合适的高度
+//                ballHeight > computerY - 80 && // 球不能太低
+//                badmintonSpeedY >= -200 && // 球不能向上飞得太快
+//                getDistance() < (hitAreaRadius + racketRadius) * 0.8; // 距离合适
+//
+//        // 最高难度下的智能击球策略
+//        if (opponentDistance > 400 && GameProperties.netPosition - opponentX < defenceOpponentDistance) {
+//            // 对手距离较远，优先选择杀球
+//            if (canSmash) {
+//                moveHorizontal(30); // 向上移动30像素的击球位置
+//                superShot();
+//            } else if (computerX - GameProperties.netPosition < highShotDistance) {
+//                moveHorizontal(-hitAreaRadius);
+//                highShot();
+//            } else if (ballSpeed > 800) {
+//                moveHorizontal(hitAreaRadius/1.414);
+//                middleShot();
+//            } else {
+//                moveHorizontal(-hitAreaRadius);
+//                highShot();
+//            }
+//        } else if (opponentDistance > 200 && GameProperties.netPosition - opponentX < defenceOpponentDistance) {
+//            // 中等距离，根据球速和高度选择策略
+//            if (computerX - GameProperties.netPosition < highShotDistance) {
+//                moveHorizontal(-hitAreaRadius);
+//                highShot();
+//            } else if (canSmash && opponentDistance > 250) {
+//                moveHorizontal(20); // 稍微向上的击球位置
+//                superShot();
+//            } else {
+//                moveHorizontal(GameProperties.hitAreaCenterHeight/1.5);
+//                middleShot();
+//            }
+//        } else {
+//            // 对手距离较近，选择高球或快速中场球
+//            if (computerX - GameProperties.netPosition < 200 ||
+//                    GameProperties.netPosition - opponentX < defenceOpponentDistance) {
+//                moveHorizontal(-hitAreaRadius);
+//                highShot();
+//            } else if (ballSpeed > 600) {
+//                moveHorizontal(GameProperties.hitAreaCenterHeight/1.2);
+//                middleShot();
+//            } else {
+//                moveHorizontal(-GameProperties.hitAreaCenterHeight/1.5);
+//                highShot();
+//            }
+//        }
+//    }
     private void decideShotStrategy() {
         isShot = true;
 
-        // 根据对手位置和球的位置选择击球策略
+        // 基础数据
         double opponentDistance = Math.abs(opponentX - computerX);
         double ballHeight = badmintonY;
         double ballSpeed = getBallSpeed();
 
-        // 最高难度下的智能击球策略
+        // 放宽的“可扣杀”窗口：
+        // - 高度：在肩部上方一定范围（更宽一些，-120~-20）
+        // - 距离：在击球圈+球拍半径之内（不再乘 0.8）
+        // - 竖直速度：不过快（避免超高速上升/下降）
+        boolean canSmash =
+                ballHeight < (computerY - 20) &&
+                        ballHeight > (computerY - 120) &&
+                        getDistance() < (hitAreaRadius + racketRadius) &&
+                        Math.abs(badmintonSpeedY) < 500;
+
+        // 优先：只要满足扣杀窗口，直接 superShot，不再被对手距离分支卡住
+        if (canSmash) {
+            // 轻微微调站位，提高命中
+            moveHorizontal(-superShotPoint);
+            System.out.println("superShot (direct) | ballY=" + badmintonY
+                    + " compY=" + computerY
+                    + " dist=" + getDistance()
+                    + " vy=" + badmintonSpeedY);
+            superShot();
+            return;
+        }
+
+        // 下面保留原有分支做战术补充（当不满足扣杀窗口时）
         if (opponentDistance > 400 && GameProperties.netPosition - opponentX < defenceOpponentDistance) {
-            // 对手距离较远，优先选择杀球
-            if (ballHeight < computerY+racketRadius+hitAreaRadius - racketRadius/3)
-            {
-                //(hitAreaRadius+2.0/3*racketRadius)*0.866
-                moveHorizontal((hitAreaRadius+2.0/3*racketRadius)*0.866);
-                superShot();
-            }
-            else if(computerX - GameProperties.netPosition < highShotDistance)
-            {
-                moveHorizontal(-hitAreaRadius);
-                highShot();
-            }
-            else if (ballSpeed > 800) {
-                // 高速球时选择中场球
-                //hitAreaRadius/1.414
-                moveHorizontal(hitAreaRadius/1.414);
+            if (ballSpeed > 800) {
+                moveHorizontal(hitAreaRadius / 1.414);
                 middleShot();
             } else {
-                // 低速球时选择高球
                 moveHorizontal(-hitAreaRadius);
                 highShot();
             }
         } else if (opponentDistance > 200 && GameProperties.netPosition - opponentX < defenceOpponentDistance) {
-            // 中等距离，根据球速和高度选择策略
-            if(computerX - GameProperties.netPosition < highShotDistance)
-            {
+            if (computerX - GameProperties.netPosition < highShotDistance) {
                 moveHorizontal(-hitAreaRadius);
                 highShot();
-            }
-            else if (ballHeight < computerY+hitAreaRadius) {
-                moveHorizontal(GameProperties.hitAreaCenterHeight/2);
-                superShot();
             } else {
-                moveHorizontal(GameProperties.hitAreaCenterHeight/1.5);
+                moveHorizontal(GameProperties.hitAreaCenterHeight / 1.5);
                 middleShot();
             }
         } else {
-            // 对手距离较近，选择高球或快速中场球
-            if(computerX - GameProperties.netPosition < 200|| GameProperties.netPosition - opponentX < defenceOpponentDistance)
-            {
+            if (computerX - GameProperties.netPosition < 200 ||
+                    GameProperties.netPosition - opponentX < defenceOpponentDistance) {
                 moveHorizontal(-hitAreaRadius);
                 highShot();
-            }
-            else if (ballSpeed > 600) {
-                moveHorizontal(GameProperties.hitAreaCenterHeight/1.2);
+            } else if (ballSpeed > 600) {
+                moveHorizontal(GameProperties.hitAreaCenterHeight / 1.2);
                 middleShot();
             } else {
-                moveHorizontal(-GameProperties.hitAreaCenterHeight/1.5);
+                moveHorizontal(-GameProperties.hitAreaCenterHeight / 1.5);
                 highShot();
             }
         }
@@ -364,7 +523,7 @@ public class ComputerDecision {
         // 4. 计算球到达球网的时间
         double timeToNet = calculateTimeToNet(netX, currentX, vx, vy);
 
-        // 5. 智能跳跃决策
+        //5. 智能跳跃决策
         if (shouldJump(timeToNet, currentX, vy)) {
             isJump = true;
         }
@@ -411,7 +570,7 @@ public class ComputerDecision {
      */
     private boolean shouldJump(double timeToNet, double currentX, double vy) {
         // 基础跳跃条件
-        boolean basicJumpCondition = timeToNet > 0.2 && timeToNet < 0.5; // 0.2-0.5秒窗口
+        boolean basicJumpCondition = timeToNet > 0.2 ; // 0.2-0.5秒窗口
 
         // 高度条件
         double idealHitY = computerY - GameProperties.hitAreaCenterHeight / 1.5;
@@ -421,8 +580,8 @@ public class ComputerDecision {
         boolean aggressiveJump = (opponentX < 150 && random.nextDouble() < 0.8 * DIFFICULTY_LEVEL);
 
         // 防守性跳跃 - 当球已经过网且高度合适时
-        boolean defensiveJump = (currentX > GameProperties.netPosition &&
-                badmintonY < computerY - 100 && vy > 0);
+        boolean defensiveJump = ((currentX - GameProperties.netPosition > 250) &&
+                badmintonY < computerY - 150 && vy > 0);
 
         // 根据难度调整跳跃概率 - 最高难度下几乎不会失误
         double jumpProbability = DIFFICULTY_LEVEL;
@@ -432,7 +591,9 @@ public class ComputerDecision {
 
         return (basicJumpCondition && heightCondition) || aggressiveJump || defensiveJump;
     }
-
+    /**
+     * 判断是否应该进行进攻性跳跃
+     */
     /**
      * 杀球 - 重击（重写）
      * 说明：
@@ -445,123 +606,220 @@ public class ComputerDecision {
      * - 这里仅计算"角度"并写入 superShotAngleDeg。
      * - 你的 Badminton 类里会在 angle < 180 时把合速度固定为 2500，并据此计算分量。
      */
+    // 重写并简化：仅在 badmintonY 接近 superShotPoint（按一帧内允许误差）时才触发扣杀，
+// 不再强求擦网，只需把球打到对方半场即可。
     public void superShot() {
-        // 标记这是一次"重击型"出球
-        isHeavyhit = true;
-        isShot = true;
-
-        // 读取基本数据
-        final double g = GameProperties.badmintonGravity; // y 向下为正
-        final double x0 = badmintonX;
-        final double y0 = badmintonY;
-        final double xNet = GameProperties.netPosition;
-        final double netY = GameProperties.floorBallY - GameProperties.netHeight + 20; // 球网判定的 Y 坐标
-        final double clearance = 10.0;                          // 过网裕量
-        final double netYSafe = netY - clearance;
-        final double s = 2500.0;                                // 扣球固定合速度（angle < 180）
-
-        // 目标落点（对方半场接近地面）
-        final double targetYOffset = 6.0;                       // 落地与地面距离
-        final double yTargetBase = GameProperties.floorBallY - targetYOffset;
-
-        // 确定对方半场的目标X坐标
-        double targetX;
-        if (computerX < xNet) {
-            // AI在左侧，目标是右侧半场
-            if (opponentX > xNet + 150) {
-                // 对手在右后场，打近网
-                targetX = xNet + 80 + random.nextDouble() * 70;
-            } else {
-                // 对手在前场，打后场
-                targetX = GameProperties.playFieldRight - 100 + random.nextDouble() * 50;
-            }
-        } else {
-            // AI在右侧，目标是左侧半场
-            if (opponentX < xNet - 150) {
-                // 对手在左后场，打近网
-                targetX = xNet - 80 - random.nextDouble() * 70;
-            } else {
-                // 对手在前场，打后场
-                targetX = GameProperties.playFieldLeft + 100 - random.nextDouble() * 50;
-            }
+        // 只在球下落阶段考虑扣杀
+        if (badmintonSpeedY <= 0) {
+            return;
         }
 
-        // 计算水平和垂直距离
-        double deltaX = targetX - x0;
-        double deltaY = yTargetBase - y0;
+        // 计算跳跃最高点的高度
+        double jumpHeight = (GameProperties.jumpSpeedY * GameProperties.jumpSpeedY) / (2 * GameProperties.jumpGravity);
+        double superShotPoint = computerY - jumpHeight;
 
-        // 使用物理公式计算最优角度
-        // 考虑空气阻力的简化处理：使用稍大的发射角度来补偿
-        double angle = calculateOptimalAngle(deltaX, deltaY, s, g);
+        // 计算球到达superShotPoint所需时间（考虑空气阻力）
+        double timeToHitPoint = calculateTimeToReachYWithAirResistance(superShotPoint);
 
-        // 确保角度在合理范围内（10度到80度之间的扣球角度）
-        angle = Math.max(10, Math.min(80, angle));
+        // 计算球员跳到最高点所需时间
+        double timeToJumpPeak = GameProperties.jumpSpeedY / GameProperties.jumpGravity;
 
-        // 根据战术需要微调角度
-        if (Math.abs(opponentX - targetX) < 100) {
-            // 对手距离目标较近，增加角度使球更陡峭
-            angle += 5 + random.nextDouble() * 10;
+        // 如果球到达时间与跳跃时间匹配，则触发扣杀和跳跃
+        if (timeToHitPoint >= 0 && Math.abs(timeToHitPoint - timeToJumpPeak) < 0.1) {
+            System.out.println("superShot triggered at Y=" + superShotPoint +
+                    " (currentY=" + badmintonY + ", timeToHit=" + timeToHitPoint + ")");
+            isHeavyhit = true;
+            isLighthit = false;
+            isShot = true;
+            isJump = true; // 设置跳跃标志
+
+            // 计算扣杀角度和目标落点
+            calculateSuperShotAngle();
         }
-
-        // 添加一点随机性，避免过于机械化
-        angle += (random.nextDouble() - 0.5) * 5;
-
-        // 最终角度限制在扣球范围内（小于180度）
-        angle = Math.max(5, Math.min(175, angle));
-
-        // 保存计算出的角度
-        superShotAngleDeg = angle;
     }
 
     /**
-     * 计算最优发射角度
-     * @param deltaX 水平距离
-     * @param deltaY 垂直距离（向下为正）
-     * @param speed 发射速度
-     * @param gravity 重力加速度
-     * @return 最优角度（度）
+     * 计算球到达指定Y坐标所需的时间（秒），考虑空气阻力
+     * 使用更精确的数值积分方法
      */
-    private double calculateOptimalAngle(double deltaX, double deltaY, double speed, double gravity) {
-        // 使用抛物运动公式计算理论角度
-        double v2 = speed * speed;
-        double gx = Math.abs(deltaX);
-
-        // 计算判别式
-        double discriminant = v2 * v2 - gravity * (gravity * gx * gx + 2 * deltaY * v2);
-
-        if (discriminant < 0) {
-            // 无解情况，使用45度作为默认角度
-            return 45.0;
+    private double calculateTimeToReachYWithAirResistance(double targetY) {
+        if (Math.abs(badmintonY - targetY) < 1.0) {
+            return 0; // 已经非常接近目标高度
         }
 
-        // 计算两个可能的角度
-        double sqrt_discriminant = Math.sqrt(discriminant);
-        double tan_theta1 = (v2 + sqrt_discriminant) / (gravity * gx);
-        double tan_theta2 = (v2 - sqrt_discriminant) / (gravity * gx);
+        // 基本运动参数
+        double g = GameProperties.badmintonGravity;
+        double vx = badmintonSpeedX;
+        double vy = badmintonSpeedY;
+        double currentY = badmintonY;
+        double dt = GameProperties.frameTime / 10.0; // 使用更小的步长提高精度
 
-        double angle1 = Math.toDegrees(Math.atan(tan_theta1));
-        double angle2 = Math.toDegrees(Math.atan(tan_theta2));
+        // 模拟球的运动，直到达到目标高度
+        double timeElapsed = 0;
+        int maxSteps = 2000; // 防止无限循环
 
-        // 选择较小的角度（更平的轨迹，适合扣球）
-        double selectedAngle = Math.min(angle1, angle2);
+        while ((currentY < targetY && vy > 0) || (currentY > targetY && vy < 0)) {
+            if (timeElapsed > 5.0 || maxSteps-- <= 0) {
+                return -1; // 超时或步数过多，无法到达目标高度
+            }
 
-        // 如果计算角度过小或过大，使用经验值
-        if (selectedAngle < 10 || selectedAngle > 80) {
-            // 根据距离选择合适的角度
-            if (Math.abs(deltaX) < 200) {
-                return 25 + random.nextDouble() * 10; // 近距离陡一点
-            } else {
-                return 35 + random.nextDouble() * 15; // 远距离平一点
+            // 计算空气阻力
+            double speed = Math.sqrt(vx * vx + vy * vy);
+            double airResistance = 0.00001 * (speed * speed);
+
+            // 计算加速度分量
+            double ax = -2.7 * airResistance * (vx / Math.max(speed, 0.001)); // 避免除以零
+            double ay = g - 0.5 * airResistance * (vy / Math.max(speed, 0.001));
+
+            // 更新速度
+            vx += ax * dt;
+            vy += ay * dt;
+
+            // 更新位置
+            currentY += vy * dt;
+
+            // 更新时间
+            timeElapsed += dt;
+
+            // 检查是否达到目标高度
+            if (Math.abs(currentY - targetY) < 1.0) {
+                return timeElapsed;
             }
         }
 
-        return selectedAngle;
+        return -1; // 无法到达目标高度
+    }
+
+    /**
+     * 计算超级扣杀的角度，考虑空气阻力
+     */
+    private void calculateSuperShotAngle() {
+        final double x0 = badmintonX;
+        final double y0 = badmintonY;
+        final double xNet = GameProperties.netPosition;
+        final double s = 2500.0; // 扣杀速度
+
+        // 确定对方半场范围
+        double halfLeft, halfRight;
+        if (computerX < xNet) { // 我在左半场，目标右半场
+            halfLeft = xNet + GameProperties.playerWidth;
+            halfRight = GameProperties.playFieldRight - 40;
+        } else { // 我在右半场，目标左半场
+            halfLeft = GameProperties.playFieldLeft + 40;
+            halfRight = xNet - GameProperties.playerWidth;
+        }
+
+        // 选择远离对手的落点
+        double mid = 0.5 * (halfLeft + halfRight);
+        double targetX = (opponentX < mid) ? (halfRight - 20) : (halfLeft + 20);
+        double yTarget = GameProperties.floorBallY - 6.0;
+
+        // 计算角度，考虑空气阻力
+        double angle = calculateOptimalAngleWithAirResistance(x0, y0, targetX, yTarget, s);
+
+        // 限制角度范围
+        angle = Math.max(15.0, Math.min(55.0, angle));
+
+        // 保存角度
+        superShotAngleDeg = angle;
+
+        System.out.println("Super shot angle: " + angle + " degrees, targetX: " + targetX);
+    }
+
+    /**
+     * 计算最优发射角度，考虑空气阻力
+     * 使用更精确的二分法寻找最佳角度
+     */
+    private double calculateOptimalAngleWithAirResistance(double x0, double y0, double targetX, double targetY, double initialSpeed) {
+        double bestAngle = 45.0; // 默认角度
+        double minDistance = Double.MAX_VALUE;
+
+        // 测试多个角度，使用更精细的步长
+        for (double angle = 15.0; angle <= 55.0; angle += 1.0) {
+            // 模拟球的轨迹
+            double[] landingPoint = simulateTrajectory(x0, y0, angle, initialSpeed);
+            double distance = Math.abs(landingPoint[0] - targetX);
+
+            // 更新最佳角度
+            if (distance < minDistance) {
+                minDistance = distance;
+                bestAngle = angle;
+            }
+        }
+
+        // 在最佳角度附近进行更精细的搜索
+        double fineTunedAngle = bestAngle;
+        double fineTunedMinDistance = minDistance;
+
+        for (double angle = bestAngle - 2.0; angle <= bestAngle + 2.0; angle += 0.5) {
+            if (angle < 15.0 || angle > 55.0) continue;
+
+            double[] landingPoint = simulateTrajectory(x0, y0, angle, initialSpeed);
+            double distance = Math.abs(landingPoint[0] - targetX);
+
+            if (distance < fineTunedMinDistance) {
+                fineTunedMinDistance = distance;
+                fineTunedAngle = angle;
+            }
+        }
+
+        return fineTunedAngle;
+    }
+
+    /**
+     * 模拟球的轨迹，考虑空气阻力
+     * 使用更精确的模拟方法
+     */
+    private double[] simulateTrajectory(double startX, double startY, double angle, double initialSpeed) {
+        double g = GameProperties.badmintonGravity;
+        double dt = GameProperties.frameTime / 5.0; // 使用更小的步长提高精度
+
+        // 初始速度分量
+        double vx = initialSpeed * Math.cos(Math.toRadians(angle));
+        double vy = initialSpeed * Math.sin(Math.toRadians(angle));
+
+        // 初始位置
+        double x = startX;
+        double y = startY;
+
+        int maxSteps = 2000;
+        int steps = 0;
+
+        // 模拟直到球落地或超出最大步数
+        while (y < GameProperties.floorBallY && steps < maxSteps) {
+            // 计算空气阻力
+            double speed = Math.sqrt(vx * vx + vy * vy);
+            double airResistance = 0.00001 * (speed * speed);
+
+            // 计算加速度分量
+            double ax = -2.7 * airResistance * (vx / Math.max(speed, 0.001)); // 避免除以零
+            double ay = g - 0.5 * airResistance * (vy / Math.max(speed, 0.001));
+
+            // 更新速度
+            vx += ax * dt;
+            vy += ay * dt;
+
+            // 更新位置
+            x += vx * dt;
+            y += vy * dt;
+
+            steps++;
+
+            // 检查是否过网
+            if (Math.abs(x - GameProperties.netPosition) < 10 && y > GameProperties.floorBallY - GameProperties.netHeight) {
+                // 如果球会触网，调整角度
+                return new double[]{x, y};
+            }
+        }
+
+        return new double[]{x, y};
     }
 
     /**
      * 高球 - 轻击
      */
     public void highShot() {
+        System.out.println("highShot");
         isLighthit = true;
         isHeavyhit = false;
     }
@@ -570,6 +828,7 @@ public class ComputerDecision {
      * 中场球 - 轻击
      */
     public void middleShot() {
+        System.out.println("middleShot");
         double distance = computerX -  GameProperties.netPosition;
         if(new Random().nextDouble() < 0.3 && distance > 200)
         {
