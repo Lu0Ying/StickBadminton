@@ -238,7 +238,7 @@ public class StickMan extends GameObject {
                                 if (Math.pow(badminton.getX() - racketX, 2) + Math.pow(badminton.getY() - racketY, 2)
                                         <= Math.pow(GameProperties.racketRadius, 2)) {
                                     double ballAngle = nowAngle + (side == sideRight ?  - 90 - 30 : 90 + 30);
-                                    if (side == sideRight && nowAngle > 90 && nowAngle < 300)
+                                    if (side == sideRight && nowAngle > 260 && nowAngle < 300)
                                         ballAngle = 300;
                                     if (side == sideLeft && nowAngle > 240)
                                         ballAngle = 240;
