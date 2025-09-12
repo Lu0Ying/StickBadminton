@@ -290,10 +290,10 @@ public class StickMan extends GameObject {
 
     @Override
     public void deactivate() {
-        super.deactivate();
         bodyIdle.deactivate();
         bodyMoving.deactivate();
         rightHand.deactivate();
         leftHandIdle.deactivate();
+        super.deactivate();
     }
 }

@@ -121,4 +121,11 @@ public class Room {
         }
         return result;
     }
+
+    public void refresh() {
+        for (GameObject o : objects) {
+            if (o.isActive == false)
+                objects.remove(o);
+        }
+    }
 }

@@ -164,12 +164,11 @@ public class NetAnimation extends GameObject {
     //禁用网对象
     @Override
     public void deactivate() {
-        // 禁用父对象
-        super.deactivate();
         // 禁用静态网
         netStatic.deactivate();
         // 禁用动画网
         netAnimation.deactivate();
+        super.deactivate();
     }
 
     //设置可见性

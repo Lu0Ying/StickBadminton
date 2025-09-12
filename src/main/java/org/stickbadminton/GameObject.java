@@ -98,6 +98,7 @@ public class GameObject {
     public void deactivate() {
         FXGL.getGameWorld().removeEntity(entity);
         isActive = false;
+        inRoom.removeObjectFromList(this);
     }
 }
 
