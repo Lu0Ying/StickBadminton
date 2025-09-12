@@ -17,10 +17,13 @@ public class GameProperties {
     public static final double playerHeight = 72.0;
     // 地板的 y 坐标，人物站立在地板上，羽毛球碰到地板则丢分
     public static final double floorY = 550.0;
+    public static final double floorBallY = 565.0;
     // 球网的位置 (x 坐标)
     public static final double netPosition = 450.0;
     // 球网高
     public static final double netHeight = 120.0;
+    // 发球线到球网的距离
+    public static final double serveLineDistance = 50.0;
     // 击球时，判定区域为以肩膀为圆心的圆环区域的两段（上方击球分一段扇形，下方捞球分一段扇形）
     // 肩膀（圆心）到火柴人脚的高度
     public static final double hitAreaCenterHeight = 56.0;
@@ -41,9 +44,9 @@ public class GameProperties {
     // 跳跃冷却时间（单位：秒）
     public static final double jumpCooldown = 0.67;
     // 人物跳跃的初速度
-    public static final double jumpSpeedY = 600.0;
+    public static final double jumpSpeedY = 700.0;
     // 人物在跳跃过程中受到的重力
-    public static final double jumpGravity = 30.0;
+    public static final double jumpGravity = 35.0;
     // 羽毛球重力
     public static final double badmintonGravity = 13.0;
     // 人物移动速度

@@ -14,7 +14,7 @@ public class StickMan extends GameObject {
     private GameObject bodyMoving;
     private GameObject rightHand;
     private GameObject leftHandIdle;
-    private int side; // 1->Right -1->Left
+    private int side; // 1->（画面左侧）朝向右边; -1->（画面右侧）朝向左边
     public static final int sideLeft = -1;
     public static final int sideRight = 1;
     int getSide() { return side; }
@@ -198,6 +198,10 @@ public class StickMan extends GameObject {
                         nowAngle = nowAngle + 45;
                         if (side == -1)
                             nowAngle = 180 - nowAngle;
+                        while (nowAngle < 0)
+                            nowAngle += 360;
+                        while (nowAngle > 360)
+                            nowAngle -= 360;
                         GameObject badmintonObj = inRoom.getObject("badminton");
                         if (badmintonObj != null) {
                             Badminton badminton = (Badminton) badmintonObj;
@@ -207,10 +211,25 @@ public class StickMan extends GameObject {
                             if (Math.pow(badminton.getX() - racketX, 2) + Math.pow(badminton.getY() - racketY, 2)
                                     <= Math.pow(GameProperties.racketRadius, 2)) {
                                 // 判定为打到球
+                                double hitAngle = nowAngle;
+                                if (side == sideRight) {
+                                    hitAngle += 90;
+                                    if (hitAngle > 360)
+                                        hitAngle -= 360;
+                                    if (hitAngle > 340 && getCenterY() > GameProperties.floorY - GameProperties.netHeight - 60)
+                                        hitAngle = 340;
+                                }
+                                else {
+                                    hitAngle -= 90;
+                                    if (hitAngle < 0)
+                                        hitAngle += 360;
+                                    if (hitAngle > 180 && hitAngle < 200 && getCenterY() > GameProperties.floorY - GameProperties.netHeight - 60)
+                                        hitAngle = 200;
+                                }
                                 if (isHeavyShot)
-                                    badminton.heavyHit(nowAngle + (side == sideRight ? 90 - 20 : -90 + 20));
+                                    badminton.heavyHit(hitAngle);
                                 else
-                                    badminton.lightHit(nowAngle + (side == sideRight ? 90 - 20 : -90 + 20));
+                                    badminton.lightHit(hitAngle);
                                 hasShotted = true;
                             }
                         }
@@ -237,15 +256,29 @@ public class StickMan extends GameObject {
                                         + Math.sin(Math.toRadians(nowAngle)) * GameProperties.hitAreaRadius;
                                 if (Math.pow(badminton.getX() - racketX, 2) + Math.pow(badminton.getY() - racketY, 2)
                                         <= Math.pow(GameProperties.racketRadius, 2)) {
-                                    double ballAngle = nowAngle + (side == sideRight ?  - 90 - 30 : 90 + 30);
-                                    if (side == sideRight && nowAngle > 260 && nowAngle < 300)
-                                        ballAngle = 300;
-                                    if (side == sideLeft && nowAngle > 240)
-                                        ballAngle = 240;
+                                    double hitAngle = nowAngle;
+                                    if (side == sideRight) {
+                                        hitAngle -= 90;
+                                        if (hitAngle < 0)
+                                            hitAngle += 360;
+                                        if (hitAngle < 90 || hitAngle > 330)
+                                            hitAngle = 330;
+                                        else if (hitAngle < 290)
+                                            hitAngle = 290;
+                                    }
+                                    else {
+                                        hitAngle += 90;
+                                        if (hitAngle > 360)
+                                            hitAngle -= 360;
+                                        if (hitAngle < 210)
+                                            hitAngle = 210;
+                                        else if (hitAngle > 250)
+                                            hitAngle = 250;
+                                    }
                                     if (isHeavyShot)
-                                        badminton.heavyHit(ballAngle);
+                                        badminton.heavyHit(hitAngle);
                                     else
-                                        badminton.lightHit(ballAngle);
+                                        badminton.lightHit(hitAngle);
                                     hasShotted = true;
                                 }
                             }
@@ -267,7 +300,7 @@ public class StickMan extends GameObject {
             GameObject badminton = inRoom.getObject("badminton");
             if (badminton != null) {
                 if ((badminton.getCenterX() - 450) * side < 0 // 轮到本方击球
-                        && badminton.getCenterY() > getCenterY())
+                        && badminton.getCenterY() > getCenterY() - 30)
                     shotType = shotTypeDown;
                 else
                     shotType = shotTypeUp;

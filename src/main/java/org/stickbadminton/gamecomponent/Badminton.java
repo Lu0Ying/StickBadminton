@@ -40,14 +40,14 @@ public class Badminton extends GameObject {
         //落地判断
         double centerX = getCenterX();
         double centerY = getCenterY();
-        if(y+ speedY * GameProperties.frameTime >=GameProperties.floorY) {
+        if(y+ speedY * GameProperties.frameTime >=GameProperties.floorBallY) {
             isTouchedGround = true;
             onHitGround();
         }
         else
             isTouchedGround = false;
         if(isTouchedGround) {
-            y=GameProperties.floorY;
+            y=GameProperties.floorBallY;
             if(speedY>=400) {
                 speedY = -(speedY * 0.4);
                 speedX*=0.3;
@@ -76,12 +76,12 @@ public class Badminton extends GameObject {
             speedX = -speedX * 0.6;
         }
         //触网判断
-        if(y + speedY * GameProperties.frameTime>= GameProperties.floorY-GameProperties.netHeight+20
+        if(y + speedY * GameProperties.frameTime>= GameProperties.floorBallY-GameProperties.netHeight+20
                 && (x+ speedX * GameProperties.frameTime >=GameProperties.netPosition-18 && x<= GameProperties.netPosition-18
                 || x+speedX * GameProperties.frameTime <= GameProperties.netPosition-8 && x>= GameProperties.netPosition-8)) {
             onNetCrashed();   //调用播放触网动画方法
-            if(y< GameProperties.floorY-GameProperties.netHeight+30) {
-                y=GameProperties.floorY-GameProperties.netHeight+27;
+            if(y< GameProperties.floorBallY-GameProperties.netHeight+30) {
+                y=GameProperties.floorBallY-GameProperties.netHeight+27;
                 speedY = speedY * 0.1;
                 speedX = speedX * 0.8;
             }
@@ -129,8 +129,8 @@ public class Badminton extends GameObject {
         // 开球..（自由落体）
         isHitted = true;
         isFrozen = false;
-        double angle = x > 450 ? -45 : 45;
-        double speed = 900;
+        double angle = getCenterX() > GameProperties.netPosition ? -45 : 45;
+        double speed = 1100;
         speedY = -speed * Math.cos(Math.toRadians(angle));
         speedX = speed * Math.sin(Math.toRadians(angle));
         onHit();
@@ -139,7 +139,7 @@ public class Badminton extends GameObject {
         // 开球..（自由落体）
         isHitted = true;
         isFrozen = false;
-        double angle = x > 450 ? -58 : 58;
+        double angle = getCenterX() > GameProperties.netPosition ? -58 : 58;
         double speed = 700;
         speedY = -speed * Math.cos(Math.toRadians(angle));
         speedX = speed * Math.sin(Math.toRadians(angle));
@@ -148,14 +148,22 @@ public class Badminton extends GameObject {
     public void lightHit(double angle) {
         // angle: 击打角度
         // 被击打（力度小)
+        while (angle < 0)
+            angle += 360;
+        while (angle > 360)
+            angle -= 360;
         isHitted = true;
         double speed;
-        if(Math.sin(Math.toRadians(angle))>0.2)
+        if(angle < 180) // 扣球
             speed = 1200;
-        else if(getCenterX()>=350 && getCenterX()<=550)
-            speed= 300;
+        else if(getCenterX()>=GameProperties.netPosition - GameProperties.serveLineDistance
+                && getCenterX()<=GameProperties.netPosition + GameProperties.serveLineDistance) // 近场
+            speed = 500;
+        else if (getCenterX() <= GameProperties.netPosition - GameProperties.serveLineDistance * 2
+                || getCenterX() >= GameProperties.netPosition + GameProperties.serveLineDistance * 2) // 远场
+            speed = 900;
         else
-            speed= 500;
+            speed = 700;
         speedY = speed * Math.sin(Math.toRadians(angle));
         speedX = speed * Math.cos(Math.toRadians(angle));
         onHit();
@@ -164,14 +172,22 @@ public class Badminton extends GameObject {
     public void heavyHit(double angle) {
         // angle: 击打角度
         // 被击打（力度大）
+        while (angle < 0)
+            angle += 360;
+        while (angle > 360)
+            angle -= 360;
         isHitted = true;
         double speed;
-        if(Math.sin(Math.toRadians(angle))>0.2)
-            speed= 2500;
-        else if(getCenterX()>=320 && getCenterX()<=680)
-            speed= 700;
+        if(angle < 180) // 扣球
+            speed = 2500;
+        else if(getCenterX()>=GameProperties.netPosition - GameProperties.serveLineDistance
+                && getCenterX()<=GameProperties.netPosition + GameProperties.serveLineDistance) // 近场
+            speed = 900;
+        else if (getCenterX() <= GameProperties.netPosition - GameProperties.serveLineDistance * 2
+                || getCenterX() >= GameProperties.netPosition + GameProperties.serveLineDistance * 2) // 远场
+            speed = 1300;
         else
-            speed= 900;
+            speed = 1100;
         speedY = speed * Math.sin(Math.toRadians(angle));
         speedX = speed * Math.cos(Math.toRadians(angle));
         onHit();
