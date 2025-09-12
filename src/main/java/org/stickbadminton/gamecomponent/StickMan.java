@@ -6,7 +6,6 @@ import javafx.scene.input.KeyCode;
 import javafx.util.Duration;
 import org.stickbadminton.GameObject;
 import org.stickbadminton.KeyInput;
-import org.stickbadminton.SoundPlay;
 
 public class StickMan extends GameObject {
     public int characterType = 0; // 1 ~ 5

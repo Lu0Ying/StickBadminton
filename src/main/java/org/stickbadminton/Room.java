@@ -13,6 +13,8 @@ public class Room {
     private List<UIObject> uiObjects = new ArrayList<>();
     private List<Pair<Node, Pair<Integer, Integer>>> uiNodes =  new ArrayList<>();
     private boolean isActive = false;
+    private boolean isClearing;
+    public boolean isClearing() { return isClearing; }
 
     public Room() {}
 
@@ -87,9 +89,11 @@ public class Room {
     }
 
     public void leave() {
+        isClearing = true;
         objects.forEach(o -> o.deactivate());
-        isActive = false;
         uiNodes.forEach( pack -> FXGL.removeUINode(pack.getKey()));
+        isActive = false;
+        isClearing = false;
     }
 
     @Nullable
