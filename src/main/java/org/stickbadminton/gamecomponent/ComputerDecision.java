@@ -34,8 +34,8 @@ public class ComputerDecision {
     // AI难度和反应时间控制
     private static final double REACTION_TIME_MIN = 0.05; // 最小反应时间（秒）
     private static final double REACTION_TIME_MAX = 0.1; // 最大反应时间（秒）
-    private static final double DIFFICULTY_LEVEL = 1.0; // 难度等级 0.0-1.0 (最高难度)
-
+    // 难度等级 0.0-1.0 (最高难度)
+    private static double DIFFICULTY_LEVEL;
     // 预判和策略相关
     private double predictedLandingX;
     private double predictedLandingY;
@@ -48,6 +48,7 @@ public class ComputerDecision {
                             double opponentX, double opponentY)
     {
         // 初始化基本信息
+        this.DIFFICULTY_LEVEL = GameProperties.difficultyLevel;
         this.badmintonSpeedX = badmintonSpeedX;
         this.badmintonSpeedY = badmintonSpeedY;
         this.badmintonX = badmintonX;
@@ -58,11 +59,11 @@ public class ComputerDecision {
         this.opponentY = opponentY;
         this.isJumpCooldown = isJumpCooldown;
         this.superShotPoint = computerY -30;
-//        if (random.nextDouble() > 0.95*DIFFICULTY_LEVEL)
-//        {
-//            this.racketRadius = GameProperties.racketRadius*(1.0/DIFFICULTY_LEVEL);
-//            this.hitAreaRadius = GameProperties.hitAreaRadius*(1.0/DIFFICULTY_LEVEL);
-//        }
+        if (random.nextDouble() > 0.95*DIFFICULTY_LEVEL)
+        {
+            this.racketRadius = GameProperties.racketRadius*(1.0/DIFFICULTY_LEVEL);
+            this.hitAreaRadius = GameProperties.hitAreaRadius*(1.0/DIFFICULTY_LEVEL);
+        }
         this.racketRadius = GameProperties.racketRadius;
         this.hitAreaRadius = GameProperties.hitAreaRadius;
         // 预判球的落点
@@ -93,7 +94,7 @@ public class ComputerDecision {
 
         if (side == -1) {
             // 我在右侧：当球在左侧半场时回到 725 附近
-            if (badmintonX < GameProperties.netPosition && badmintonSpeedX<0) {
+            if (badmintonX < GameProperties.netPosition&&badmintonX>GameProperties.netPosition-50) {
                 if (computerX > anchorRight) {
                     isMoveLeft = true;  isMoveRight = false;
                 } else if (computerX < anchorRight) {
@@ -171,7 +172,8 @@ public class ComputerDecision {
 
         // 最后决定是否跳跃
         if (getDistance()<(100+hitAreaRadius+racketRadius)&&
-                (GameProperties.netPosition - opponentX > 100))
+                (GameProperties.netPosition - opponentX > 100)
+        && Math.abs(computerX-badmintonX)<100)
                 {
             moveVertical();
         }
