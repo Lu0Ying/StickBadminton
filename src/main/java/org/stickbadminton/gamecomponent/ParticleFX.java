@@ -16,22 +16,9 @@ public class ParticleFX {
 
         ParticleEmitter emitter = ParticleEmitters.newSmokeEmitter();
         emitter.setNumParticles(0);
-        emitter.setExpireFunction(i -> Duration.seconds(FXGL.random(1, 2)));
-        emitter.setSize(1,2);
-        emitter.setVelocityFunction(i -> {
-            // 给一个随机方向（-15° ~ 15° 偏移）保证尾焰不会太死板
-            double angle = FXGL.random(85.0, 95.0);
-            double speed = FXGL.random(100, 250);
-            return new Point2D(
-                     speed * Math.cos(Math.toRadians(angle)),
-                    speed * Math.sin(Math.toRadians(angle))-140
-            );
-        });
         emitter.setSpawnPointFunction(i -> {
             return new Point2D(7, 0);
         });
-        emitter.setEndColor(Color.color(0.96, 0.9, 0.1, 0.4+Math.random()*0.18+Math.random()*0.32));
-        emitter.setStartColor(Color.color(0.96, 0.9, 0.01, 0.1+Math.random()*0.35+Math.random()*0.15));
         emitter.setBlendMode(BlendMode.ADD);
         return emitter;
     }
@@ -49,5 +36,46 @@ public class ParticleFX {
         }
         component = new ParticleComponent(emitter);
         object.getEntity().addComponent(component);
+    }
+    public static void updataFire(ParticleEmitter emitter,double speedX, double speedY) {
+        double speed = Math.sqrt(speedX * speedX + speedY * speedY);
+        if (speed > 300) {
+            emitter.setVelocityFunction(i -> {
+                double dirX = -speedX / speed;
+                double dirY = -speedY / speed;
+                double randomAngle = FXGL.random(-15.0, 15.0);
+                double cos = Math.cos(Math.toRadians(randomAngle));
+                double sin = Math.sin(Math.toRadians(randomAngle));
+                double finalX = dirX * cos - dirY * sin;
+                double finalY = dirX * sin + dirY * cos;
+                double FireSpeed = FXGL.random(100, 250);
+                return new Point2D(finalX * FireSpeed, finalY * FireSpeed);
+            });
+        }
+        if (speed>1400)
+        {
+            emitter.setSize(6,9);
+            emitter.setExpireFunction(i -> Duration.seconds(FXGL.random(0.4, 0.6)));
+            emitter.setNumParticles(40);
+            emitter.setEndColor(Color.color(0.5, 0.03,0.03, 0.9));
+        }
+        else if (speed > 1000) {
+            emitter.setSize(2,3);
+            emitter.setExpireFunction(i -> Duration.seconds(FXGL.random(0.5, 0.8)));
+            emitter.setNumParticles(20);
+            emitter.setEndColor(Color.color(0.96, 0.1+Math.random()*0.5, 0.02, Math.random()*0.7));
+            emitter.setStartColor(Color.color(0.96, 0.1+Math.random()*0.5, 0.02, Math.random()*0.7));
+        } else if (speed > 300) {
+            emitter.setSize(2,3);
+            emitter.setExpireFunction(i -> Duration.seconds(FXGL.random(0.5, 0.8)));
+            emitter.setNumParticles(4);
+            emitter.setEndColor(Color.color(0.96, 0.1+Math.random()*0.5, 0.02, Math.random()*0.7));
+            emitter.setStartColor(Color.color(0.96, 0.1+Math.random()*0.5, 0.02, Math.random()*0.7));
+        } else {
+            emitter.setNumParticles(0);
+        }
+    }
+    public static void closeParticle(ParticleEmitter emitter) {
+        emitter.setNumParticles(0);
     }
 }
