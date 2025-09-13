@@ -29,9 +29,9 @@ public class RoomStickmanSelect extends Room{
         addUiObject(startButton, 380, 480);
         startButton.setOnAction(e->{
             if(team1!=0&&team2!=0) {
-                Room1 room1 = new Room1();
+                RoomGameplay roomGameplay = new RoomGameplay();
                 this.leave();
-                room1.enter();
+                roomGameplay.enter();
             }
         });
         UIImageButton undoButton=new UIImageButton("button_undo.png");

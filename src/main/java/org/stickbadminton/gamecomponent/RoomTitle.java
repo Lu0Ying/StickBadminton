@@ -28,6 +28,7 @@ public class RoomTitle extends Room{
         //900x600 布局
         UIImageButton button_start = new UIImageButton("button_titlestart.png");
         button_start.setOnAction(e -> {
+            GameProperties.matchMode = 1;
             RoomStickmanSelect rsr = new RoomStickmanSelect();
             this.leave();
             rsr.enter();
@@ -36,6 +37,7 @@ public class RoomTitle extends Room{
 
         UIImageButton button_players = new UIImageButton("button_2player.png");
         button_players.setOnAction(e -> {
+            GameProperties.matchMode = 2;
             RoomStickmanSelect rsr = new RoomStickmanSelect();
             this.leave();
             rsr.enter();
