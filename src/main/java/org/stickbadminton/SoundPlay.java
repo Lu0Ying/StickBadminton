@@ -17,10 +17,14 @@ public class SoundPlay {
     // 初始化音频池
     public static void initSoundPool() {
         // 加载所有资源
-        loadSound("title_bgm.mp3");
+        loadSound("add_score.mp3");
+        loadSound("button_select.mp3");
+        loadSound("cheer.mp3");
         loadSound("ingame_bgm.mp3");
-        loadSound("guncock.mp3");
+        loadSound("shot_light.mp3");
+        loadSound("shot_heavy.mp3");
         loadSound("sigh.mp3");
+        loadSound("title_bgm.mp3");
     }
 
     private static void loadSound(String sourceUrl) {
@@ -96,14 +100,9 @@ public class SoundPlay {
                 soundPlayer=new MediaPlayer(media);
                soundCache.put(sourceUrl,soundPlayer);
             }
+            soundPlayer.stop();
             soundPlayer.setVolume(Math.max(0,Math.min(1,volume)));
             soundPlayer.play();
-            MediaPlayer finalSoundPlayer = soundPlayer;
-            soundPlayer.setOnEndOfMedia(() -> {
-                finalSoundPlayer.seek(Duration.ZERO);  // 重置音效回到开始
-                finalSoundPlayer.stop();  // 停止播放
-                // No need to remove from cache since it will be reused
-            });
         }catch (MalformedURLException e){
             System.err.println("无效的音频文件路径:"+e.getMessage());
         }

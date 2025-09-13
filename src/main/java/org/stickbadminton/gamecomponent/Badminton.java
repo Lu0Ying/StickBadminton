@@ -9,6 +9,7 @@ import org.stickbadminton.GameObject;
 import org.stickbadminton.KeyInput;
 import org.stickbadminton.Sprite;
 import org.stickbadminton.UIObject;
+import org.stickbadminton.*;
 import org.stickbadminton.gamecomponent.GameProperties;
 
 public class Badminton extends GameObject {
@@ -155,6 +156,7 @@ public class Badminton extends GameObject {
     public void lightHit(double angle) {
         // angle: 击打角度
         // 被击打（力度小)
+        SoundPlay.playSound("shot_light.mp3", 0.4);
         while (angle < 0)
             angle += 360;
         while (angle > 360)
@@ -180,6 +182,7 @@ public class Badminton extends GameObject {
     public void heavyHit(double angle) {
         // angle: 击打角度
         // 被击打（力度大）
+        SoundPlay.playSound("shot_heavy.mp3", 1.0);
         while (angle < 0)
             angle += 360;
         while (angle > 360)
