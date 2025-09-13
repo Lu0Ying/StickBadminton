@@ -54,11 +54,11 @@ public class MatchController extends GameObject{
             }
         }
     }
-    
+
     public void resetBall() {
         if (inRoom.getObject("badminton") != null)
             inRoom.removeObject(inRoom.getObject("badminton"));
-        inRoom.addObject(new Badminton(serveSide)).setPosition(-100, -100);
+        inRoom.addObject(new Badminton(serveSide)).setPosition(450 - 200 * serveSide, 700);
     }
 
     private void showGameResult(String winner) {
@@ -94,7 +94,7 @@ public class MatchController extends GameObject{
                 if (serveSide == StickMan.sideLeft) {
                     StickMan stickmanRight = (StickMan) inRoom.getObject("stickman_right");
                     if (stickmanRight.isShotting)
-                        scoreChangeTimer = 0.01;
+                        scoreChangeTimer = 0.04;
                     else {
                         scoreChangeTimer = 0.0;
                         stickmanRight.isReadyingServe = true;
@@ -104,7 +104,7 @@ public class MatchController extends GameObject{
                 else {
                     StickMan stickmanLeft = (StickMan) inRoom.getObject("stickman_left");
                     if (stickmanLeft.isShotting)
-                        scoreChangeTimer = 0.01;
+                        scoreChangeTimer = 0.04;
                     else {
                         scoreChangeTimer = 0.0;
                         stickmanLeft.isReadyingServe = true;
