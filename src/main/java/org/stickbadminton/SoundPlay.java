@@ -20,6 +20,7 @@ public class SoundPlay {
         loadSound("add_score.mp3");
         loadSound("button_select.mp3");
         loadSound("cheer.mp3");
+        loadSound("fire.mp3");
         loadSound("ingame_bgm.mp3");
         loadSound("shot_light.mp3");
         loadSound("shot_heavy.mp3");
@@ -103,6 +104,21 @@ public class SoundPlay {
             soundPlayer.stop();
             soundPlayer.setVolume(Math.max(0,Math.min(1,volume)));
             soundPlayer.play();
+        }catch (MalformedURLException e){
+            System.err.println("无效的音频文件路径:"+e.getMessage());
+        }
+    }
+
+    public static void stopSound(String sourceUrl) {
+        try {
+            MediaPlayer soundPlayer=soundCache.get(sourceUrl);
+            if(soundPlayer==null){
+                // 如果音效没有预加载，则动态加载
+                Media media = new Media(new File(getAbsolutePath(sourceUrl)).toURI().toURL().toString());
+                soundPlayer=new MediaPlayer(media);
+                soundCache.put(sourceUrl,soundPlayer);
+            }
+            soundPlayer.stop();
         }catch (MalformedURLException e){
             System.err.println("无效的音频文件路径:"+e.getMessage());
         }
