@@ -24,14 +24,14 @@ public class ParticleFX {
             double speed = FXGL.random(100, 250);
             return new Point2D(
                      speed * Math.cos(Math.toRadians(angle)),
-                    speed * Math.sin(Math.toRadians(angle))
+                    speed * Math.sin(Math.toRadians(angle))-140
             );
         });
         emitter.setSpawnPointFunction(i -> {
             return new Point2D(7, 0);
         });
-        emitter.setEndColor(Color.color(0.96, 0.9, 0.1, 0.9));
-        emitter.setStartColor(Color.color(0.96, 0.9, 0.01, 0.6));
+        emitter.setEndColor(Color.color(0.96, 0.9, 0.1, 0.4+Math.random()*0.18+Math.random()*0.32));
+        emitter.setStartColor(Color.color(0.96, 0.9, 0.01, 0.1+Math.random()*0.35+Math.random()*0.15));
         emitter.setBlendMode(BlendMode.ADD);
         return emitter;
     }
@@ -44,7 +44,7 @@ public class ParticleFX {
                 break;
             default:
                 emitter = ParticleEmitters.newFireEmitter();
-                emitter.setNumParticles(0); // 默认不发射
+                emitter.setNumParticles(0);
                 break;
         }
         component = new ParticleComponent(emitter);
