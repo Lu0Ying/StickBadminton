@@ -139,7 +139,7 @@ public class Badminton extends GameObject {
         double speed = Math.sqrt(speedX * speedX + speedY * speedY);
         if (speed > 1000) {
             emitter.setNumParticles(8);
-        } else if (speed > 400) {
+        } else if (speed > 300) {
             emitter.setNumParticles(4);
         } else {
             emitter.setNumParticles(0);
