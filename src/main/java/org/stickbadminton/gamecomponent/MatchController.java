@@ -2,6 +2,7 @@ package org.stickbadminton.gamecomponent;
 
 import javafx.scene.image.Image;
 import org.stickbadminton.GameObject;
+import org.stickbadminton.SoundPlay;
 import org.stickbadminton.UIObject;
 
 
@@ -11,6 +12,7 @@ public class MatchController extends GameObject{
     private int lastPointWinner = 0; // -1 -> 右侧, 1 -> 左侧
     private boolean isServeReadying = false; // 是否处于发球阶段
     public int serveSide = 1; // -1 -> 右侧发球, 1 -> 左侧发球
+    private double playBGMTimer = 0.0;
     public MatchController() {
         super("controller", new Image("stickman_head1.png"));
         setVisible(false);
@@ -18,12 +20,14 @@ public class MatchController extends GameObject{
     public void matchStart() {
         ballHitGroundTimer = 0.0;
         scoreChangeTimer = 0.01;
+        playBGMTimer = 0.0;
     }
     public void onBallGroundHit(int winner) {
         ballHitGroundTimer = 1.0;
         lastPointWinner = winner;
     }
     public void changeScore() {
+        SoundPlay.playSound("add_score.mp3", 1.0);
         if (lastPointWinner == -1) {
             UIObject scoreRight = inRoom.getUiObject("score_right");
             if (scoreRight instanceof UIDigitView) {
@@ -48,6 +52,8 @@ public class MatchController extends GameObject{
 
             if (leftView.getCurrentNumber() >= 9 || rightView.getCurrentNumber() >= 9) {
                 // 游戏结束，显示结果
+                SoundPlay.stopBackgroundMusic();
+                SoundPlay.playSound("cheer.mp3", 1.0);
                 showGameResult(leftView.getCurrentNumber() >= 9 ? "Player1" : "Player2");
                 deactivate();
                 return;
@@ -113,12 +119,11 @@ public class MatchController extends GameObject{
                 }
             }
         }
-        else if (isServeReadying) {
-            if (serveSide == 1) { // 左侧人物发球
-
-            }
-            else { // 右侧人物发球
-
+        if (playBGMTimer <= 1.5) {
+            playBGMTimer += GameProperties.frameTime;
+            if (playBGMTimer > 1.5) {
+                SoundPlay.setBackgroundMusic("ingame_bgm.mp3");
+                SoundPlay.playBackgroundMusic();
             }
         }
     }

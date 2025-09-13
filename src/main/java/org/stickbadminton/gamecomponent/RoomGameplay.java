@@ -4,9 +4,11 @@ import javafx.scene.control.Button;
 import javafx.scene.image.Image;
 import org.stickbadminton.GameObject;
 import org.stickbadminton.Room;
+import org.stickbadminton.SoundPlay;
 
 public class RoomGameplay extends Room {
     public RoomGameplay() {
+        SoundPlay.stopBackgroundMusic();
         //背景
         addObject(new GameObject("background", new Image("ingame_background.png")));
         //控制器

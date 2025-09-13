@@ -8,14 +8,19 @@ import javafx.util.Duration;
 import org.stickbadminton.GameObject;
 import org.stickbadminton.Room;
 import javafx.scene.image.ImageView;
+import org.stickbadminton.SoundPlay;
 import org.stickbadminton.SwitchRoomEffect;
 
 public class RoomTitle extends Room{
     public RoomTitle() {
+        SoundPlay.setBackgroundMusic("title_bgm.mp3");
+        SoundPlay.playBackgroundMusic();
+
         addObject(new GameObject("title_background", new Image("title_background.png")));
 
         UIImageButton button_start = new UIImageButton("button_titlestart.png");
         button_start.setOnAction(e -> {
+            SoundPlay.playSound("button_select.mp3", 100);
             GameProperties.matchMode = 1;
             RoomStickmanSelect rsr = new RoomStickmanSelect();
             new SwitchRoomEffect(this, rsr);
@@ -24,6 +29,7 @@ public class RoomTitle extends Room{
 
         UIImageButton button_players = new UIImageButton("button_2player.png");
         button_players.setOnAction(e -> {
+            SoundPlay.playSound("button_select.mp3", 100);
             GameProperties.matchMode = 2;
             RoomStickmanSelect rsr = new RoomStickmanSelect();
             new SwitchRoomEffect(this, rsr);

@@ -8,6 +8,7 @@ import javafx.scene.control.Button;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.Background;
+import org.stickbadminton.SoundPlay;
 import org.stickbadminton.UIObject;
 
 public class UIImageButton extends UIObject {
@@ -41,7 +42,5 @@ public class UIImageButton extends UIObject {
         button.setOnMouseExited(e -> iv.setImage(imgNormal));
     }
 
-    public void setOnAction(EventHandler<ActionEvent> eventHandler) {
-        button.setOnAction(eventHandler);
-    }
+    public void setOnAction(EventHandler<ActionEvent> eventHandler) {button.setOnAction(eventHandler);}
 }
