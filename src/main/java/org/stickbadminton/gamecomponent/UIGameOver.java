@@ -6,6 +6,7 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import org.stickbadminton.Room;
+import org.stickbadminton.SwitchRoomEffect;
 import org.stickbadminton.UIObject;
 
 public class UIGameOver extends UIObject {
@@ -37,18 +38,17 @@ public class UIGameOver extends UIObject {
         // 重新开始当前房间
         if (getParentRoom() != null) {
             Room currentRoom = getParentRoom();
-            currentRoom.leave();
             RoomGameplay newRoom = new RoomGameplay();
-            newRoom.enter();
+            new SwitchRoomEffect(currentRoom, newRoom);
         }
     }
 
     private void onMainMenu() {
         // 返回主菜单
         if (getParentRoom() != null) {
-            getParentRoom().leave();
-            RoomTitle roomtitle = new RoomTitle();
-            roomtitle.enter();
+            Room currentRoom = getParentRoom();
+            RoomTitle roomTitle = new RoomTitle();
+            new SwitchRoomEffect(currentRoom, roomTitle);
         }
     }
 

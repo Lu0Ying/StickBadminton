@@ -9,6 +9,7 @@ module org.example.stickbadminton {
     requires javafx.graphics;
     requires javafx.base;
     requires java.desktop;
+    requires com.almasb.fxgl.entity;
 
     opens org.stickbadminton to javafx.fxml;
     exports org.stickbadminton;

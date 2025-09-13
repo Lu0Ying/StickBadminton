@@ -4,6 +4,7 @@ import com.almasb.fxgl.particle.ParticleComponent;
 import com.almasb.fxgl.particle.ParticleEmitter;
 import javafx.scene.image.Image;
 import javafx.scene.input.KeyCode;
+import javafx.scene.paint.Color;
 import org.stickbadminton.GameObject;
 import org.stickbadminton.KeyInput;
 import org.stickbadminton.Sprite;
@@ -16,6 +17,7 @@ public class Badminton extends GameObject {
     public boolean isFrozen = true; // 待发球状态时为 false，开球后能够自由移动，设为 true
     public boolean isTouchedGround = false; // 球是否落地
     public boolean isHitted = false;
+    public int TouchedTime = 11;  //触墙或者触网后经过的时间，小于10的时候关闭拖尾
     public boolean isShotable = true; // 是否能被打出
     ParticleEmitter emitter = ParticleFX.fire();
     ParticleComponent particleComponent = new ParticleComponent(emitter);
@@ -54,7 +56,12 @@ public class Badminton extends GameObject {
                 StickMan stickManLeft = (StickMan) inRoom.getObject("stickman_left");
                 setPositionWithCenter(stickManLeft.getX() + 21, stickManLeft.getY() + 30);
             }
-            if (((sideServe == StickMan.sideRight) && (KeyInput.isKeyHolding(KeyCode.Q) || KeyInput.isKeyHolding(KeyCode.E)))
+            if (sideServe == StickMan.sideLeft && GameProperties.matchMode == 1) {
+                isFrozen = false;
+                speedX = 250 * sideServe;
+                speedY = 300;
+            }
+            else if (((sideServe == StickMan.sideRight) && (KeyInput.isKeyHolding(KeyCode.Q) || KeyInput.isKeyHolding(KeyCode.E)))
                     || ((sideServe == StickMan.sideLeft) && (KeyInput.isKeyHolding(KeyCode.U) || KeyInput.isKeyHolding(KeyCode.O)))) {
                 isFrozen = false;
                 speedX = 250 * sideServe;
@@ -96,6 +103,7 @@ public class Badminton extends GameObject {
         }
         //触墙判断
         if (x + speedX * GameProperties.frameTime <= GameProperties.playFieldLeft || x + speedX * GameProperties.frameTime >= GameProperties.playFieldRight) {
+            TouchedTime = 0;
             x = Math.pow(x - GameProperties.playFieldLeft, 2) < Math.pow(x - GameProperties.playFieldRight, 2) ? GameProperties.playFieldLeft : GameProperties.playFieldRight;
             speedX = -speedX * 0.6;
         }
@@ -103,6 +111,7 @@ public class Badminton extends GameObject {
         if (y + speedY * GameProperties.frameTime >= GameProperties.floorBallY - GameProperties.netHeight + 20
                 && (x + speedX * GameProperties.frameTime >= GameProperties.netPosition - 18 && x <= GameProperties.netPosition - 18
                 || x + speedX * GameProperties.frameTime <= GameProperties.netPosition - 8 && x >= GameProperties.netPosition - 8)) {
+            TouchedTime = 0;
             onNetCrashed();   //调用播放触网动画方法
             if (y < GameProperties.floorBallY - GameProperties.netHeight + 25) {
                 y = GameProperties.floorBallY - GameProperties.netHeight + 20;
@@ -135,21 +144,12 @@ public class Badminton extends GameObject {
                 rotation = targetRotation * p + rotation * (1 - p);
         }
         //拖尾粒子发射
-
-        double speed = Math.sqrt(speedX * speedX + speedY * speedY);
-        if (speed > 1000) {
-            emitter.setNumParticles(8);
-        } else if (speed > 300) {
-            emitter.setNumParticles(4);
-        } else {
-            emitter.setNumParticles(0);
+        if(TouchedTime>10)
+            ParticleFX.updataFire(emitter, speedX, speedY);
+        else {
+            ParticleFX.closeParticle(emitter);
+            TouchedTime++;
         }
-
-        //测试代码
-        if(KeyInput.isKeyHolding(KeyCode.T))
-            heavyHit(x >=450 ? -155 :-25);
-        if(KeyInput.isKeyHolding(KeyCode.Y))
-            heavyHit(x >=450 ? 165 :15);
     }
 
     public void lightHit(double angle) {

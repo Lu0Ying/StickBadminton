@@ -12,43 +12,24 @@ public class RoomGameplay extends Room {
         //控制器
         MatchController matchController = new MatchController();
         addObject(matchController);
-        //测试用物体，以后版本移除
-        //addObject(new Box());
+
         //火柴人
         GameObject stickmanRight = addObject(new StickMan(-1, GameProperties.characterType2));
         stickmanRight.setPosition(700, GameProperties.floorY - GameProperties.playerHeight - 11);
         stickmanRight.setName("stickman_right");
-        //((StickMan)stickmanRight).isAIControlled = true;
+        if (GameProperties.matchMode == 1)
+            ((StickMan)stickmanRight).isAIControlled = true; // 单人游戏模式下，连接电脑
+
         GameObject stickmanLeft = addObject(new StickMan(1, GameProperties.characterType1));
         stickmanLeft.setPosition(200, GameProperties.floorY - GameProperties.playerHeight - 11);
         stickmanLeft.setName("stickman_left");
-        //ui按钮
-        UIImageButton button1 = new UIImageButton("button_titlestart.png");
-        button1.setOnAction(e -> {
-            Room2 room2 = new Room2();
-            this.leave();
-            room2.enter();
-        });
-        addUiObject(button1, 300, 100);
-        //测试黄色按钮
 
         //显示数字，电子显像管风格
-
         UIDigitView digitView = new UIDigitView(0);
         addUiObject(digitView, 390, 21).setName("score_left");
         UIDigitView digitView2 = new UIDigitView(0);
         addUiObject(digitView2, 484, 21).setName("score_right");
-        /*
-         *（测试用）
-         */
-        //添加点击加一的按钮
-        Button incrementButton = new Button("数字+1");
-        incrementButton.setOnAction(e -> digitView.setCurrentNumber((digitView.getCurrentNumber() + 1)%10));
-        addUiNode(incrementButton, 300, 80);
-        //添加重置按钮
-        Button reloadButton = new Button("重置");
-        reloadButton.setOnAction(e -> digitView.setCurrentNumber(0));
-        addUiNode(reloadButton, 300, 100);
+
 
         //添加触网
         NetAnimation net = new NetAnimation();
