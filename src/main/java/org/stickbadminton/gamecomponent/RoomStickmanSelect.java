@@ -63,10 +63,12 @@ public class RoomStickmanSelect extends Room{
         // 根据当前队伍添加到对应列表
         if (isTeam1Selecting) {
             team1=characterId;
+            GameProperties.characterType1 = characterId;
             isTeam1Selecting=false;
             updatePlayerViews();
         } else if (team2 == 0){
             team2=characterId;
+            GameProperties.characterType2 = characterId;
             updatePlayerViews();
         }
     }
