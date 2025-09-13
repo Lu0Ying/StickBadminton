@@ -54,7 +54,12 @@ public class Badminton extends GameObject {
                 StickMan stickManLeft = (StickMan) inRoom.getObject("stickman_left");
                 setPositionWithCenter(stickManLeft.getX() + 21, stickManLeft.getY() + 30);
             }
-            if (((sideServe == StickMan.sideRight) && (KeyInput.isKeyHolding(KeyCode.Q) || KeyInput.isKeyHolding(KeyCode.E)))
+            if (sideServe == StickMan.sideLeft && GameProperties.matchMode == 1) {
+                isFrozen = false;
+                speedX = 250 * sideServe;
+                speedY = 300;
+            }
+            else if (((sideServe == StickMan.sideRight) && (KeyInput.isKeyHolding(KeyCode.Q) || KeyInput.isKeyHolding(KeyCode.E)))
                     || ((sideServe == StickMan.sideLeft) && (KeyInput.isKeyHolding(KeyCode.U) || KeyInput.isKeyHolding(KeyCode.O)))) {
                 isFrozen = false;
                 speedX = 250 * sideServe;
