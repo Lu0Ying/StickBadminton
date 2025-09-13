@@ -38,7 +38,7 @@ public class UIGameOver extends UIObject {
         if (getParentRoom() != null) {
             Room currentRoom = getParentRoom();
             currentRoom.leave();
-            Room1 newRoom = new Room1();
+            RoomGameplay newRoom = new RoomGameplay();
             newRoom.enter();
         }
     }

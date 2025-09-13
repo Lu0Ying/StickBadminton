@@ -57,8 +57,8 @@ public class GameProperties {
     // 以下为变量
 
     // 双方人物类型
-    public static int characterType1 = 0;
-    public static int characterType2 = 0;
+    public static int characterType1 = 1;
+    public static int characterType2 = 1;
     // 单人模式(1) 还是双人模式(2)
-    public static int matchMode = 0;
+    public static int matchMode = 2;
 }
