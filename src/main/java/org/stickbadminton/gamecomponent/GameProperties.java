@@ -55,7 +55,8 @@ public class GameProperties {
     public static final double moveSpeed = 250.0;
 
     // 以下为变量
-
+    // 人机难度
+    public static double difficultyLevel;
     // 双方人物类型
     public static int characterType1 = 1;
     public static int characterType2 = 1;
