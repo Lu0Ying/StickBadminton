@@ -3,6 +3,7 @@ package org.stickbadminton.gamecomponent;
 import javafx.scene.image.Image;
 import org.stickbadminton.GameObject;
 import org.stickbadminton.Room;
+import org.stickbadminton.SwitchRoomEffect;
 
 public class RoomStickmanSelect extends Room{
     private int team1;
@@ -30,8 +31,7 @@ public class RoomStickmanSelect extends Room{
         startButton.setOnAction(e->{
             if(team1!=0&&team2!=0) {
                 RoomGameplay roomGameplay = new RoomGameplay();
-                this.leave();
-                roomGameplay.enter();
+                new SwitchRoomEffect(this, roomGameplay);
             }
         });
         UIImageButton undoButton=new UIImageButton("button_undo.png");

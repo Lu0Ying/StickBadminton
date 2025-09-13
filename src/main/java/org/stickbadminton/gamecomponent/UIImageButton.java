@@ -24,7 +24,6 @@ public class UIImageButton extends UIObject {
         //鼠标悬停时图片样式
         StringBuffer sb = new StringBuffer(sourceUrl);
         sb.insert(sb.length() - 4, "_hover");
-        System.out.println(sb);
         Image imgHover = new Image(sb.toString());
         //默认常态
         ImageView iv = new ImageView(imgNormal);
