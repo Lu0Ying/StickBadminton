@@ -14,6 +14,7 @@ public class StickMan extends GameObject {
     private GameObject bodyMoving;
     private GameObject rightHand;
     private GameObject leftHandIdle;
+    private GameObject decoration;
     private int side; // 1->（画面左侧）朝向右边; -1->（画面右侧）朝向左边
     public static final int sideLeft = -1;
     public static final int sideRight = 1;
@@ -29,10 +30,9 @@ public class StickMan extends GameObject {
     public static final boolean shotTypeUp = false;
     public static final boolean shotTypeDown = true;
     private double shotCooldownTimer = 0;
-    public boolean isReadyingKickOff = false;
-    private double kickedOffTimer = 0;
+    public boolean isReadyingServe = false;
 
-    public StickMan(int side) {
+    public StickMan(int side, int characterType) {
         super("stickman1", new Image("stickman_head1.png")); //head
         this.side = side;
 
@@ -48,6 +48,30 @@ public class StickMan extends GameObject {
 
         leftHandIdle = new GameObject("left_hand", new Image("stickman_lefthand_idle.png"));
         leftHandIdle.setCenterPosition(1, 1);
+
+        this.characterType = characterType;
+        decoration = new GameObject("decoration", new Image("stickman_decoration" + characterType + ".png"));
+        decoration.getEntity().setScaleOrigin(new Point2D(52, 0));
+    }
+
+    @Override
+    public void activate() {
+        super.activate();
+        bodyIdle.activate();
+        bodyMoving.activate();
+        rightHand.activate();
+        leftHandIdle.activate();
+        decoration.activate();
+    }
+
+    @Override
+    public void deactivate() {
+        bodyIdle.deactivate();
+        bodyMoving.deactivate();
+        rightHand.deactivate();
+        leftHandIdle.deactivate();
+        decoration.deactivate();
+        super.deactivate();
     }
 
     private void bindBodyPart() { //显示层面
@@ -57,6 +81,8 @@ public class StickMan extends GameObject {
             rightHand.getEntity().setScaleX(-1);
             leftHandIdle.getEntity().setScaleX(-1);
             bodyMoving.getEntity().setScaleX(-1);
+            decoration.getEntity().setScaleX(-0.66);
+            decoration.getEntity().setScaleY(0.66);
         }
         else {
             this.entity.setScaleX(1);
@@ -64,6 +90,8 @@ public class StickMan extends GameObject {
             rightHand.getEntity().setScaleX(1);
             leftHandIdle.getEntity().setScaleX(1);
             bodyMoving.getEntity().setScaleX(1);
+            decoration.getEntity().setScaleX(0.66);
+            decoration.getEntity().setScaleY(0.66);
         }
 
         bodyIdle.setX(x - 2 - 6 * side);
@@ -74,12 +102,14 @@ public class StickMan extends GameObject {
         bodyMoving.setY(y + 20);
         bodyMoving.speedX = speedX;
         bodyMoving.speedY = speedY;
+        decoration.setX(x - 42 - 2 * side);
+        decoration.setY(y - 22);
+        decoration.speedX = speedX;
+        decoration.speedY = speedY;
 
         rightHand.setX(x + 9 - 3 * side);
         rightHand.setY(y + 25);
-        if (isReadyingKickOff)
-            rightHand.setRotation(90 * side);
-        else if (isShotting) {
+        if (isShotting) {
             if (shotType == shotTypeUp) { // 上方击球
                 double deltaT = GameProperties.shotCooldown - shotCooldownTimer;
                 double targetAngle = 180 + 45 + GameProperties.hitAreaAngleUp;
@@ -195,6 +225,19 @@ public class StickMan extends GameObject {
             }
         }
 
+        if (isReadyingServe) {
+            if (side == 1 && x + speedX * GameProperties.frameTime
+                    >= GameProperties.netPosition - GameProperties.serveLineDistance - GameProperties.playerWidth/2 - spriteCenterX) { // 左半场
+                x = GameProperties.netPosition - GameProperties.serveLineDistance - GameProperties.playerWidth/2 - spriteCenterX;
+                speedX = 0;
+            }
+            else if (side == -1 && x + speedX * GameProperties.frameTime
+                    <= GameProperties.netPosition + GameProperties.serveLineDistance - 10 + GameProperties.playerWidth/2 - spriteCenterX){ // 右半场
+                x = GameProperties.netPosition + GameProperties.serveLineDistance - 10 + GameProperties.playerWidth/2 - spriteCenterX;
+                speedX = 0;
+            }
+        }
+
         // 竖直移动相关
         if (isJumping) {
             jumpCooldownTimer -= GameProperties.frameTime;
@@ -202,6 +245,10 @@ public class StickMan extends GameObject {
                 isJumping = false;
                 jumpCooldownTimer = 0;
             }
+        }
+        else if (isReadyingServe) {
+            // 发球时禁用跳跃
+            // do nothing
         }
         else if (isAIControlled) {
             if (decision.isJump == true) {
@@ -230,7 +277,7 @@ public class StickMan extends GameObject {
                 isShotting = false;
                 shotCooldownTimer = 0;
             }
-            else if (hasShotted == false){
+            else if (hasShotted == false && badminton.isShotable){
                 if (shotType == shotTypeUp) { // 上方击球
                     double deltaT = GameProperties.shotCooldown - shotCooldownTimer;
                     if (deltaT < GameProperties.shotAnimationTime)
@@ -271,6 +318,7 @@ public class StickMan extends GameObject {
                                 else
                                     badminton.lightHit(hitAngle);
                                 hasShotted = true;
+                                isReadyingServe = false;
                             }
                         }
                     }
@@ -299,8 +347,8 @@ public class StickMan extends GameObject {
                                         hitAngle -= 90;
                                         if (hitAngle < 0)
                                             hitAngle += 360;
-                                        if (hitAngle < 90 || hitAngle > 330)
-                                            hitAngle = 330;
+                                        if (hitAngle < 90 || hitAngle > 320)
+                                            hitAngle = 320;
                                         else if (hitAngle < 290)
                                             hitAngle = 290;
                                     }
@@ -308,8 +356,8 @@ public class StickMan extends GameObject {
                                         hitAngle += 90;
                                         if (hitAngle > 360)
                                             hitAngle -= 360;
-                                        if (hitAngle < 210)
-                                            hitAngle = 210;
+                                        if (hitAngle < 220)
+                                            hitAngle = 220;
                                         else if (hitAngle > 250)
                                             hitAngle = 250;
                                     }
@@ -318,6 +366,7 @@ public class StickMan extends GameObject {
                                     else
                                         badminton.lightHit(hitAngle);
                                     hasShotted = true;
+                                    isReadyingServe = false;
                                 }
                             }
                         }
@@ -364,23 +413,5 @@ public class StickMan extends GameObject {
 
         // 身体部件和头绑定
         bindBodyPart();
-    }
-
-    @Override
-    public void activate() {
-        super.activate();
-        bodyIdle.activate();
-        bodyMoving.activate();
-        rightHand.activate();
-        leftHandIdle.activate();
-    }
-
-    @Override
-    public void deactivate() {
-        bodyIdle.deactivate();
-        bodyMoving.deactivate();
-        rightHand.deactivate();
-        leftHandIdle.deactivate();
-        super.deactivate();
     }
 }

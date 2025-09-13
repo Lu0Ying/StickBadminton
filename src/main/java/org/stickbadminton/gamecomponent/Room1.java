@@ -9,18 +9,19 @@ public class Room1 extends Room {
     public Room1() {
         //背景
         addObject(new GameObject("background", new Image("ingame_background.png")));
+        //控制器
+        MatchController matchController = new MatchController();
+        addObject(matchController);
         //测试用物体，以后版本移除
         //addObject(new Box());
-        //火柴人(未完成)
-        GameObject stickmanRight = addObject(new StickMan(-1));
+        //火柴人
+        GameObject stickmanRight = addObject(new StickMan(-1, 4));
         stickmanRight.setPosition(700, 300);
         stickmanRight.setName("stickman_right");
-        ((StickMan)stickmanRight).isAIControlled = true;
-        GameObject stickmanLeft = addObject(new StickMan(1));
+        //((StickMan)stickmanRight).isAIControlled = true;
+        GameObject stickmanLeft = addObject(new StickMan(1, 5));
         stickmanLeft.setPosition(200, 300);
         stickmanLeft.setName("stickman_left");
-        //羽毛球(未完成)
-        addObject(new Badminton()).setPosition(100, 100);
         //ui按钮
         UIImageButton button1 = new UIImageButton("button_titlestart.png");
         button1.setOnAction(e -> {
@@ -28,7 +29,7 @@ public class Room1 extends Room {
             this.leave();
             room2.enter();
         });
-        addUiObject(button1, 300, 400);
+        addUiObject(button1, 300, 100);
         //测试黄色按钮
 
         //显示数字，电子显像管风格
@@ -53,6 +54,6 @@ public class Room1 extends Room {
         NetAnimation net = new NetAnimation();
         addObject(net, "net");
 
-
+        matchController.matchStart();
     }
 }
