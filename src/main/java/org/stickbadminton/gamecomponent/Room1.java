@@ -15,11 +15,11 @@ public class Room1 extends Room {
         //测试用物体，以后版本移除
         //addObject(new Box());
         //火柴人
-        GameObject stickmanRight = addObject(new StickMan(-1));
+        GameObject stickmanRight = addObject(new StickMan(-1, 4));
         stickmanRight.setPosition(700, 300);
         stickmanRight.setName("stickman_right");
         //((StickMan)stickmanRight).isAIControlled = true;
-        GameObject stickmanLeft = addObject(new StickMan(1));
+        GameObject stickmanLeft = addObject(new StickMan(1, 5));
         stickmanLeft.setPosition(200, 300);
         stickmanLeft.setName("stickman_left");
         //ui按钮

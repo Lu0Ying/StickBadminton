@@ -53,4 +53,12 @@ public class GameProperties {
     public static final double badmintonGravity = 13.0;
     // 人物移动速度
     public static final double moveSpeed = 250.0;
+
+    // 以下为变量
+
+    // 双方人物类型
+    public static int characterType1 = 0;
+    public static int characterType2 = 0;
+    // 单人模式(1) 还是双人模式(2)
+    public static int matchMode = 0;
 }

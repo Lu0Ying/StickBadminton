@@ -14,6 +14,7 @@ public class StickMan extends GameObject {
     private GameObject bodyMoving;
     private GameObject rightHand;
     private GameObject leftHandIdle;
+    private GameObject decoration;
     private int side; // 1->（画面左侧）朝向右边; -1->（画面右侧）朝向左边
     public static final int sideLeft = -1;
     public static final int sideRight = 1;
@@ -31,7 +32,7 @@ public class StickMan extends GameObject {
     private double shotCooldownTimer = 0;
     public boolean isReadyingServe = false;
 
-    public StickMan(int side) {
+    public StickMan(int side, int characterType) {
         super("stickman1", new Image("stickman_head1.png")); //head
         this.side = side;
 
@@ -47,6 +48,30 @@ public class StickMan extends GameObject {
 
         leftHandIdle = new GameObject("left_hand", new Image("stickman_lefthand_idle.png"));
         leftHandIdle.setCenterPosition(1, 1);
+
+        this.characterType = characterType;
+        decoration = new GameObject("decoration", new Image("stickman_decoration" + characterType + ".png"));
+        decoration.getEntity().setScaleOrigin(new Point2D(52, 0));
+    }
+
+    @Override
+    public void activate() {
+        super.activate();
+        bodyIdle.activate();
+        bodyMoving.activate();
+        rightHand.activate();
+        leftHandIdle.activate();
+        decoration.activate();
+    }
+
+    @Override
+    public void deactivate() {
+        bodyIdle.deactivate();
+        bodyMoving.deactivate();
+        rightHand.deactivate();
+        leftHandIdle.deactivate();
+        decoration.deactivate();
+        super.deactivate();
     }
 
     private void bindBodyPart() { //显示层面
@@ -56,6 +81,8 @@ public class StickMan extends GameObject {
             rightHand.getEntity().setScaleX(-1);
             leftHandIdle.getEntity().setScaleX(-1);
             bodyMoving.getEntity().setScaleX(-1);
+            decoration.getEntity().setScaleX(-0.66);
+            decoration.getEntity().setScaleY(0.66);
         }
         else {
             this.entity.setScaleX(1);
@@ -63,6 +90,8 @@ public class StickMan extends GameObject {
             rightHand.getEntity().setScaleX(1);
             leftHandIdle.getEntity().setScaleX(1);
             bodyMoving.getEntity().setScaleX(1);
+            decoration.getEntity().setScaleX(0.66);
+            decoration.getEntity().setScaleY(0.66);
         }
 
         bodyIdle.setX(x - 2 - 6 * side);
@@ -73,6 +102,10 @@ public class StickMan extends GameObject {
         bodyMoving.setY(y + 20);
         bodyMoving.speedX = speedX;
         bodyMoving.speedY = speedY;
+        decoration.setX(x - 42 - 2 * side);
+        decoration.setY(y - 22);
+        decoration.speedX = speedX;
+        decoration.speedY = speedY;
 
         rightHand.setX(x + 9 - 3 * side);
         rightHand.setY(y + 25);
@@ -380,23 +413,5 @@ public class StickMan extends GameObject {
 
         // 身体部件和头绑定
         bindBodyPart();
-    }
-
-    @Override
-    public void activate() {
-        super.activate();
-        bodyIdle.activate();
-        bodyMoving.activate();
-        rightHand.activate();
-        leftHandIdle.activate();
-    }
-
-    @Override
-    public void deactivate() {
-        bodyIdle.deactivate();
-        bodyMoving.deactivate();
-        rightHand.deactivate();
-        leftHandIdle.deactivate();
-        super.deactivate();
     }
 }
