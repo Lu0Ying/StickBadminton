@@ -8,6 +8,7 @@ import javafx.scene.effect.BlendMode;
 import javafx.scene.paint.Color;
 import javafx.util.Duration;
 import org.stickbadminton.GameObject;
+import org.stickbadminton.SoundPlay;
 
 public class ParticleFX {
 
@@ -37,6 +38,9 @@ public class ParticleFX {
         component = new ParticleComponent(emitter);
         object.getEntity().addComponent(component);
     }
+
+    private static boolean lastState = false;
+
     public static void updataFire(ParticleEmitter emitter,double speedX, double speedY) {
         double speed = Math.sqrt(speedX * speedX + speedY * speedY);
         if (speed > 300) {
@@ -54,25 +58,32 @@ public class ParticleFX {
         }
         if (speed>1400)
         {
+            if (lastState == false) {
+                lastState = true;
+                SoundPlay.playSound("fire.mp3", 0.2);
+            }
             emitter.setSize(6,9);
             emitter.setExpireFunction(i -> Duration.seconds(FXGL.random(0.4, 0.6)));
             emitter.setNumParticles(40);
             emitter.setEndColor(Color.color(0.5, 0.03,0.03, 0.9));
         }
-        else if (speed > 1000) {
-            emitter.setSize(2,3);
-            emitter.setExpireFunction(i -> Duration.seconds(FXGL.random(0.5, 0.8)));
-            emitter.setNumParticles(20);
-            emitter.setEndColor(Color.color(0.96, 0.1+Math.random()*0.5, 0.02, Math.random()*0.7));
-            emitter.setStartColor(Color.color(0.96, 0.1+Math.random()*0.5, 0.02, Math.random()*0.7));
-        } else if (speed > 300) {
-            emitter.setSize(2,3);
-            emitter.setExpireFunction(i -> Duration.seconds(FXGL.random(0.5, 0.8)));
-            emitter.setNumParticles(4);
-            emitter.setEndColor(Color.color(0.96, 0.1+Math.random()*0.5, 0.02, Math.random()*0.7));
-            emitter.setStartColor(Color.color(0.96, 0.1+Math.random()*0.5, 0.02, Math.random()*0.7));
-        } else {
-            emitter.setNumParticles(0);
+        else {
+            lastState = false;
+            if (speed > 1000) {
+                emitter.setSize(2, 3);
+                emitter.setExpireFunction(i -> Duration.seconds(FXGL.random(0.5, 0.8)));
+                emitter.setNumParticles(20);
+                emitter.setEndColor(Color.color(0.96, 0.1 + Math.random() * 0.5, 0.02, Math.random() * 0.7));
+                emitter.setStartColor(Color.color(0.96, 0.1 + Math.random() * 0.5, 0.02, Math.random() * 0.7));
+            } else if (speed > 300) {
+                emitter.setSize(2, 3);
+                emitter.setExpireFunction(i -> Duration.seconds(FXGL.random(0.5, 0.8)));
+                emitter.setNumParticles(4);
+                emitter.setEndColor(Color.color(0.96, 0.1 + Math.random() * 0.5, 0.02, Math.random() * 0.7));
+                emitter.setStartColor(Color.color(0.96, 0.1 + Math.random() * 0.5, 0.02, Math.random() * 0.7));
+            } else {
+                emitter.setNumParticles(0);
+            }
         }
     }
     public static void closeParticle(ParticleEmitter emitter) {

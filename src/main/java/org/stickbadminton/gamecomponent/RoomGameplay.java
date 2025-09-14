@@ -15,6 +15,10 @@ public class RoomGameplay extends Room {
         MatchController matchController = new MatchController();
         addObject(matchController);
 
+        //添加触网
+        NetAnimation net = new NetAnimation();
+        addObject(net, "net");
+
         //火柴人
         GameObject stickmanRight = addObject(new StickMan(-1, GameProperties.characterType2));
         stickmanRight.setPosition(700, GameProperties.floorY - GameProperties.playerHeight - 11);
@@ -31,11 +35,6 @@ public class RoomGameplay extends Room {
         addUiObject(digitView, 390, 21).setName("score_left");
         UIDigitView digitView2 = new UIDigitView(0);
         addUiObject(digitView2, 484, 21).setName("score_right");
-
-
-        //添加触网
-        NetAnimation net = new NetAnimation();
-        addObject(net, "net");
 
         matchController.matchStart();
     }

@@ -13,6 +13,7 @@ public class MatchController extends GameObject{
     private boolean isServeReadying = false; // 是否处于发球阶段
     public int serveSide = 1; // -1 -> 右侧发球, 1 -> 左侧发球
     private double playBGMTimer = 0.0;
+    private double matchEndTimer = 0.0;
     public MatchController() {
         super("controller", new Image("stickman_head1.png"));
         setVisible(false);
@@ -52,11 +53,7 @@ public class MatchController extends GameObject{
 
             if (leftView.getCurrentNumber() >= 9 || rightView.getCurrentNumber() >= 9) {
                 // 游戏结束，显示结果
-                SoundPlay.stopBackgroundMusic();
-                SoundPlay.playSound("cheer.mp3", 1.0);
-                showGameResult(leftView.getCurrentNumber() >= 9 ? "Player1" : "Player2");
-                deactivate();
-                return;
+                matchEndTimer = 1.5;
             }
         }
     }
@@ -85,9 +82,18 @@ public class MatchController extends GameObject{
     }
     @Override
     public void onUpdate() {
+        if (matchEndTimer > 0.0) {
+            matchEndTimer -= GameProperties.frameTime;
+            if (matchEndTimer <= 0.0) {
+                SoundPlay.stopBackgroundMusic();
+                showGameResult(lastPointWinner == 1 ? "玩家 1" : "玩家 2");
+                deactivate();
+                return;
+            }
+        }
         if (ballHitGroundTimer > 0.0) { // 羽毛球落地后到记分牌改变前等待时间
             ballHitGroundTimer -= GameProperties.frameTime;
-            if (ballHitGroundTimer < 0.0) {
+            if (ballHitGroundTimer <= 0.0) {
                 changeScore();
                 ballHitGroundTimer = 0.0;
                 scoreChangeTimer = 2.0;
@@ -96,13 +102,16 @@ public class MatchController extends GameObject{
         }
         else if (scoreChangeTimer > 0.0) { // 记分牌改变后到重置玩家和球的位置等待时间
             scoreChangeTimer -= GameProperties.frameTime;
-            if (scoreChangeTimer < 0.0) {
+            if (scoreChangeTimer <= 0.0) {
                 if (serveSide == StickMan.sideLeft) {
                     StickMan stickmanRight = (StickMan) inRoom.getObject("stickman_right");
                     if (stickmanRight.isShotting)
                         scoreChangeTimer = 0.04;
                     else {
                         scoreChangeTimer = 0.0;
+                        stickmanRight.setY(GameProperties.floorY - GameProperties.playerHeight - 11);
+                        stickmanRight.isJumping = false;
+                        stickmanRight.isShotting = false;
                         stickmanRight.isReadyingServe = true;
                         resetBall();
                     }
@@ -113,6 +122,9 @@ public class MatchController extends GameObject{
                         scoreChangeTimer = 0.04;
                     else {
                         scoreChangeTimer = 0.0;
+                        stickmanLeft.setY(GameProperties.floorY - GameProperties.playerHeight - 11);
+                        stickmanLeft.isJumping = false;
+                        stickmanLeft.isShotting = false;
                         stickmanLeft.isReadyingServe = true;
                         resetBall();
                     }
