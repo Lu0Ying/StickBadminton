@@ -91,9 +91,18 @@ public class ComputerDecision {
             this.difficultyLevel = 0.9;
         else
             this.difficultyLevel = 1.0;
-
+        if(random.nextDouble()>difficultyLevel*0.1)
+        {
+            System.out.println("random");
+            this.racketRadius = GameProperties.racketRadius*difficultyLevel;
+            this.hitAreaRadius = GameProperties.hitAreaRadius*difficultyLevel;
+        }
+        else{
+            System.out.println("666");
         this.racketRadius = GameProperties.racketRadius;
         this.hitAreaRadius = GameProperties.hitAreaRadius;
+    }
+
 
         // 更新墙反弹冷却（跨帧记忆）
         updateWallBounceCooldown();
