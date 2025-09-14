@@ -1,5 +1,6 @@
 package org.stickbadminton.gamecomponent;
 
+import com.almasb.fxgl.dsl.FXGL;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.layout.VBox;
@@ -19,6 +20,7 @@ public class UIGameOver extends UIObject {
     public UIGameOver(String winner) {
         container = new VBox(20);
         container.setStyle("-fx-background-color: rgba(0, 0, 0, 0.7); -fx-padding: 30px; -fx-alignment: center;");
+        container.setLayoutX(30);
 
         if (GameProperties.matchMode == 1) {
             if (winner.equals("玩家 2")) {
