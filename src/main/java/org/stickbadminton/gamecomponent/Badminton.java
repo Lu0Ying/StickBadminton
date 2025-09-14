@@ -45,6 +45,7 @@ public class Badminton extends GameObject {
     @Override
     public void onUpdate() {
         if (isFrozen) {
+            speedY = 0;
             if (sideServe == StickMan.sideLeft) { // 右侧火柴人
                 StickMan stickmanRight = (StickMan) inRoom.getObject("stickman_right");
                 setPositionWithCenter(stickmanRight.getX(), stickmanRight.getY() + 30);
@@ -204,7 +205,7 @@ public class Badminton extends GameObject {
 
     //播放触网动画，在触网判断中被调用
     public void onNetCrashed() {
-        SoundPlay.playSound("net_crash.mp3", 0.5);
+        SoundPlay.playSound("net_crash.mp3", 0.4);
         NetAnimation net = (NetAnimation) inRoom.getObject("net");
         if (net != null) {
             net.playCrashAnimation();
