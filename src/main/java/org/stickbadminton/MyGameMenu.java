@@ -4,9 +4,11 @@ import com.almasb.fxgl.app.scene.FXGLMenu;
 import com.almasb.fxgl.app.scene.MenuType;
 import com.almasb.fxgl.dsl.FXGL;
 import com.almasb.fxgl.entity.Entity;
+import com.almasb.fxgl.input.UserAction;
 import com.almasb.fxgl.particle.ParticleSystem;
 import javafx.scene.control.Button;
 import javafx.scene.effect.DropShadow;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
@@ -49,7 +51,7 @@ public class MyGameMenu extends FXGLMenu {
         // ==== 菜单按钮 ====
         Button resumeButton = new Button("继续游戏");
         resumeButton.setStyle("-fx-font-family: '黑体'; -fx-font-size: 18px; -fx-font-weight: bold; -fx-padding: 10px 20px;");
-        resumeButton.setOnAction(e -> {SoundPlay.playBackgroundMusic(); fireResume();});
+        resumeButton.setOnAction(e -> fireResume());
 
         Button exitButton = new Button("退出");
         exitButton.setStyle("-fx-font-family: '黑体'; -fx-font-size: 18px; -fx-font-weight: bold; -fx-padding: 10px 20px;");
@@ -67,6 +69,12 @@ public class MyGameMenu extends FXGLMenu {
         box.setTranslateY(FXGL.getAppHeight() / 2.0 - 150);
 
         getContentRoot().getChildren().add(box);
+        getInput().addAction(new UserAction("Exit Menu") {
+            @Override
+            protected void onActionBegin() {
+                SoundPlay.playBackgroundMusic();
+            }
+        }, KeyCode.ESCAPE);
     }
 
     @Override

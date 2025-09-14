@@ -1,6 +1,5 @@
 package org.stickbadminton.gamecomponent;
 
-import javafx.scene.control.Button;
 import javafx.scene.image.Image;
 import org.stickbadminton.GameObject;
 import org.stickbadminton.Room;
@@ -37,7 +36,7 @@ public class RoomGameplay extends Room {
         addUiObject(digitView2, 484, 21).setName("score_right");
 
         //按键提示
-        addObject(new Hint());
+        addObject(new HintKeyboard());
 
         matchController.matchStart();
     }

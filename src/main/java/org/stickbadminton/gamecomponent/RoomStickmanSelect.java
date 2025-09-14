@@ -13,6 +13,8 @@ public class RoomStickmanSelect extends Room{
     private UIStickmanPlayer view1;
     private UIStickmanPlayer view2;
 
+    private HintAIDifficulty hintAIDifficulty;
+
     // 当前选择的队伍
     private boolean isTeam1Selecting = true;
 
@@ -35,12 +37,20 @@ public class RoomStickmanSelect extends Room{
             SoundPlay.playSound("button_select.mp3", 100);
             onUndoButtonClick();
         });
-        addCharacterButton(1,420,120);
-        addCharacterButton(2,320,120);
+        addCharacterButton(1,320,120);
+        addCharacterButton(2,420,120);
         addCharacterButton(3,520,120);
         addCharacterButton(4,370,220);
         addCharacterButton(5,470,220);
 
+        addObject(new GameObject("modeHint", new Image(
+                GameProperties.matchMode == 1 ? "stickmanselect_mode1hint.png" : "stickmanselect_mode2hint.png"
+        ))).setOpacity(0.2);
+
+        if (GameProperties.matchMode == 1) {
+            hintAIDifficulty = new HintAIDifficulty();
+            addObject(hintAIDifficulty);
+        }
 
         view1=new UIStickmanPlayer();
         view2=new UIStickmanPlayer();
@@ -63,11 +73,15 @@ public class RoomStickmanSelect extends Room{
     private void onCharacterSelect(int characterId){
         // 根据当前队伍添加到对应列表
         if (isTeam1Selecting) {
+            if (GameProperties.matchMode == 1)
+                hintAIDifficulty.isOpened = true;
             team1=characterId;
             GameProperties.characterType1 = characterId;
             isTeam1Selecting=false;
             updatePlayerViews();
         } else if (team2 == 0){
+            if (GameProperties.matchMode == 1)
+                GameProperties.difficultyLevel = characterId;
             team2=characterId;
             GameProperties.characterType2 = characterId;
             updatePlayerViews();
@@ -77,9 +91,10 @@ public class RoomStickmanSelect extends Room{
     private  void onUndoButtonClick() {
         if (!isTeam1Selecting && team2 != 0) {
             team2 = 0;
-            isTeam1Selecting=false;
             updatePlayerViews();
         } else if (!isTeam1Selecting && team1 != 0) {
+            if (GameProperties.matchMode == 1)
+                hintAIDifficulty.isOpened = false;
             team1 = 0;
             isTeam1Selecting=true;
             updatePlayerViews();

@@ -277,7 +277,8 @@ public class StickMan extends GameObject {
                 isShotting = false;
                 shotCooldownTimer = 0;
             }
-            else if (hasShotted == false && badminton.isShotable){
+            else if (hasShotted == false && badminton.isShotable
+                    && (badminton.getCenterX() - GameProperties.netPosition) * side <= 0){
                 if (shotType == shotTypeUp) { // 上方击球
                     double deltaT = GameProperties.shotCooldown - shotCooldownTimer;
                     if (deltaT < GameProperties.shotAnimationTime)
@@ -403,7 +404,7 @@ public class StickMan extends GameObject {
                 shotType = shotTypeUp;
                 if (badminton != null) {
                     if ((badminton.getCenterX() - 450) * side < 0 // 轮到本方击球
-                            && badminton.getCenterY() > getCenterY() - 30)
+                            && badminton.getCenterY() > getCenterY() - 30 && badminton.speedY >= 0)
                         shotType = shotTypeDown;
                     else
                         shotType = shotTypeUp;

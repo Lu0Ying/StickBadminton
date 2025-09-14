@@ -1,9 +1,7 @@
 package org.stickbadminton;
 
-import com.almasb.fxgl.audio.Music;
 import javafx.scene.media.Media;
 import javafx.scene.media.MediaPlayer;
-import javafx.util.Duration;
 
 import java.io.File;
 import java.net.MalformedURLException;
@@ -22,6 +20,7 @@ public class SoundPlay {
         loadSound("cheer.mp3");
         loadSound("fire.mp3");
         loadSound("ingame_bgm.mp3");
+        loadSound("net_crash.mp3");
         loadSound("shot_light.mp3");
         loadSound("shot_heavy.mp3");
         loadSound("sigh.mp3");
