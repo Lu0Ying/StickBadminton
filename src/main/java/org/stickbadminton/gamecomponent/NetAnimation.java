@@ -18,7 +18,7 @@ public class NetAnimation extends GameObject {
     // 动画计时器
     private double animationTime = 0;
     // 动画总持续时间（秒）
-    private final double ANIMATION_DURATION = 1;
+    private final double ANIMATION_DURATION = 2;
     // 网的中心点X坐标
     private final double netCenterX = GameProperties.netPosition-3;
     // 网的底部Y坐标
