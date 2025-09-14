@@ -56,7 +56,7 @@ public class GameProperties {
 
     // 以下为变量
     // 人机难度
-    public static double difficultyLevel;
+    public static int difficultyLevel; // 1 ~ 5
     // 双方人物类型
     public static int characterType1 = 1;
     public static int characterType2 = 1;
