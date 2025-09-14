@@ -4,13 +4,9 @@ import com.almasb.fxgl.particle.ParticleComponent;
 import com.almasb.fxgl.particle.ParticleEmitter;
 import javafx.scene.image.Image;
 import javafx.scene.input.KeyCode;
-import javafx.scene.paint.Color;
 import org.stickbadminton.GameObject;
 import org.stickbadminton.KeyInput;
-import org.stickbadminton.Sprite;
-import org.stickbadminton.UIObject;
 import org.stickbadminton.*;
-import org.stickbadminton.gamecomponent.GameProperties;
 
 public class Badminton extends GameObject {
     public static int sideServe = 0; // 当前发球人
@@ -33,13 +29,13 @@ public class Badminton extends GameObject {
 
     }
 
-    public Badminton(int sideServe) {
+    public Badminton(int _sideServe) {
         super("badminton", new Image("badminton.png"));
         speedY = -100;
         setCenterPosition(10.5, 3);
         setRotation(180);
 
-        this.sideServe = sideServe;
+        sideServe = _sideServe;
         setRotation(sideServe == 1 ? 225: -225);
 
         emitter.setNumParticles(0);
@@ -208,6 +204,7 @@ public class Badminton extends GameObject {
 
     //播放触网动画，在触网判断中被调用
     public void onNetCrashed() {
+        SoundPlay.playSound("net_crash.mp3", 0.5);
         NetAnimation net = (NetAnimation) inRoom.getObject("net");
         if (net != null) {
             net.playCrashAnimation();
