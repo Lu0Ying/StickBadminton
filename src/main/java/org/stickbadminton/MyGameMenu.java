@@ -24,10 +24,9 @@ import javafx.scene.paint.Color;
 import javafx.scene.text.Text;
 import javafx.scene.layout.Pane;
 import javafx.scene.Node;
+import org.stickbadminton.gamecomponent.RoomTitle;
 
 public class MyGameMenu extends FXGLMenu {
-
-    private ParticleSystem particleSystem;
 
     public MyGameMenu(MenuType type) {
         super(type);
@@ -50,24 +49,32 @@ public class MyGameMenu extends FXGLMenu {
         // ==== 菜单按钮 ====
         Button resumeButton = new Button("继续游戏");
         resumeButton.setStyle("-fx-font-family: '黑体'; -fx-font-size: 18px; -fx-font-weight: bold; -fx-padding: 10px 20px;");
-        resumeButton.setOnAction(e -> fireResume());
+        resumeButton.setOnAction(e -> {SoundPlay.playBackgroundMusic(); fireResume();});
 
         Button exitButton = new Button("退出");
         exitButton.setStyle("-fx-font-family: '黑体'; -fx-font-size: 18px; -fx-font-weight: bold; -fx-padding: 10px 20px;");
         exitButton.setOnAction(e -> fireExit());
 
-        VBox box = new VBox(30, title, resumeButton, exitButton);
+        Button backButton = new Button("返回主菜单");
+        backButton.setStyle("-fx-font-family: '黑体'; -fx-font-size: 18px; -fx-font-weight: bold; -fx-padding: 10px 20px;");
+        backButton.setOnAction(e -> {
+            SoundPlay.playBackgroundMusic(); fireResume();
+            FXGL.getGameWorld().getEntities().clear();
+            FXGL.getGameScene().clearUINodes();
+            RoomTitle roomTitle = new RoomTitle();
+            roomTitle.enter();
+        });
+
+        VBox box = new VBox(30, title, resumeButton, backButton, exitButton);
         box.setAlignment(Pos.CENTER);
         box.setTranslateX(FXGL.getAppWidth() / 2.0 - 150);
-        box.setTranslateY(FXGL.getAppHeight() / 2.0 - 100);
+        box.setTranslateY(FXGL.getAppHeight() / 2.0 - 150);
 
         getContentRoot().getChildren().add(box);
     }
 
     @Override
     public void onUpdate(double tpf) {
-        if (particleSystem != null) {
-            particleSystem.onUpdate(tpf);
-        }
+        SoundPlay.stopBackgroundMusic();
     }
 }
