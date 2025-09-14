@@ -23,7 +23,7 @@ public class GameApp extends GameApplication {
         settings.setVersion("v0.1");
         settings.setTicksPerSecond(60);
         settings.setPauseMusicWhenMinimized(true);
-        settings.setMenuKey(KeyCode.P);
+        settings.setMenuKey(KeyCode.ESCAPE);
         settings.setSceneFactory(new SceneFactory() {
             @Override
             public FXGLMenu newGameMenu() {
