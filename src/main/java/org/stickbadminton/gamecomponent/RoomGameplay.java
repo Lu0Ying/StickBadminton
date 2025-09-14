@@ -36,6 +36,9 @@ public class RoomGameplay extends Room {
         UIDigitView digitView2 = new UIDigitView(0);
         addUiObject(digitView2, 484, 21).setName("score_right");
 
+        //按键提示
+        addObject(new Hint());
+
         matchController.matchStart();
     }
 }
