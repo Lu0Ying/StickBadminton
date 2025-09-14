@@ -58,11 +58,7 @@ public class MyGameMenu extends FXGLMenu {
         Button backButton = new Button("返回主菜单");
         backButton.setStyle("-fx-font-family: '黑体'; -fx-font-size: 18px; -fx-font-weight: bold; -fx-padding: 10px 20px;");
         backButton.setOnAction(e -> {
-            SoundPlay.playBackgroundMusic(); fireResume();
-            FXGL.getGameWorld().getEntities().clear();
-            FXGL.getGameScene().clearUINodes();
-            RoomTitle roomTitle = new RoomTitle();
-            roomTitle.enter();
+            FXGL.getGameController().startNewGame();
         });
 
         VBox box = new VBox(30, title, resumeButton, backButton, exitButton);
