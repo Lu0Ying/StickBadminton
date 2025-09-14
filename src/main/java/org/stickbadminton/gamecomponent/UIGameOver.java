@@ -37,11 +37,11 @@ public class UIGameOver extends UIObject {
         winnerLabel.setTextFill(Color.WHITE);
 
         restartButton = new Button("重新开始");
-        restartButton.setStyle("-fx-font-size: 18px; -fx-padding: 10px 20px;");
+        restartButton.setStyle("-fx-font-family: '黑体'; -fx-font-size: 18px; -fx-font-weight: bold; -fx-padding: 10px 20px;");
         restartButton.setOnAction(e -> onRestart());
 
         mainMenuButton = new Button("返回主菜单");
-        mainMenuButton.setStyle("-fx-font-size: 18px; -fx-padding: 10px 20px;");
+        mainMenuButton.setStyle("-fx-font-family: '黑体'; -fx-font-size: 18px; -fx-font-weight: bold; -fx-padding: 10px 20px;");
         mainMenuButton.setOnAction(e -> onMainMenu());
 
         container.getChildren().addAll(winnerLabel, restartButton, mainMenuButton);

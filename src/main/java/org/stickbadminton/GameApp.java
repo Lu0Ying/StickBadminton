@@ -3,6 +3,10 @@ package org.stickbadminton;
 import com.almasb.fxgl.app.GameApplication;
 import com.almasb.fxgl.app.GameSettings;
 
+import com.almasb.fxgl.app.scene.FXGLMenu;
+import com.almasb.fxgl.app.scene.MenuType;
+import com.almasb.fxgl.app.scene.SceneFactory;
+import javafx.scene.input.KeyCode;
 import org.stickbadminton.gamecomponent.RoomGameplay;
 import org.stickbadminton.gamecomponent.RoomTitle;
 
@@ -18,6 +22,14 @@ public class GameApp extends GameApplication {
         settings.setTitle("火柴人打羽毛球");
         settings.setVersion("v0.1");
         settings.setTicksPerSecond(60);
+        settings.setPauseMusicWhenMinimized(true);
+        settings.setMenuKey(KeyCode.P);
+        settings.setSceneFactory(new SceneFactory() {
+            @Override
+            public FXGLMenu newGameMenu() {
+                return new MyGameMenu(MenuType.GAME_MENU);
+            }
+        });
     }
 
     // 字段保存，方便退出时 stop()
