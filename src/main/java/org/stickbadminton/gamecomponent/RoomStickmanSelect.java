@@ -80,6 +80,8 @@ public class RoomStickmanSelect extends Room{
             isTeam1Selecting=false;
             updatePlayerViews();
         } else if (team2 == 0){
+            if (GameProperties.matchMode == 1)
+                GameProperties.difficultyLevel = characterId;
             team2=characterId;
             GameProperties.characterType2 = characterId;
             updatePlayerViews();
