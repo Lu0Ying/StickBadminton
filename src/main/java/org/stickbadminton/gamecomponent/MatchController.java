@@ -61,7 +61,10 @@ public class MatchController extends GameObject{
     public void resetBall() {
         if (inRoom.getObject("badminton") != null)
             inRoom.removeObject(inRoom.getObject("badminton"));
-        inRoom.addObject(new Badminton(serveSide)).setPosition(450 - 200 * serveSide, 700);
+        GameObject badminton = inRoom.addObject(new Badminton(serveSide));
+        badminton.setPosition(450 - 200 * serveSide, 700);
+        badminton.speedX = 0;
+        badminton.speedY = 0;
     }
 
     private void showGameResult(String winner) {

@@ -11,7 +11,7 @@ import java.util.HashMap;
 public class SoundPlay {
     private static MediaPlayer backgroundPlayer;
     private static double backgroundVolume = 1;
-    private static HashMap<String,MediaPlayer> soundCache=new HashMap<>();
+    private static HashMap<String, Media> soundCache=new HashMap<>();
     // 初始化音频池
     public static void initSoundPool() {
         // 加载所有资源
@@ -32,7 +32,7 @@ public class SoundPlay {
         try{
             String path=getAbsolutePath(sourceUrl);
             Media media=new Media(new File(path).toURI().toURL().toString());
-            soundCache.put(sourceUrl,new MediaPlayer(media));
+            soundCache.put(sourceUrl, media);
         }catch(MalformedURLException e) {
             System.err.println("无效音频路径:"+e.getMessage());
         }
@@ -93,35 +93,21 @@ public class SoundPlay {
         // 播放指定的音效，以给定的音量
         // volume 范围：0为静音，1为原音量
         try {
-            MediaPlayer soundPlayer=soundCache.get(sourceUrl);
-            if(soundPlayer==null){
+            Media media = soundCache.get(sourceUrl);
+            if(media==null){
                 // 如果音效没有预加载，则动态加载
-                Media media = new Media(new File(getAbsolutePath(sourceUrl)).toURI().toURL().toString());
-                soundPlayer=new MediaPlayer(media);
-               soundCache.put(sourceUrl,soundPlayer);
+                media = new Media(new File(getAbsolutePath(sourceUrl)).toURI().toURL().toString());
+                soundCache.put(sourceUrl, media);
             }
-            soundPlayer.stop();
+            MediaPlayer soundPlayer = new MediaPlayer(media);
             soundPlayer.setVolume(Math.max(0,Math.min(1,volume)));
             soundPlayer.play();
+            soundPlayer.setOnEndOfMedia(() -> soundPlayer.dispose());
         }catch (MalformedURLException e){
             System.err.println("无效的音频文件路径:"+e.getMessage());
         }
     }
 
-    public static void stopSound(String sourceUrl) {
-        try {
-            MediaPlayer soundPlayer=soundCache.get(sourceUrl);
-            if(soundPlayer==null){
-                // 如果音效没有预加载，则动态加载
-                Media media = new Media(new File(getAbsolutePath(sourceUrl)).toURI().toURL().toString());
-                soundPlayer=new MediaPlayer(media);
-                soundCache.put(sourceUrl,soundPlayer);
-            }
-            soundPlayer.stop();
-        }catch (MalformedURLException e){
-            System.err.println("无效的音频文件路径:"+e.getMessage());
-        }
-    }
     //手动移除不需要的音效
     public static void removeSoundFromCache(String sourceUrl) {
         soundCache.remove(sourceUrl);

@@ -404,7 +404,7 @@ public class StickMan extends GameObject {
                 shotType = shotTypeUp;
                 if (badminton != null) {
                     if ((badminton.getCenterX() - 450) * side < 0 // 轮到本方击球
-                            && badminton.getCenterY() > getCenterY() - 30 && badminton.speedY >= 0)
+                            && badminton.getCenterY() > getCenterY() - 30 && (badminton.speedY == 0 || badminton.speedY > 150))
                         shotType = shotTypeDown;
                     else
                         shotType = shotTypeUp;
