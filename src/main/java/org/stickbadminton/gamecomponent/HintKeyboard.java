@@ -1,15 +1,12 @@
 package org.stickbadminton.gamecomponent;
 
-import javafx.geometry.Point2D;
 import javafx.scene.image.Image;
-import javafx.scene.input.KeyCode;
-import javafx.util.Duration;
 import org.stickbadminton.GameObject;
 
-public class Hint extends GameObject{
+public class HintKeyboard extends GameObject{
     private double liveTimer = 0;
-    public Hint() {
-        super("hint", new Image("ingame_hint.png"));
+    public HintKeyboard() {
+        super("hint", new Image(GameProperties.matchMode == 1 ? "ingame_hint_singleplayer.png" : "ingame_hint.png"));
     }
     @Override
     public void onUpdate() {
