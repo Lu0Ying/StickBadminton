@@ -6,10 +6,14 @@ import org.stickbadminton.GameObject;
 import org.stickbadminton.Room;
 import org.stickbadminton.SoundPlay;
 import org.stickbadminton.SwitchRoomEffect;
+import org.stickbadminton.UIObject;
 import org.stickbadminton.gamecomponent.network.NetworkClient;
-import org.stickbadminton.gamecomponent.GameProperties;
 
 public class RoomStickmanSelectNet extends Room {
+
+    // 自引用，供匿名内部类安全引用外部房间实例，避免 “不是封闭类”
+    private final RoomStickmanSelectNet self = this;
+
     private int team1;
     private int team2;
 
@@ -27,13 +31,14 @@ public class RoomStickmanSelectNet extends Room {
     private volatile boolean p1Ready = false;
     private volatile boolean p2Ready = false;
 
+    // 关键字段：网络客户端
     private NetworkClient netClient;
     private volatile String myId = null; // "p1" / "p2" / watcher*
 
     // 保存服务器地址与期望席位
     private final String serverHost;
     private final int serverPort;
-    private final String desiredId; // 新增：HELLO 期望席位
+    private final String desiredId; // HELLO 期望席位："p1"/"p2"/null
 
     public RoomStickmanSelectNet() {
         this(
@@ -45,7 +50,7 @@ public class RoomStickmanSelectNet extends Room {
         );
     }
 
-    // 新增构造：支持传入 desiredId（"p1" / "p2"）
+    // 与 RoomNetJoin.goToSelect 保持一致的构造签名
     public RoomStickmanSelectNet(String host, int port, String desiredId) {
         this.serverHost = host == null || host.isBlank() ? "127.0.0.1" : host.trim();
         this.serverPort = (port >= 1 && port <= 65535) ? port : 8888;
@@ -63,7 +68,7 @@ public class RoomStickmanSelectNet extends Room {
         buttonReady2 = new UIImageButton("button_ready.png");
         addUiObject(buttonReady2, 130, 170);
 
-        // 设置初始状态为 waiting（关键修复）
+        // 初始 waiting
         buttonReady1.setVisible(false);
         buttonWaiting1.setVisible(true);
         buttonReady2.setVisible(false);
@@ -75,27 +80,16 @@ public class RoomStickmanSelectNet extends Room {
         buttonReady2.setOnAction(e -> tryToggleReady("p2"));
         buttonWaiting2.setOnAction(e -> tryToggleReady("p2"));
 
-        updateNetReadyUi(); // 确保状态同步
+        updateNetReadyUi();
 
-        // 开始按钮
+        // 开始按钮：满足条件会由服务端自动 START
         UIImageButton startButton = new UIImageButton("button_start.png");
         addUiObject(startButton, 380, 480);
         startButton.setOnAction(e -> {
             SoundPlay.playSound("button_select.mp3", 100);
             if (netClient != null) {
-                // 若我方已选人但未就绪，先自动就绪一次（减少误操作）
-                if ("p1".equalsIgnoreCase(myId) && !p1Ready && team1 > 0) {
-                    netClient.sendReady(true);
-                } else if ("p2".equalsIgnoreCase(myId) && !p2Ready && team2 > 0) {
-                    netClient.sendReady(true);
-                }
-                // 只有都已就绪且都已选非0人物时才发送 START
-                if (p1Ready && p2Ready && team1 > 0 && team2 > 0) {
-                    netClient.sendStartRequest();
-                } else {
-                    System.out.println("[SelectNet] Start blocked: p1Ready=" + p1Ready + ", p2Ready=" + p2Ready
-                            + ", team1=" + team1 + ", team2=" + team2 + " (请双方都选人并点就绪)");
-                }
+                if ("p1".equalsIgnoreCase(myId) && !p1Ready && team1 > 0) netClient.setReady(true);
+                if ("p2".equalsIgnoreCase(myId) && !p2Ready && team2 > 0) netClient.setReady(true);
             }
         });
 
@@ -107,7 +101,7 @@ public class RoomStickmanSelectNet extends Room {
             onUndoButtonClick();
         });
 
-        // 角色选择按钮
+        // 角色选择按钮（示例）
         addCharacterButton(1, 320, 120);
         addCharacterButton(2, 420, 120);
         addCharacterButton(3, 520, 120);
@@ -130,6 +124,7 @@ public class RoomStickmanSelectNet extends Room {
         addUiObject(view1, 65, 320);
         addUiObject(view2, 840, 320);
 
+        // 初始化网络并监听服务端事件
         initNetStatusListener();
     }
 
@@ -171,16 +166,23 @@ public class RoomStickmanSelectNet extends Room {
                     applySelect(playerId, characterId);
                 }
 
+                // 监听到服务器下发 START 后
                 @Override
                 public void onStartGame(int ct1, int ct2) {
                     GameProperties.characterType1 = ct1;
                     GameProperties.characterType2 = ct2;
-                    RoomGameplay roomGameplay = new RoomGameplay();
-                    new SwitchRoomEffect(RoomStickmanSelectNet.this, roomGameplay);
+                    // 把已有的 netClient 传给对战房间
+                    RoomGameplay roomGameplay = new RoomGameplay(netClient);
+                    // 这里使用 self，避免 “不是封闭类” 的报错
+                    new SwitchRoomEffect(self, roomGameplay);
+                }
+
+                @Override
+                public void onGameStatusChanged(String status) {
+                    System.out.println("[SelectNet] Game status: " + status);
                 }
             });
-            netClient.start();
-            Platform.runLater(() -> netClient.attachToPrimaryStageAuto());
+            netClient.connect();
         } catch (Exception e) {
             System.out.println("[RoomStickmanSelectNet] net init error: " + e.getMessage());
         }
@@ -198,14 +200,12 @@ public class RoomStickmanSelectNet extends Room {
     private void onCharacterSelect(int characterId) {
         if ("p1".equalsIgnoreCase(myId)) {
             applySelect("p1", characterId);
-            if (netClient != null) netClient.sendSelect(characterId);
-            // ✅ 可选：选人后自动就绪（若希望手动就绪，可注释下一行）
-            if (characterId > 0 && !p1Ready && netClient != null) netClient.sendReady(true);
+            if (netClient != null) netClient.selectCharacter(characterId);
+            if (characterId > 0 && !p1Ready && netClient != null) netClient.setReady(true);
         } else if ("p2".equalsIgnoreCase(myId)) {
             applySelect("p2", characterId);
-            if (netClient != null) netClient.sendSelect(characterId);
-            // ✅ 可选：选人后自动就绪
-            if (characterId > 0 && !p2Ready && netClient != null) netClient.sendReady(true);
+            if (netClient != null) netClient.selectCharacter(characterId);
+            if (characterId > 0 && !p2Ready && netClient != null) netClient.setReady(true);
         } else {
             System.out.println("[SelectNet] watcher cannot select");
         }
@@ -214,12 +214,12 @@ public class RoomStickmanSelectNet extends Room {
     private void onUndoButtonClick() {
         if ("p1".equalsIgnoreCase(myId) && team1 != 0) {
             applySelect("p1", 0);
-            if (netClient != null) netClient.sendSelect(0);
-            if (p1Ready && netClient != null) netClient.sendReady(false);
+            if (netClient != null) netClient.selectCharacter(0);
+            if (p1Ready && netClient != null) netClient.setReady(false);
         } else if ("p2".equalsIgnoreCase(myId) && team2 != 0) {
             applySelect("p2", 0);
-            if (netClient != null) netClient.sendSelect(0);
-            if (p2Ready && netClient != null) netClient.sendReady(false);
+            if (netClient != null) netClient.selectCharacter(0);
+            if (p2Ready && netClient != null) netClient.setReady(false);
         }
     }
 
@@ -238,7 +238,7 @@ public class RoomStickmanSelectNet extends Room {
         if (myId == null) return;
         if (!myId.equalsIgnoreCase(side)) return;
         boolean target = "p1".equalsIgnoreCase(side) ? !p1Ready : !p2Ready;
-        if (netClient != null) netClient.sendReady(target);
+        if (netClient != null) netClient.setReady(target);
     }
 
     private void updatePlayerViews() {
@@ -267,12 +267,11 @@ public class RoomStickmanSelectNet extends Room {
         updateNetReadyUi();
     }
 
-    // ✅ 修复：完整更新所有按钮状态
     private void updateNetReadyUi() {
         Runnable r = () -> {
             if (buttonReady1 != null) buttonReady1.setVisible(p1Ready);
             if (buttonWaiting1 != null) buttonWaiting1.setVisible(!p1Ready);
-            if (buttonReady2 != null) buttonReady2.setVisible(p2Ready);        // ⬅️ 修复：之前缺失
+            if (buttonReady2 != null) buttonReady2.setVisible(p2Ready);
             if (buttonWaiting2 != null) buttonWaiting2.setVisible(!p2Ready);
         };
         if (Platform.isFxApplicationThread()) r.run();

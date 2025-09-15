@@ -1,72 +1,429 @@
-
-
-
-
 package org.stickbadminton.gamecomponent.network;
 
 import com.almasb.fxgl.dsl.FXGL;
 import javafx.application.Platform;
-import javafx.event.Event;
 import javafx.scene.Scene;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
-import javafx.stage.Stage;
+import javafx.event.Event;
+import org.stickbadminton.KeyInput;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.Socket;
-import java.nio.charset.StandardCharsets;
+import java.net.SocketException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * 文本协议客户端，新增大厅协议：
- * - 发送：SELECT:<characterId>，READY:<0|1>，START
- * - 接收：SELECT:<playerId>:<characterId>，READY:<playerId>:<0|1>，START:<ct1>:<ct2>
+ * 重写后的 NetworkClient：
+ * - 不在本地推断任何权威状态
+ * - 捕获本地物理输入，仅向服务端上报
+ * - 仅根据服务端的广播/回显来注入按键和派发连接/游戏事件
+ *
+ * 为了兼容仓库里的旧调用，保留 start()/sendReady()/sendSelect()/sendStartRequest()/attachToPrimaryStageAuto() 的别名或空实现。
  */
 public class NetworkClient {
 
-    public enum Action {
-        MOVE_LEFT_ON, MOVE_LEFT_OFF,
-        MOVE_RIGHT_ON, MOVE_RIGHT_OFF,
-        JUMP,
-        LIGHT_HIT, HEAVY_HIT,
-        LIGHT_HIT_UP, LIGHT_HIT_DOWN,
-        HEAVY_HIT_UP, HEAVY_HIT_DOWN
-    }
+    // 连接配置
+    private final String host;
+    private final int port;
+    private final String desiredPlayerId; // 可为空，非空时用于请求 p1/p2
 
-    // 网络状态/大厅事件监听
-    public interface ConnectionListener {
-        default void onAssigned(String playerId) {}
-        default void onPlayerState(String playerId, boolean present) {} // 连接占位（READY/WAITING）
-        default void onPlayerLeft(String playerId) {}
+    // I/O
+    private volatile boolean running = false;
+    private Thread ioThread;
+    private Socket socket;
+    private BufferedReader in;
+    private PrintWriter out;
 
-        // 新增：就绪与选人、开始
-        default void onReadyState(String playerId, boolean ready) {}
-        default void onSelected(String playerId, int characterId) {}
-        default void onStartGame(int ct1, int ct2) {}
-    }
+    // 身份
+    private volatile String assignedId; // "p1" | "p2" | "w<seq>"
 
+    // 事件监听（保持原事件接口）
     private final List<ConnectionListener> connectionListeners = new CopyOnWriteArrayList<>();
 
-    public void addConnectionListener(ConnectionListener l) { if (l != null) connectionListeners.add(l); }
-    public void removeConnectionListener(ConnectionListener l) { connectionListeners.remove(l); }
+    // 注入去重：由服务端注入的按键集合，避免被本地物理输入过滤器再次上送造成回显循环
+    private final Set<KeyCode> pressedByServer = Collections.synchronizedSet(new HashSet<>());
+    // 本地物理按下状态，仅控制首次 PRESS/RELEASE 上送
+    private final Set<KeyCode> pressedLocally = Collections.synchronizedSet(new HashSet<>());
 
-    private void runOnFxThreadOrNow(Runnable r) {
+    // 记录每个玩家当前“服务端认定”的按下集合，用于处理 KEY_STATE 心跳纠偏
+    private final Map<String, Set<KeyCode>> serverPressed = new ConcurrentHashMap<>();
+
+    // 已挂接的 Scene（通过它们注入 KeyEvent）
+    private final Set<Scene> attachedScenes = Collections.newSetFromMap(new IdentityHashMap<>());
+
+    // 本地键位白名单（仅用于客户端软约束；服务端仍会进行硬校验）
+    private static final EnumSet<KeyCode> P1_KEYS = EnumSet.of(KeyCode.Q, KeyCode.W, KeyCode.E, KeyCode.A, KeyCode.S, KeyCode.D);
+    private static final EnumSet<KeyCode> P2_KEYS = EnumSet.of(KeyCode.U, KeyCode.I, KeyCode.O, KeyCode.J, KeyCode.K, KeyCode.L);
+
+    public NetworkClient(String host, int port) {
+        this(host, port, null);
+    }
+
+    public NetworkClient(String host, int port, String desiredPlayerId) {
+        this.host = host;
+        this.port = port;
+        this.desiredPlayerId = desiredPlayerId;
+        serverPressed.put("p1", Collections.synchronizedSet(new HashSet<>()));
+        serverPressed.put("p2", Collections.synchronizedSet(new HashSet<>()));
+    }
+
+    public String getAssignedId() {
+        return assignedId;
+    }
+
+    // ============== 对外 API ==============
+
+    public void connect() throws IOException {
+        if (running) return;
+        running = true;
+
+        socket = new Socket(host, port);
+        socket.setTcpNoDelay(true);
         try {
-            if (Platform.isFxApplicationThread()) r.run();
-            else Platform.runLater(r);
-        } catch (IllegalStateException e) {
-            try { r.run(); } catch (Exception ignored) {}
+            in = new BufferedReader(new InputStreamReader(socket.getInputStream(), "UTF-8"));
+            out = new PrintWriter(socket.getOutputStream(), true);
+        } catch (IOException e) {
+            closeQuietly();
+            throw e;
+        }
+
+        // HELLO（可带期望身份）
+        if (desiredPlayerId != null && !desiredPlayerId.isBlank()) {
+            sendLine("HELLO:" + desiredPlayerId.trim());
+        } else {
+            sendLine("HELLO");
+        }
+
+        ioThread = new Thread(this::ioLoop, "NetworkClient-IO");
+        ioThread.setDaemon(true);
+        ioThread.start();
+    }
+
+    public void disconnect() {
+        running = false;
+        closeQuietly();
+    }
+
+    public void addConnectionListener(ConnectionListener l) {
+        if (l != null) connectionListeners.add(l);
+    }
+
+    public void removeConnectionListener(ConnectionListener l) {
+        connectionListeners.remove(l);
+    }
+
+    /**
+     * 绑定一个 Scene：
+     * - 本地物理按下/抬起仅上送服务端，并消费事件
+     * - 真实注入事件均来自服务端回显或心跳
+     */
+    public void attachScene(Scene scene) {
+        if (scene == null || attachedScenes.contains(scene)) return;
+        attachedScenes.add(scene);
+
+        scene.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
+            if (!running) return;
+            if (isWatcher()) return; // 旁观者不发送任何输入
+
+            final KeyCode code = e.getCode();
+            // 服务器注入事件：仅清理标记，允许事件传递
+            if (pressedByServer.contains(code)) {
+                pressedByServer.remove(code);
+                return;
+            }
+
+            // 客户端白名单软校验：避免无效/越权按键淹没网络（服务端仍会硬校验）
+            if (!isKeyAllowedForSelf(code)) {
+                return;
+            }
+
+            // 避免重复发送
+            if (pressedLocally.add(code)) {
+                sendLine("KEY_DOWN:" + code.name());
+            }
+            // 物理输入不直接作用于本地游戏，由服务端回显为准，故消费事件防止本地与权威状态分叉
+            e.consume();
+        });
+
+        scene.addEventFilter(KeyEvent.KEY_RELEASED, e -> {
+            if (!running) return;
+            if (isWatcher()) return;
+
+            final KeyCode code = e.getCode();
+            if (pressedByServer.contains(code)) {
+                pressedByServer.remove(code);
+                return;
+            }
+            if (!isKeyAllowedForSelf(code)) {
+                return;
+            }
+            if (pressedLocally.remove(code)) {
+                sendLine("KEY_UP:" + code.name());
+            }
+            e.consume();
+        });
+    }
+
+    // 游戏房间/人的操作，上送服务器，由服务器广播权威结果
+    public void setReady(boolean ready) {
+        sendLine("READY:" + (ready ? "1" : "0"));
+    }
+
+    public void selectCharacter(int characterId) {
+        sendLine("SELECT:" + characterId);
+    }
+
+    // ============== 兼容旧 API，避免“直接粘贴报错” ==============
+
+    // 旧调用：netClient.start()
+    public void start() throws IOException { connect(); }
+
+    // 旧调用：netClient.sendReady(x)
+    public void sendReady(boolean ready) { setReady(ready); }
+
+    // 旧调用：netClient.sendSelect(x)
+    public void sendSelect(int characterId) { selectCharacter(characterId); }
+
+    // 旧调用：netClient.sendStartRequest() —— 现由服务端自动判定，保持空实现
+    public void sendStartRequest() { /* no-op: server auto START when conditions met */ }
+
+    // 旧调用：netClient.attachToPrimaryStageAuto() —— 选择房间不绑定输入，保持空实现
+    public void attachToPrimaryStageAuto() { /* no-op */ }
+
+    // ============== 内部实现 ==============
+
+    private void ioLoop() {
+        try {
+            String line;
+            while (running && (line = in.readLine()) != null) {
+                handleServerLine(line.trim());
+            }
+        } catch (SocketException se) {
+            // 连接异常/关闭
+        } catch (IOException e) {
+            System.out.println("[Client] IO error: " + e.getMessage());
+        } finally {
+            running = false;
+            closeQuietly();
+            notifyGameStatus("DISCONNECTED");
         }
     }
 
+    private void handleServerLine(String line) {
+        if (line.isEmpty()) return;
+        // System.out.println("[Client] <= " + line);
+
+        try {
+            if (line.startsWith("ASSIGN:")) {
+                String id = line.substring("ASSIGN:".length());
+                notifyAssigned(id);
+                return;
+            }
+            if (line.startsWith("INFO:PLAYER_STATE:")) {
+                // INFO:PLAYER_STATE:<p1|p2>:<READY|WAITING>
+                String[] parts = line.split(":", 4);
+                if (parts.length >= 4) {
+                    String pid = parts[2];
+                    boolean present = "READY".equalsIgnoreCase(parts[3]); // 语义：READY 表示占位存在
+                    notifyPlayerState(pid, present);
+                }
+                return;
+            }
+            if (line.startsWith("PLAYER_LEFT:")) {
+                String pid = line.substring("PLAYER_LEFT:".length());
+                notifyPlayerLeft(pid);
+                return;
+            }
+            if (line.startsWith("READY:")) {
+                // READY:<p1|p2>:<0|1>
+                String[] parts = line.split(":", 3);
+                if (parts.length == 3) {
+                    notifyReady(parts[1], "1".equals(parts[2]));
+                }
+                return;
+            }
+            if (line.startsWith("SELECT:")) {
+                // SELECT:<p1|p2>:<int>
+                String[] parts = line.split(":", 3);
+                if (parts.length == 3) {
+                    try {
+                        notifySelected(parts[1], Integer.parseInt(parts[2]));
+                    } catch (NumberFormatException ignored) {}
+                }
+                return;
+            }
+            if (line.startsWith("START:")) {
+                // START:<ct1>:<ct2>
+                String[] parts = line.split(":", 3);
+                if (parts.length == 3) {
+                    try {
+                        notifyStart(Integer.parseInt(parts[1]), Integer.parseInt(parts[2]));
+                    } catch (NumberFormatException ignored) {}
+                }
+                return;
+            }
+            if (line.startsWith("GAME_STATUS:")) {
+                notifyGameStatus(line.substring("GAME_STATUS:".length()));
+                return;
+            }
+            if (line.startsWith("KEY_DOWN:") || line.startsWith("KEY_UP:")) {
+                // KEY_DOWN:<p1|p2>:<KEY>
+                boolean down = line.startsWith("KEY_DOWN:");
+                String[] parts = line.split(":", 3);
+                if (parts.length == 3) {
+                    String pid = parts[1];
+                    KeyCode code = keyCodeSafe(parts[2]);
+                    if (code != null) {
+                        applyServerKey(pid, code, down);
+                    }
+                }
+                return;
+            }
+            if (line.startsWith("KEY_STATE:")) {
+                // KEY_STATE:<p1|p2>:key1,key2,...
+                String[] parts = line.split(":", 3);
+                if (parts.length == 3) {
+                    String pid = parts[1];
+                    Set<KeyCode> newSet = parseKeyList(parts[2]);
+                    reconcileKeyState(pid, newSet);
+                }
+            }
+        } catch (Exception ex) {
+            System.out.println("[Client] parse error for line: " + line + " -> " + ex.getMessage());
+        }
+    }
+
+    private void applyServerKey(String pid, KeyCode code, boolean down) {
+        // 记录服务器权威集合
+        Set<KeyCode> set = serverPressed.computeIfAbsent(pid, k -> Collections.synchronizedSet(new HashSet<>()));
+        if (down) set.add(code); else set.remove(code);
+
+        // 注入 FX 事件
+        if (down) {
+            injectKeyPressed(code);
+        } else {
+            injectKeyReleased(code);
+        }
+    }
+
+    private void reconcileKeyState(String pid, Set<KeyCode> newSet) {
+        Set<KeyCode> current = serverPressed.computeIfAbsent(pid, k -> Collections.synchronizedSet(new HashSet<>()));
+        // 需要按下的补发
+        for (KeyCode code : newSet) {
+            if (!current.contains(code)) {
+                current.add(code);
+                injectKeyPressed(code);
+            }
+        }
+        // 需要抬起的补发
+        Iterator<KeyCode> it = current.iterator();
+        while (it.hasNext()) {
+            KeyCode code = it.next();
+            if (!newSet.contains(code)) {
+                it.remove();
+                injectKeyReleased(code);
+            }
+        }
+    }
+
+    private void injectKeyPressed(KeyCode code) {
+        runOnFxThreadOrNow(() -> {
+            pressedByServer.add(code);
+            try {
+                // 关键：标记为服务器注入，允许 KeyInput 在联机模式下接收这些事件
+                KeyInput.beginServerInjection();
+                for (Scene s : attachedScenes) {
+                    KeyEvent evt = new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, false, false, false, false);
+                    Event.fireEvent(s, evt);
+                }
+            } finally {
+                KeyInput.endServerInjection();
+            }
+        });
+    }
+
+    private void injectKeyReleased(KeyCode code) {
+        runOnFxThreadOrNow(() -> {
+            pressedByServer.add(code);
+            try {
+                // 关键：标记为服务器注入，允许 KeyInput 在联机模式下接收这些事件
+                KeyInput.beginServerInjection();
+                for (Scene s : attachedScenes) {
+                    KeyEvent evt = new KeyEvent(KeyEvent.KEY_RELEASED, "", "", code, false, false, false, false);
+                    Event.fireEvent(s, evt);
+                }
+            } finally {
+                KeyInput.endServerInjection();
+            }
+        });
+    }
+
+    private Set<KeyCode> parseKeyList(String csv) {
+        Set<KeyCode> set = Collections.synchronizedSet(new HashSet<>());
+        if (csv == null || csv.isBlank()) return set;
+        String[] ks = csv.split(",");
+        for (String k : ks) {
+            KeyCode code = keyCodeSafe(k.trim());
+            if (code != null) set.add(code);
+        }
+        return set;
+    }
+
+    private KeyCode keyCodeSafe(String name) {
+        try {
+            return KeyCode.valueOf(name);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private boolean isWatcher() {
+        String id = assignedId;
+        return id == null || id.startsWith("w");
+    }
+
+    private boolean isKeyAllowedForSelf(KeyCode code) {
+        if ("p1".equals(assignedId)) return P1_KEYS.contains(code);
+        if ("p2".equals(assignedId)) return P2_KEYS.contains(code);
+        return false;
+    }
+
+    private void sendLine(String s) {
+        if (out != null) {
+            out.println(s);
+            out.flush();
+        }
+    }
+
+    private void closeQuietly() {
+        try { if (in != null) in.close(); } catch (IOException ignored) {}
+        try { if (out != null) out.close(); } catch (Exception ignored) {}
+        try { if (socket != null && !socket.isClosed()) socket.close(); } catch (IOException ignored) {}
+        in = null; out = null; socket = null;
+        pressedLocally.clear();
+        pressedByServer.clear();
+        serverPressed.values().forEach(Set::clear);
+    }
+
+    private void runOnFxThreadOrNow(Runnable r) {
+        if (Platform.isFxApplicationThread()) {
+            r.run();
+        } else {
+            Platform.runLater(r);
+        }
+    }
+
+    // ============== 原事件分发保持 ==============
+
     private void notifyAssigned(String id) {
         this.assignedId = id;
+        System.out.println("[Client] Assigned as: " + id);
         runOnFxThreadOrNow(() -> connectionListeners.forEach(l -> {
             try { l.onAssigned(id); } catch (Exception ignored) {}
         }));
@@ -102,428 +459,85 @@ public class NetworkClient {
         }));
     }
 
-    private final String host;
-    private final int port;
-    private final String desiredPlayerId;
-
-    private volatile boolean running = false;
-    private Thread ioThread;
-
-    private Socket socket;
-    private BufferedReader in;
-    private PrintWriter out;
-
-    private final Set<KeyCode> pressedByClient = Collections.synchronizedSet(new HashSet<>());
-    private final Set<KeyCode> pressedLocally = Collections.synchronizedSet(new HashSet<>());
-
-    private final Map<String, Map<Action, KeyCode>> perPlayerKeyMap = new ConcurrentHashMap<>();
-    private final Set<Scene> attachedScenes = Collections.newSetFromMap(new IdentityHashMap<>());
-
-    private volatile String assignedId;
-
-    public NetworkClient(String host, int port) {
-        this(host, port, null);
+    private void notifyGameStatus(String status) {
+        runOnFxThreadOrNow(() -> connectionListeners.forEach(l -> {
+            try { l.onGameStatusChanged(status); } catch (Exception ignored) {}
+        }));
     }
 
-    public NetworkClient(String host, int port, String desiredPlayerId) {
-        this.host = host;
-        this.port = port;
-        this.desiredPlayerId = desiredPlayerId;
-        initDefaultKeyMaps();
+    // 若项目中已有该接口定义，可移除此处重复声明
+    public interface ConnectionListener {
+        void onAssigned(String id);
+        void onPlayerState(String id, boolean present);
+        void onPlayerLeft(String id);
+        void onReadyState(String id, boolean ready);
+        void onSelected(String id, int characterId);
+        void onStartGame(int ct1, int ct2);
+        void onGameStatusChanged(String status);
     }
-
-    public String getAssignedId() { return assignedId; }
-
-    private void initDefaultKeyMaps() {
-        Map<Action, KeyCode> p1 = new EnumMap<>(Action.class);
-        p1.put(Action.MOVE_LEFT_ON, KeyCode.A);
-        p1.put(Action.MOVE_LEFT_OFF, KeyCode.A);
-        p1.put(Action.MOVE_RIGHT_ON, KeyCode.D);
-        p1.put(Action.MOVE_RIGHT_OFF, KeyCode.D);
-        p1.put(Action.JUMP, KeyCode.W);
-        p1.put(Action.LIGHT_HIT, KeyCode.Q);
-        p1.put(Action.HEAVY_HIT, KeyCode.E);
-        p1.put(Action.LIGHT_HIT_UP, KeyCode.Q);
-        p1.put(Action.LIGHT_HIT_DOWN, KeyCode.Q);
-        p1.put(Action.HEAVY_HIT_UP, KeyCode.E);
-        p1.put(Action.HEAVY_HIT_DOWN, KeyCode.E);
-
-        Map<Action, KeyCode> p2 = new EnumMap<>(Action.class);
-        p2.put(Action.MOVE_LEFT_ON, KeyCode.J);
-        p2.put(Action.MOVE_LEFT_OFF, KeyCode.J);
-        p2.put(Action.MOVE_RIGHT_ON, KeyCode.L);
-        p2.put(Action.MOVE_RIGHT_OFF, KeyCode.L);
-        p2.put(Action.JUMP, KeyCode.I);
-        p2.put(Action.LIGHT_HIT, KeyCode.U);
-        p2.put(Action.HEAVY_HIT, KeyCode.O);
-        p2.put(Action.LIGHT_HIT_UP, KeyCode.U);
-        p2.put(Action.LIGHT_HIT_DOWN, KeyCode.U);
-        p2.put(Action.HEAVY_HIT_UP, KeyCode.O);
-        p2.put(Action.HEAVY_HIT_DOWN, KeyCode.O);
-
-        perPlayerKeyMap.put("p1", p1);
-        perPlayerKeyMap.put("p2", p2);
-    }
-
-    public void setPlayerKeyMap(String playerId, Map<Action, KeyCode> map) {
-        if (playerId == null || map == null) return;
-        perPlayerKeyMap.put(playerId, new EnumMap<>(map));
-    }
-
-    // 大厅发送
-    public void sendSelect(int characterId) {
-        // 允许发送 0（撤销）
-        sendLine("SELECT:" + characterId);
-    }
-
-    public void sendReady(boolean ready) {
-        sendLine("READY:" + (ready ? "1" : "0"));
-    }
-
-    public void sendStartRequest() {
-        sendLine("START");
-    }
-
-    // 按键转发绑定（原有）
-    public void attachToScene(Scene scene) {
-        if (scene == null) return;
-        if (attachedScenes.contains(scene)) return;
-        attachedScenes.add(scene);
-
-        scene.addEventFilter(KeyEvent.KEY_PRESSED, ev -> {
-            KeyCode code = ev.getCode();
-            if (code == null) return;
-            if (pressedByClient.contains(code)) return;
-            if (pressedLocally.add(code)) {
-                sendKeyPress(code);
-            }
-        });
-        scene.addEventFilter(KeyEvent.KEY_RELEASED, ev -> {
-            KeyCode code = ev.getCode();
-            if (code == null) return;
-            if (pressedByClient.contains(code)) return;
-            if (pressedLocally.remove(code)) {
-                sendKeyRelease(code);
-            }
-        });
-
-        System.out.println("[Client] input attached to Scene@" + Integer.toHexString(System.identityHashCode(scene)));
-    }
-
-    public boolean attachToPrimaryScene() {
-        Scene s = getScene();
-        if (s != null) {
-            attachToScene(s);
-            return true;
-        }
-        return false;
-    }
-
-    public void attachToPrimaryStageAuto() {
-        runOnFxThreadOrNow(() -> {
-            Stage stage;
-            try { stage = FXGL.getPrimaryStage(); }
-            catch (Exception e) { System.out.println("[Client] getPrimaryStage failed: " + e.getMessage()); return; }
-            if (stage == null) return;
-
-            Scene current = stage.getScene();
-            if (current != null) attachToScene(current);
-
-            stage.sceneProperty().addListener((obs, oldScene, newScene) -> {
-                if (newScene != null) attachToScene(newScene);
-            });
-            System.out.println("[Client] primary stage auto-attach enabled");
-        });
-    }
-
-    public synchronized void start() {
-        if (running) return;
-        running = true;
-        ioThread = new Thread(this::runLoop, "NetworkClient-IO");
-        ioThread.setDaemon(true);
-        ioThread.start();
-    }
-
-    public synchronized void stop() {
-        running = false;
-        closeSilently();
-        if (ioThread != null) {
-            try { ioThread.join(1000); } catch (InterruptedException ignored) {}
-            ioThread = null;
-        }
-        flushAllPressedKeys();
-        pressedLocally.clear();
-        System.out.println("[Client] stopped");
-    }
-
-    public void sendKeyPress(KeyCode code) {
+    private void simulateServerKeyPress(KeyCode code) {
         if (code == null) return;
-        sendLine("KEY:PRESS:" + code.name());
-    }
-
-    public void sendKeyRelease(KeyCode code) {
-        if (code == null) return;
-        sendLine("KEY:RELEASE:" + code.name());
-    }
-
-    public void sendAction(Action action) {
-        if (action == null) return;
-        String pid = assignedId != null ? assignedId : (desiredPlayerId != null ? desiredPlayerId : "p1");
-        sendLine("ACTION:" + pid + ":" + action.name());
-    }
-
-    public void sendLine(String line) {
-        PrintWriter writer = out;
-        if (writer != null) {
-            writer.println(line);
-            writer.flush();
-            System.out.println("[Client] TX " + line);
-        } else {
-            System.out.println("[Client] TX drop (not connected): " + line);
-        }
-    }
-
-    private void runLoop() {
-        while (running) {
-            try {
-                connect();
-                System.out.println("[Client] connected to " + host + ":" + port);
-                if (desiredPlayerId != null && !desiredPlayerId.isEmpty()) {
-                    sendLine("HELLO:" + desiredPlayerId);
-                }
-                String line;
-                while (running && (line = in.readLine()) != null) {
-                    line = line.trim();
-                    if (!line.isEmpty()) {
-                        System.out.println("[Client] RX " + line);
-                        handleLine(line);
-                    }
-                }
-                System.out.println("[Client] server closed connection");
-            } catch (IOException e) {
-                System.out.println("[Client] connect/read error: " + e.getMessage());
-                sleep(1000);
-            } finally {
-                closeSilently();
-            }
-        }
-    }
-
-    private void connect() throws IOException {
-        System.out.println("[Client] connecting " + host + ":" + port + " ...");
-        socket = new Socket(host, port);
-        socket.setTcpNoDelay(true);
-        in = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
-        out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8), true);
-    }
-
-    private void closeSilently() {
-        try { if (out != null) out.close(); } catch (Exception ignored) {}
-        try { if (in != null) in.close(); } catch (Exception ignored) {}
-        try { if (socket != null && !socket.isClosed()) socket.close(); } catch (Exception ignored) {}
-        out = null;
-        in = null;
-        socket = null;
-    }
-
-    private void handleLine(String line) {
-        try {
-            if (line.startsWith("KEY:")) {
-                handleKeyLine(line);
-            } else if (line.startsWith("ACTION:")) {
-                handleActionLine(line);
-            } else if (line.startsWith("ASSIGN:")) {
-                String assigned = line.substring("ASSIGN:".length()).trim();
-                System.out.println("[Client] assigned as " + assigned);
-                notifyAssigned(assigned);
-            } else if (line.startsWith("INFO:")) {
-                handleInfoLine(line);
-            } else if (line.startsWith("READY:")) {
-                handleReadyLine(line);
-            } else if (line.startsWith("SELECT:")) {
-                handleSelectLine(line);
-            } else if (line.startsWith("START:")) {
-                handleStartLine(line);
-            } else if (line.startsWith("ERROR:")) {
-                System.out.println("[Client] server error: " + line);
-            }
-        } catch (Exception e) {
-            System.out.println("[Client] handle error: " + e.getMessage());
-        }
-    }
-
-    private void handleInfoLine(String line) {
-        String[] parts = line.split(":");
-        if (parts.length < 2) return;
-
-        if ("INFO".equals(parts[0]) && "PLAYER_STATE".equals(parts[1]) && parts.length >= 4) {
-            String playerId = parts[2].trim().toLowerCase();
-            String state = parts[3].trim().toUpperCase();
-            boolean present = "READY".equals(state) || "1".equals(state) || "CONNECTED".equals(state);
-            notifyPlayerState(playerId, present);
-            return;
-        }
-
-        if ("INFO".equals(parts[0]) && "PLAYER_LEFT".equals(parts[1]) && parts.length >= 3) {
-            String playerId = parts[2].trim().toLowerCase();
-            notifyPlayerLeft(playerId);
-            notifyPlayerState(playerId, false);
-        }
-    }
-
-    private void handleReadyLine(String line) {
-        // READY:<playerId>:<0|1>
-        String[] p = line.split(":");
-        if (p.length != 3) return;
-        String pid = p[1].trim().toLowerCase();
-        String v = p[2].trim();
-        boolean r = "1".equals(v) || "true".equalsIgnoreCase(v);
-        notifyReady(pid, r);
-    }
-
-    private void handleSelectLine(String line) {
-        // SELECT:<playerId>:<characterId>
-        String[] p = line.split(":");
-        if (p.length != 3) return;
-        String pid = p[1].trim().toLowerCase();
-        int cid = 0;
-        try { cid = Integer.parseInt(p[2].trim()); } catch (NumberFormatException ignored) {}
-        notifySelected(pid, cid);
-    }
-
-    private void handleStartLine(String line) {
-        // START:<ct1>:<ct2>
-        String[] p = line.split(":");
-        if (p.length != 3) return;
-        int ct1 = 0, ct2 = 0;
-        try { ct1 = Integer.parseInt(p[1].trim()); } catch (NumberFormatException ignored) {}
-        try { ct2 = Integer.parseInt(p[2].trim()); } catch (NumberFormatException ignored) {}
-        notifyStart(ct1, ct2);
-    }
-
-    private void handleKeyLine(String line) {
-        String[] parts = line.split(":");
-        if (parts.length != 3) return;
-
-        String op = parts[1].trim().toUpperCase();
-        String keyName = parts[2].trim().toUpperCase();
-
-        final KeyCode code;
-        try {
-            code = KeyCode.valueOf(keyName);
-        } catch (IllegalArgumentException ex) {
-            System.out.println("[Client] unknown KeyCode: " + keyName);
-            return;
-        }
-
-        switch (op) {
-            case "PRESS":
-                simulateKeyPress(code);
-                break;
-            case "RELEASE":
-                simulateKeyRelease(code);
-                break;
-            default:
-                System.out.println("[Client] unknown KEY op: " + op);
-        }
-    }
-
-    private void handleActionLine(String line) {
-        String[] parts = line.split(":");
-        if (parts.length != 3) return;
-
-        String playerId = parts[1].trim();
-        String cmd = parts[2].trim().toUpperCase();
-
-        final Action action;
-        try {
-            action = Action.valueOf(cmd);
-        } catch (IllegalArgumentException e) {
-            System.out.println("[Client] unknown action: " + cmd);
-            return;
-        }
-
-        Map<Action, KeyCode> map = perPlayerKeyMap.get(playerId);
-        if (map == null) {
-            System.out.println("[Client] no key map for playerId " + playerId);
-            return;
-        }
-
-        KeyCode code = map.get(action);
-        if (code == null) {
-            System.out.println("[Client] no key for action " + action + " of " + playerId);
-            return;
-        }
-
-        switch (action) {
-            case MOVE_LEFT_ON:
-            case MOVE_RIGHT_ON:
-                simulateKeyPress(code);
-                break;
-
-            case MOVE_LEFT_OFF:
-            case MOVE_RIGHT_OFF:
-                simulateKeyRelease(code);
-                break;
-
-            case JUMP:
-            case LIGHT_HIT:
-            case HEAVY_HIT:
-            case LIGHT_HIT_UP:
-            case LIGHT_HIT_DOWN:
-            case HEAVY_HIT_UP:
-            case HEAVY_HIT_DOWN:
-                simulateKeyPress(code);
-                scheduleRelease(code, 30);
-                break;
-        }
-    }
-
-    private void simulateKeyPress(KeyCode code) {
-        if (code == null) return;
-        if (pressedByClient.contains(code)) return;
-        pressedByClient.add(code);
+        if (pressedByServer.contains(code)) return;
+        pressedByServer.add(code);
 
         Scene scene = getScene();
         if (scene == null) {
-            System.out.println("[Client] scene null on PRESS " + code);
+            System.out.println("[Client] scene null on server PRESS " + code);
             return;
         }
 
+        System.out.println("[Client] Simulating server key PRESS: " + code);
         runOnFxThreadOrNow(() -> {
             KeyEvent ev = new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, false, false, false, false);
-            Event.fireEvent(scene, ev);
+            // 标记为服务器注入，允许 KeyInput 放行这次事件
+            try {
+                KeyInput.beginServerInjection();
+                Event.fireEvent(scene, ev);
+            } finally {
+                KeyInput.endServerInjection();
+            }
         });
     }
 
-    private void simulateKeyRelease(KeyCode code) {
+    private void simulateServerKeyRelease(KeyCode code) {
         if (code == null) return;
-        pressedByClient.remove(code);
+        pressedByServer.remove(code);
 
         Scene scene = getScene();
         if (scene == null) {
-            System.out.println("[Client] scene null on RELEASE " + code);
+            System.out.println("[Client] scene null on server RELEASE " + code);
             return;
         }
 
+        System.out.println("[Client] Simulating server key RELEASE: " + code);
         runOnFxThreadOrNow(() -> {
             KeyEvent ev = new KeyEvent(KeyEvent.KEY_RELEASED, "", "", code, false, false, false, false);
-            Event.fireEvent(scene, ev);
+            try {
+                KeyInput.beginServerInjection();
+                Event.fireEvent(scene, ev);
+            } finally {
+                KeyInput.endServerInjection();
+            }
         });
     }
 
     private void flushAllPressedKeys() {
         Scene scene = getScene();
         if (scene == null) {
-            pressedByClient.clear();
+            pressedByServer.clear();
             return;
         }
-        Set<KeyCode> snapshot = new HashSet<>(pressedByClient);
-        pressedByClient.clear();
+        Set<KeyCode> snapshot = new HashSet<>(pressedByServer);
+        pressedByServer.clear();
         runOnFxThreadOrNow(() -> {
             for (KeyCode code : snapshot) {
                 KeyEvent ev = new KeyEvent(KeyEvent.KEY_RELEASED, "", "", code, false, false, false, false);
-                Event.fireEvent(scene, ev);
+                try {
+                    KeyInput.beginServerInjection();
+                    Event.fireEvent(scene, ev);
+                } finally {
+                    KeyInput.endServerInjection();
+                }
             }
         });
     }
@@ -534,16 +548,5 @@ public class NetworkClient {
         } catch (Exception e) {
             return null;
         }
-    }
-
-    private void scheduleRelease(KeyCode code, int delayMs) {
-        new Thread(() -> {
-            try { Thread.sleep(delayMs); } catch (InterruptedException ignored) {}
-            simulateKeyRelease(code);
-        }, "NetworkClient-ReleaseDelay").start();
-    }
-
-    private static void sleep(long ms) {
-        try { Thread.sleep(ms); } catch (InterruptedException ignored) {}
     }
 }
