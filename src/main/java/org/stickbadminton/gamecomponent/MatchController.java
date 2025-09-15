@@ -4,6 +4,7 @@ import javafx.scene.image.Image;
 import org.stickbadminton.GameObject;
 import org.stickbadminton.SoundPlay;
 import org.stickbadminton.UIObject;
+import org.stickbadminton.gamecomponent.network.NetworkClient;
 
 
 public class MatchController extends GameObject{
@@ -14,10 +15,50 @@ public class MatchController extends GameObject{
     public int serveSide = 1; // -1 -> 右侧发球, 1 -> 左侧发球
     private double playBGMTimer = 0.0;
     private double matchEndTimer = 0.0;
+
+    // 添加字段
+    private boolean isHost = false;
+    private NetworkClient netClient = null;
+
+    // 添加 setter 方法
+    public void setHost(boolean isHost) {
+        this.isHost = isHost;
+    }
+
+    public void setNetClient(NetworkClient netClient) {
+        this.netClient = netClient;
+    }
+
+    // 可选：添加 getter
+    public boolean isHost() {
+        return isHost;
+    }
+
+    public NetworkClient getNetClient() {
+        return netClient;
+    }
+
     public MatchController() {
         super("controller", new Image("stickman_head1.png"));
         setVisible(false);
     }
+
+    public void applyBallState(double x, double y, double speedX, double speedY) {
+        Badminton ball = (Badminton) inRoom.getObject("badminton");
+        if (ball == null) return;
+
+        // 标记为网络控制，防止本地物理逻辑干扰
+        ball.isNetworkControlled = true;
+
+        // 同步位置和速度
+        ball.setCenterPosition(x, y);
+        ball.speedX = speedX;
+        ball.speedY = speedY;
+
+        // 可选：平滑插值（Lerp）以减少网络抖动
+        // ball.targetX = x; ball.targetY = y; ...
+    }
+
     public void matchStart() {
         ballHitGroundTimer = 0.0;
         scoreChangeTimer = 0.01;

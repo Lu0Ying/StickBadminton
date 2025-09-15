@@ -9,6 +9,9 @@ import org.stickbadminton.KeyInput;
 import org.stickbadminton.*;
 
 public class Badminton extends GameObject {
+
+    public boolean isNetworkControlled = false; // 是否由网络同步控制
+
     public static int sideServe = 0; // 当前发球人
     public static double airResistance = 0;  //空气阻力加速度
     public boolean isFrozen = true; // 待发球状态时为 false，开球后能够自由移动，设为 true
@@ -44,6 +47,12 @@ public class Badminton extends GameObject {
 
     @Override
     public void onUpdate() {
+
+        if (isNetworkControlled) {
+            // 如果是网络控制，不运行物理逻辑
+            return;
+        }
+
         if (isFrozen) {
             speedY = 0;
             if (sideServe == StickMan.sideLeft) { // 右侧火柴人

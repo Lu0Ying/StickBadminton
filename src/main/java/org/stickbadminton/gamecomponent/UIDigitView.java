@@ -9,7 +9,7 @@ import org.stickbadminton.UIObject;
 
 import java.util.Objects;
 
-public class UIDigitView extends UIObject {
+public class  UIDigitView extends UIObject {
     private final ImageView digitView; // 用于更新显示的数字
     @Override
     public Node getUINode() {

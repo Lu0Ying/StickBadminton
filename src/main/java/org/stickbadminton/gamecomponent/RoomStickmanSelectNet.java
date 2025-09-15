@@ -181,6 +181,11 @@ public class RoomStickmanSelectNet extends Room {
                 public void onGameStatusChanged(String status) {
                     System.out.println("[SelectNet] Game status: " + status);
                 }
+
+                @Override
+                public void onBallState(double x, double y, double speedX, double speedY) {
+
+                }
             });
             netClient.connect();
         } catch (Exception e) {

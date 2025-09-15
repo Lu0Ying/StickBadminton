@@ -474,6 +474,9 @@ public class NetworkClient {
         void onSelected(String id, int characterId);
         void onStartGame(int ct1, int ct2);
         void onGameStatusChanged(String status);
+
+        // 新增：用于接收球的状态同步
+        void onBallState(double x, double y, double speedX, double speedY);
     }
     private void simulateServerKeyPress(KeyCode code) {
         if (code == null) return;
