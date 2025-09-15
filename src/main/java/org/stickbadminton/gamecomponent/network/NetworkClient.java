@@ -1,3 +1,7 @@
+
+
+
+
 package org.stickbadminton.gamecomponent.network;
 
 import com.almasb.fxgl.dsl.FXGL;
@@ -20,22 +24,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * 文本协议客户端（服务端权威，同步回显）：
- *
- * 发送：
- * - KEY:PRESS/RELEASE:<KEYCODE>
- * - ACTION:<任意占位>:<COMMAND>（服务端会盖章为你的身份）
- * - SELECT:<characterId>，READY:<0|1>，START
- *
- * 接收（仅以此驱动游戏状态，拦截本地物理按键，防止本地自算）：
- * - KEY:<p1|p2>:PRESS/RELEASE:<KEYCODE>
- * - ACTION:<p1|p2>:<COMMAND>
- * - SELECT:<playerId>:<characterId>，READY:<playerId>:<0|1>，START:<ct1>:<ct2>
- *
- * 输入限制（客户端侧也做软约束，服务端有强校验）：
- * - p1 仅采集/发送 q w e a s d
- * - p2 仅采集/发送 u i o j k l
- * - watcher 不发送 KEY/ACTION
+ * 文本协议客户端，新增大厅协议：
+ * - 发送：SELECT:<characterId>，READY:<0|1>，START
+ * - 接收：SELECT:<playerId>:<characterId>，READY:<playerId>:<0|1>，START:<ct1>:<ct2>
  */
 public class NetworkClient {
 
@@ -58,7 +49,6 @@ public class NetworkClient {
         default void onReadyState(String playerId, boolean ready) {}
         default void onSelected(String playerId, int characterId) {}
         default void onStartGame(int ct1, int ct2) {}
-        default void onGameStatusChanged(String status) {} // STARTED, ENDED 等
     }
 
     private final List<ConnectionListener> connectionListeners = new CopyOnWriteArrayList<>();
@@ -77,7 +67,6 @@ public class NetworkClient {
 
     private void notifyAssigned(String id) {
         this.assignedId = id;
-        System.out.println("[Client] Assigned as: " + id);
         runOnFxThreadOrNow(() -> connectionListeners.forEach(l -> {
             try { l.onAssigned(id); } catch (Exception ignored) {}
         }));
@@ -113,12 +102,6 @@ public class NetworkClient {
         }));
     }
 
-    private void notifyGameStatus(String status) {
-        runOnFxThreadOrNow(() -> connectionListeners.forEach(l -> {
-            try { l.onGameStatusChanged(status); } catch (Exception ignored) {}
-        }));
-    }
-
     private final String host;
     private final int port;
     private final String desiredPlayerId;
@@ -130,19 +113,13 @@ public class NetworkClient {
     private BufferedReader in;
     private PrintWriter out;
 
-    // 由服务端回显注入的按键集合，用于区分物理输入与网络注入，避免回显->本地转发
-    private final Set<KeyCode> pressedByServer = Collections.synchronizedSet(new HashSet<>());
-    // 本地物理按下状态，用于只在第一次按下时发送 PRESS，释放时发送 RELEASE
+    private final Set<KeyCode> pressedByClient = Collections.synchronizedSet(new HashSet<>());
     private final Set<KeyCode> pressedLocally = Collections.synchronizedSet(new HashSet<>());
 
     private final Map<String, Map<Action, KeyCode>> perPlayerKeyMap = new ConcurrentHashMap<>();
     private final Set<Scene> attachedScenes = Collections.newSetFromMap(new IdentityHashMap<>());
 
     private volatile String assignedId;
-
-    // 本地键位白名单（客户端侧软校验）
-    private static final EnumSet<KeyCode> P1_KEYS = EnumSet.of(KeyCode.Q, KeyCode.W, KeyCode.E, KeyCode.A, KeyCode.S, KeyCode.D);
-    private static final EnumSet<KeyCode> P2_KEYS = EnumSet.of(KeyCode.U, KeyCode.I, KeyCode.O, KeyCode.J, KeyCode.K, KeyCode.L);
 
     public NetworkClient(String host, int port) {
         this(host, port, null);
@@ -167,9 +144,9 @@ public class NetworkClient {
         p1.put(Action.LIGHT_HIT, KeyCode.Q);
         p1.put(Action.HEAVY_HIT, KeyCode.E);
         p1.put(Action.LIGHT_HIT_UP, KeyCode.Q);
-        p1.put(Action.LIGHT_HIT_DOWN, KeyCode.S); // 修改为S键
+        p1.put(Action.LIGHT_HIT_DOWN, KeyCode.Q);
         p1.put(Action.HEAVY_HIT_UP, KeyCode.E);
-        p1.put(Action.HEAVY_HIT_DOWN, KeyCode.S); // 修改为S键
+        p1.put(Action.HEAVY_HIT_DOWN, KeyCode.E);
 
         Map<Action, KeyCode> p2 = new EnumMap<>(Action.class);
         p2.put(Action.MOVE_LEFT_ON, KeyCode.J);
@@ -180,9 +157,9 @@ public class NetworkClient {
         p2.put(Action.LIGHT_HIT, KeyCode.U);
         p2.put(Action.HEAVY_HIT, KeyCode.O);
         p2.put(Action.LIGHT_HIT_UP, KeyCode.U);
-        p2.put(Action.LIGHT_HIT_DOWN, KeyCode.K); // 修改为K键
+        p2.put(Action.LIGHT_HIT_DOWN, KeyCode.U);
         p2.put(Action.HEAVY_HIT_UP, KeyCode.O);
-        p2.put(Action.HEAVY_HIT_DOWN, KeyCode.K); // 修改为K键
+        p2.put(Action.HEAVY_HIT_DOWN, KeyCode.O);
 
         perPlayerKeyMap.put("p1", p1);
         perPlayerKeyMap.put("p2", p2);
@@ -207,33 +184,7 @@ public class NetworkClient {
         sendLine("START");
     }
 
-    private boolean isController() {
-        return "p1".equalsIgnoreCase(assignedId) || "p2".equalsIgnoreCase(assignedId);
-    }
-
-    private boolean isKeyAllowedForThisClient(KeyCode code) {
-        if (!isController()) {
-            System.out.println("[Client] Not a controller (" + assignedId + "), rejecting key: " + code);
-            return false;
-        }
-        if ("p1".equalsIgnoreCase(assignedId)) {
-            boolean allowed = P1_KEYS.contains(code);
-            if (!allowed) {
-                System.out.println("[Client] P1 key not allowed: " + code + " (allowed: " + P1_KEYS + ")");
-            }
-            return allowed;
-        }
-        if ("p2".equalsIgnoreCase(assignedId)) {
-            boolean allowed = P2_KEYS.contains(code);
-            if (!allowed) {
-                System.out.println("[Client] P2 key not allowed: " + code + " (allowed: " + P2_KEYS + ")");
-            }
-            return allowed;
-        }
-        return false;
-    }
-
-    // 按键转发绑定（拦截物理输入，避免客户端自算；仅发送到服务器）
+    // 按键转发绑定（原有）
     public void attachToScene(Scene scene) {
         if (scene == null) return;
         if (attachedScenes.contains(scene)) return;
@@ -242,54 +193,18 @@ public class NetworkClient {
         scene.addEventFilter(KeyEvent.KEY_PRESSED, ev -> {
             KeyCode code = ev.getCode();
             if (code == null) return;
-
-            // 如果是由服务端注入的网络回显事件，则放行给游戏，不发送、不消费
-            if (pressedByServer.contains(code)) {
-                System.out.println("[Client] Server key PRESS passed through: " + code);
-                return;
-            }
-
-            // watcher 或未分配 或 非法键位：消费事件，禁止本地生效，不发送
-            if (!isKeyAllowedForThisClient(code)) {
-                System.out.println("[Client] Local key PRESS blocked: " + code + " (assignedId=" + assignedId + ")");
-                ev.consume();
-                return;
-            }
-
-            // 仅首次按下发送 PRESS
+            if (pressedByClient.contains(code)) return;
             if (pressedLocally.add(code)) {
-                System.out.println("[Client] Sending local key PRESS: " + code);
                 sendKeyPress(code);
             }
-            // 消费物理事件，防止本地立即生效
-            ev.consume();
         });
-
         scene.addEventFilter(KeyEvent.KEY_RELEASED, ev -> {
             KeyCode code = ev.getCode();
             if (code == null) return;
-
-            // 回显释放事件：放行
-            if (pressedByServer.contains(code)) {
-                System.out.println("[Client] Server key RELEASE passed through: " + code);
-                return;
-            }
-
-            // watcher/未分配/非法键位：消费，且清理可能残留状态
-            if (!isKeyAllowedForThisClient(code)) {
-                pressedLocally.remove(code);
-                System.out.println("[Client] Local key RELEASE blocked: " + code + " (assignedId=" + assignedId + ")");
-                ev.consume();
-                return;
-            }
-
-            // 只在本地记为按下过时发送 RELEASE
+            if (pressedByClient.contains(code)) return;
             if (pressedLocally.remove(code)) {
-                System.out.println("[Client] Sending local key RELEASE: " + code);
                 sendKeyRelease(code);
             }
-            // 同样消费物理事件，防止本地立即生效
-            ev.consume();
         });
 
         System.out.println("[Client] input attached to Scene@" + Integer.toHexString(System.identityHashCode(scene)));
@@ -338,26 +253,21 @@ public class NetworkClient {
         }
         flushAllPressedKeys();
         pressedLocally.clear();
-        assignedId = null;
         System.out.println("[Client] stopped");
     }
 
     public void sendKeyPress(KeyCode code) {
         if (code == null) return;
-        if (!isKeyAllowedForThisClient(code)) return; // 软限制
         sendLine("KEY:PRESS:" + code.name());
     }
 
     public void sendKeyRelease(KeyCode code) {
         if (code == null) return;
-        if (!isKeyAllowedForThisClient(code)) return; // 软限制
         sendLine("KEY:RELEASE:" + code.name());
     }
 
     public void sendAction(Action action) {
         if (action == null) return;
-        if (!isController()) return; // watcher 不发送
-        // 发送的 playerId 服务端会覆盖为实际分配的 assignedId，这里传什么都可以
         String pid = assignedId != null ? assignedId : (desiredPlayerId != null ? desiredPlayerId : "p1");
         sendLine("ACTION:" + pid + ":" + action.name());
     }
@@ -392,7 +302,7 @@ public class NetworkClient {
                 System.out.println("[Client] server closed connection");
             } catch (IOException e) {
                 System.out.println("[Client] connect/read error: " + e.getMessage());
-                sleep(3000); // 重连延迟增加到3秒
+                sleep(1000);
             } finally {
                 closeSilently();
             }
@@ -434,23 +344,11 @@ public class NetworkClient {
                 handleSelectLine(line);
             } else if (line.startsWith("START:")) {
                 handleStartLine(line);
-            } else if (line.startsWith("GAME_STATUS:")) {
-                handleGameStatusLine(line);
             } else if (line.startsWith("ERROR:")) {
                 System.out.println("[Client] server error: " + line);
             }
         } catch (Exception e) {
             System.out.println("[Client] handle error: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
-
-    private void handleGameStatusLine(String line) {
-        // GAME_STATUS:STARTED 或 GAME_STATUS:ENDED
-        String[] parts = line.split(":", 2);
-        if (parts.length >= 2) {
-            String status = parts[1].trim();
-            notifyGameStatus(status);
         }
     }
 
@@ -504,13 +402,11 @@ public class NetworkClient {
     }
 
     private void handleKeyLine(String line) {
-        // KEY:<playerId>:PRESS/RELEASE:<KEYCODE>
         String[] parts = line.split(":");
-        if (parts.length != 4) return;
+        if (parts.length != 3) return;
 
-        String playerId = parts[1].trim().toLowerCase();
-        String op = parts[2].trim().toUpperCase();
-        String keyName = parts[3].trim().toUpperCase();
+        String op = parts[1].trim().toUpperCase();
+        String keyName = parts[2].trim().toUpperCase();
 
         final KeyCode code;
         try {
@@ -520,14 +416,12 @@ public class NetworkClient {
             return;
         }
 
-        System.out.println("[Client] Server key command: " + playerId + " " + op + " " + code);
-
         switch (op) {
             case "PRESS":
-                simulateServerKeyPress(code);
+                simulateKeyPress(code);
                 break;
             case "RELEASE":
-                simulateServerKeyRelease(code);
+                simulateKeyRelease(code);
                 break;
             default:
                 System.out.println("[Client] unknown KEY op: " + op);
@@ -535,7 +429,6 @@ public class NetworkClient {
     }
 
     private void handleActionLine(String line) {
-        // ACTION:<playerId>:<COMMAND>
         String[] parts = line.split(":");
         if (parts.length != 3) return;
 
@@ -562,17 +455,15 @@ public class NetworkClient {
             return;
         }
 
-        System.out.println("[Client] Server action: " + playerId + " " + action + " -> " + code);
-
         switch (action) {
             case MOVE_LEFT_ON:
             case MOVE_RIGHT_ON:
-                simulateServerKeyPress(code);
+                simulateKeyPress(code);
                 break;
 
             case MOVE_LEFT_OFF:
             case MOVE_RIGHT_OFF:
-                simulateServerKeyRelease(code);
+                simulateKeyRelease(code);
                 break;
 
             case JUMP:
@@ -582,41 +473,39 @@ public class NetworkClient {
             case LIGHT_HIT_DOWN:
             case HEAVY_HIT_UP:
             case HEAVY_HIT_DOWN:
-                simulateServerKeyPress(code);
-                scheduleServerRelease(code, 50); // 增加按键持续时间
+                simulateKeyPress(code);
+                scheduleRelease(code, 30);
                 break;
         }
     }
 
-    private void simulateServerKeyPress(KeyCode code) {
+    private void simulateKeyPress(KeyCode code) {
         if (code == null) return;
-        if (pressedByServer.contains(code)) return;
-        pressedByServer.add(code);
+        if (pressedByClient.contains(code)) return;
+        pressedByClient.add(code);
 
         Scene scene = getScene();
         if (scene == null) {
-            System.out.println("[Client] scene null on server PRESS " + code);
+            System.out.println("[Client] scene null on PRESS " + code);
             return;
         }
 
-        System.out.println("[Client] Simulating server key PRESS: " + code);
         runOnFxThreadOrNow(() -> {
             KeyEvent ev = new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, false, false, false, false);
             Event.fireEvent(scene, ev);
         });
     }
 
-    private void simulateServerKeyRelease(KeyCode code) {
+    private void simulateKeyRelease(KeyCode code) {
         if (code == null) return;
-        pressedByServer.remove(code);
+        pressedByClient.remove(code);
 
         Scene scene = getScene();
         if (scene == null) {
-            System.out.println("[Client] scene null on server RELEASE " + code);
+            System.out.println("[Client] scene null on RELEASE " + code);
             return;
         }
 
-        System.out.println("[Client] Simulating server key RELEASE: " + code);
         runOnFxThreadOrNow(() -> {
             KeyEvent ev = new KeyEvent(KeyEvent.KEY_RELEASED, "", "", code, false, false, false, false);
             Event.fireEvent(scene, ev);
@@ -626,11 +515,11 @@ public class NetworkClient {
     private void flushAllPressedKeys() {
         Scene scene = getScene();
         if (scene == null) {
-            pressedByServer.clear();
+            pressedByClient.clear();
             return;
         }
-        Set<KeyCode> snapshot = new HashSet<>(pressedByServer);
-        pressedByServer.clear();
+        Set<KeyCode> snapshot = new HashSet<>(pressedByClient);
+        pressedByClient.clear();
         runOnFxThreadOrNow(() -> {
             for (KeyCode code : snapshot) {
                 KeyEvent ev = new KeyEvent(KeyEvent.KEY_RELEASED, "", "", code, false, false, false, false);
@@ -647,11 +536,11 @@ public class NetworkClient {
         }
     }
 
-    private void scheduleServerRelease(KeyCode code, int delayMs) {
+    private void scheduleRelease(KeyCode code, int delayMs) {
         new Thread(() -> {
             try { Thread.sleep(delayMs); } catch (InterruptedException ignored) {}
-            simulateServerKeyRelease(code);
-        }, "NetworkClient-ServerReleaseDelay").start();
+            simulateKeyRelease(code);
+        }, "NetworkClient-ReleaseDelay").start();
     }
 
     private static void sleep(long ms) {
