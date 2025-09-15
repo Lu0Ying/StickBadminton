@@ -8,7 +8,6 @@ import javafx.scene.control.Button;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.Background;
-import org.stickbadminton.SoundPlay;
 import org.stickbadminton.UIObject;
 
 public class UIImageButton extends UIObject {
@@ -43,4 +42,10 @@ public class UIImageButton extends UIObject {
     }
 
     public void setOnAction(EventHandler<ActionEvent> eventHandler) {button.setOnAction(eventHandler);}
+
+    // 新增：对外暴露可见性（同时设置 managed，避免占位）
+    public void setVisible(boolean visible) {
+        button.setVisible(visible);
+        button.setManaged(visible);
+    }
 }
