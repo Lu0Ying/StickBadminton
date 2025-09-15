@@ -31,6 +31,7 @@ public class StickMan extends GameObject {
     public static final boolean shotTypeDown = true;
     private double shotCooldownTimer = 0;
     public boolean isReadyingServe = false;
+    public double energyRemain = 100.0; // 满格体力 = 100
 
     public StickMan(int side, int characterType) {
         super("stickman1", new Image("stickman_head1.png")); //head
@@ -202,8 +203,6 @@ public class StickMan extends GameObject {
             }
         }
 
-
-
         if (side == 1) { // 左半场
             if (speedX < 0 && getCenterX() + speedX * GameProperties.frameTime <= GameProperties.playFieldLeft + GameProperties.playerWidth/2) {
                 speedX = 0;
@@ -223,6 +222,14 @@ public class StickMan extends GameObject {
                 speedX = 0;
                 x = GameProperties.playFieldRight - GameProperties.playerWidth/2 - spriteCenterX;
             }
+        }
+        // 体力恢复
+        if (!isJumping) {
+            if (speedX == 0)
+                energyRemain += GameProperties.idleEnergyRecover * GameProperties.frameTime;
+            else energyRemain += GameProperties.moveEnergyRecover * GameProperties.frameTime;
+            if (energyRemain > 100.0)
+                energyRemain = 100.0;
         }
 
         if (isReadyingServe) {
@@ -246,18 +253,24 @@ public class StickMan extends GameObject {
                 jumpCooldownTimer = 0;
             }
         }
+        else if (energyRemain < GameProperties.jumpEnergy) {
+            // 体力不足时禁用跳跃
+            // do nothing
+        }
         else if (isReadyingServe) {
             // 发球时禁用跳跃
             // do nothing
         }
         else if (isAIControlled) {
             if (decision.isJump == true) {
+                energyRemain -= GameProperties.jumpEnergy;
                 isJumping = true;
                 jumpCooldownTimer = GameProperties.jumpCooldown;
                 speedY = -GameProperties.jumpSpeedY;
             }
         }
         else if ((KeyInput.isKeyHolding(KeyCode.W) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.I) && side == sideLeft)) {
+            energyRemain -= GameProperties.jumpEnergy;
             isJumping = true;
             jumpCooldownTimer = GameProperties.jumpCooldown;
             speedY = -GameProperties.jumpSpeedY;
@@ -398,8 +411,13 @@ public class StickMan extends GameObject {
                 hasShotted = false;
                 if ((KeyInput.isKeyHolding(KeyCode.Q) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.U) && side == sideLeft))
                     isHeavyShot = false;
-                else if ((KeyInput.isKeyHolding(KeyCode.E) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.O) && side == sideLeft))
-                    isHeavyShot = true;
+                else if ((KeyInput.isKeyHolding(KeyCode.E) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.O) && side == sideLeft)) {
+                    if (energyRemain > GameProperties.heavyShotEnergy) { // 剩余体力大于 重击所耗体力 时消耗体力，否则无法重击，只能轻击
+                        isHeavyShot = true;
+                        energyRemain -= GameProperties.heavyShotEnergy;
+                    }
+                    else isHeavyShot = false;
+                }
                 shotCooldownTimer = GameProperties.shotCooldown;
                 shotType = shotTypeUp;
                 if (badminton != null) {

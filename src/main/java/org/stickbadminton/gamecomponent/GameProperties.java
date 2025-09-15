@@ -53,6 +53,15 @@ public class GameProperties {
     public static final double badmintonGravity = 13.0;
     // 人物移动速度
     public static final double moveSpeed = 250.0;
+    // 重击所耗体力 (人物体力满格为 100)
+    public static final double heavyShotEnergy = 30.0;
+    // 跳跃所耗体力
+    public static final double jumpEnergy = 40.0;
+    // 平地移动时所恢复体力 (单位：体力/秒)
+    public static final double moveEnergyRecover = 3.0;
+    // 站着不动时所恢复体力 (单位：体力/秒)
+    public static final double idleEnergyRecover = 20.0;
+
 
     // 以下为变量
     // 人机难度
