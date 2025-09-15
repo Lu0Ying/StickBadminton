@@ -1,3 +1,4 @@
+// RoomGameplay.java
 package org.stickbadminton.gamecomponent;
 
 import com.almasb.fxgl.dsl.FXGL;
@@ -79,42 +80,58 @@ public class RoomGameplay extends Room {
 
     // ========== 新增：设置网络监听 ==========
     private void setupNetworkListeners() {
-        netClient.addConnectionListener(new NetworkClient.ConnectionListener() {
+        netClient.setGameplayListener(new NetworkClient.GameplaySyncListener() {
             @Override
-            public void onBallState(double x, double y, double speedX, double speedY) {
+            public void onScore(int left, int right) {
                 Platform.runLater(() -> {
-                    if (matchController != null) {
-                        matchController.applyBallState(x, y, speedX, speedY);
+                    UIDigitView scoreLeftView = (UIDigitView) getUiObject("score_left");
+                    UIDigitView scoreRightView = (UIDigitView) getUiObject("score_right");
+                    if (scoreLeftView != null) scoreLeftView.setCurrentNumber(left);
+                    if (scoreRightView != null) scoreRightView.setCurrentNumber(right);
+                });
+            }
+
+            @Override
+            public void onServeSide(int side) {
+                Platform.runLater(() -> {
+                    BadmintonNet badminton = (BadmintonNet) getObject("badminton");
+                    if (badminton != null) {
+                        badminton.sideServe = side;
                     }
                 });
             }
 
             @Override
-            public void onAssigned(String id) {
-                // 可选：记录或日志
-                System.out.println("[RoomGameplay] Assigned ID: " + id);
-                // 如果需要根据 assignedId 更新 isHost，也可以在这里做
+            public void onBall(double x, double y, double vx, double vy, double rotation,
+                               boolean isFrozen, boolean isTouchedGround, int touchedTime,
+                               boolean isShotable, boolean isHitted) {
+                Platform.runLater(() -> {
+                    BadmintonNet badminton = (BadmintonNet) getObject("badminton");
+                    if (badminton != null) {
+                        badminton.updateFromServer(x, y, vx, vy, rotation, isFrozen, isTouchedGround, touchedTime, isShotable, isHitted);
+                    }
+                });
             }
 
             @Override
-            public void onSelected(String playerId, int characterId) {}
-
-            @Override
-            public void onReadyState(String playerId, boolean ready) {}
-
-            @Override
-            public void onStartGame(int ct1, int ct2) {}
-
-            @Override
-            public void onPlayerState(String playerId, boolean present) {}
-
-            @Override
-            public void onPlayerLeft(String id) {
-                // 可选处理玩家离开
+            public void onHit(String playerId, String hitType) {
+                Platform.runLater(() -> {
+                    BadmintonNet badminton = (BadmintonNet) getObject("badminton");
+                    if (badminton != null) {
+                        badminton.onHit(hitType);
+                    }
+                });
             }
 
             @Override
-            public void onGameStatusChanged(String status) {}
+            public void onNetCrash() {
+                Platform.runLater(() -> {
+                    BadmintonNet badminton = (BadmintonNet) getObject("badminton");
+                    if (badminton != null) {
+                        badminton.onNetCrashed();
+                    }
+                });
+            }
         });
     }
 
@@ -153,6 +170,10 @@ public class RoomGameplay extends Room {
         addUiObject(digitView2, 484, 21).setName("score_right");
 
         addObject(new HintKeyboard());
+
+        // 使用 BadmintonNet 而非 Badminton
+        BadmintonNet badminton = new BadmintonNet(BadmintonNet.sideServe);
+        addObject(badminton, "badminton");
 
         matchController.matchStart();
     }

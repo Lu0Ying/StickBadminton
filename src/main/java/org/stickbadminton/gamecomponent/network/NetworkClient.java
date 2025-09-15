@@ -397,6 +397,8 @@ public class NetworkClient {
     }
 
     public interface ConnectionListener {
+        void onBallState(double x, double y, double speedX, double speedY);
+
         default void onAssigned(String id) {}
         default void onPlayerState(String id, boolean present) {}
         default void onPlayerLeft(String id) {}

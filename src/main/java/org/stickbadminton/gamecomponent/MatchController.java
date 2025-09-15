@@ -1,26 +1,20 @@
+// MatchController.java
 package org.stickbadminton.gamecomponent;
 
-import javafx.scene.image.Image;
+import com.almasb.fxgl.texture.AnimatedTexture;
 import org.stickbadminton.GameObject;
-import org.stickbadminton.SoundPlay;
-import org.stickbadminton.UIObject;
+import org.stickbadminton.Room;
 import org.stickbadminton.gamecomponent.network.NetworkClient;
 
+public class MatchController extends GameObject {
 
-public class MatchController extends GameObject{
-    private double ballHitGroundTimer = 0.0;
-    private double scoreChangeTimer = 0.0;
-    private int lastPointWinner = 0; // -1 -> 右侧, 1 -> 左侧
-    private boolean isServeReadying = false; // 是否处于发球阶段
-    public int serveSide = 1; // -1 -> 右侧发球, 1 -> 左侧发球
-    private double playBGMTimer = 0.0;
-    private double matchEndTimer = 0.0;
-
-    // 添加字段
     private boolean isHost = false;
-    private NetworkClient netClient = null;
+    private NetworkClient netClient;
 
-    // 添加 setter 方法
+    public MatchController() {
+        super("controller", (AnimatedTexture) null); // 假设无图像
+    }
+
     public void setHost(boolean isHost) {
         this.isHost = isHost;
     }
@@ -29,158 +23,53 @@ public class MatchController extends GameObject{
         this.netClient = netClient;
     }
 
-    // 可选：添加 getter
-    public boolean isHost() {
-        return isHost;
-    }
-
-    public NetworkClient getNetClient() {
-        return netClient;
-    }
-
-    public MatchController() {
-        super("controller", new Image("stickman_head1.png"));
-        setVisible(false);
-    }
-
-    public void applyBallState(double x, double y, double speedX, double speedY) {
-        Badminton ball = (Badminton) inRoom.getObject("badminton");
-        if (ball == null) return;
-
-        // 标记为网络控制，防止本地物理逻辑干扰
-        ball.isNetworkControlled = true;
-
-        // 同步位置和速度
-        ball.setCenterPosition(x, y);
-        ball.speedX = speedX;
-        ball.speedY = speedY;
-
-        // 可选：平滑插值（Lerp）以减少网络抖动
-        // ball.targetX = x; ball.targetY = y; ...
-    }
-
     public void matchStart() {
-        ballHitGroundTimer = 0.0;
-        scoreChangeTimer = 0.01;
-        playBGMTimer = 0.0;
-    }
-    public void onBallGroundHit(int winner) {
-        ballHitGroundTimer = 1.0;
-        lastPointWinner = winner;
-    }
-    public void changeScore() {
-        SoundPlay.playSound("add_score.mp3", 1.0);
-        if (lastPointWinner == -1) {
-            UIObject scoreRight = inRoom.getUiObject("score_right");
-            if (scoreRight instanceof UIDigitView) {
-                UIDigitView scoreView = (UIDigitView) scoreRight;
-                scoreView.setCurrentNumber((scoreView.getCurrentNumber() + 1) % 10);
-            }
-        } else {
-            UIObject scoreLeft = inRoom.getUiObject("score_left");
-            if (scoreLeft instanceof UIDigitView) {
-                UIDigitView scoreView = (UIDigitView) scoreLeft;
-                scoreView.setCurrentNumber((scoreView.getCurrentNumber() + 1) % 10);
-            }
-        }
-
-        //判断获胜
-        UIObject scoreLeft = inRoom.getUiObject("score_left");
-        UIObject scoreRight = inRoom.getUiObject("score_right");
-
-        if (scoreLeft instanceof UIDigitView && scoreRight instanceof UIDigitView) {
-            UIDigitView leftView = (UIDigitView) scoreLeft;
-            UIDigitView rightView = (UIDigitView) scoreRight;
-
-            if (leftView.getCurrentNumber() >= 9 || rightView.getCurrentNumber() >= 9) {
-                // 游戏结束，显示结果
-                matchEndTimer = 1.5;
-            }
-        }
+        // 初始化比赛
+        // 如果是主机，启动某些逻辑；否则等待服务端
     }
 
-    public void resetBall() {
-        if (inRoom.getObject("badminton") != null)
-            inRoom.removeObject(inRoom.getObject("badminton"));
-        GameObject badminton = inRoom.addObject(new Badminton(serveSide));
-        badminton.setPosition(450 - 200 * serveSide, 700);
-        badminton.speedX = 0;
-        badminton.speedY = 0;
-    }
-
-    private void showGameResult(String winner) {
-        // 创建游戏结束UI
-        UIGameOver gameOverUI = new UIGameOver(winner);
-
-        // 将UI添加到当前房间
-        if (inRoom != null) {
-            // 居中显示
-            double centerX = (GameProperties.roomWidth - 300) / 2; // 假设UI宽度为300
-            double centerY = (GameProperties.roomHeight - 200) / 2; // 假设UI高度为200
-
-            inRoom.addUiObject(gameOverUI, (int) centerX, (int) centerY);
-
-            // 暂停游戏逻辑
-            // 可以添加一个游戏暂停的状态变量来控制更新逻辑
-        }
-    }
     @Override
     public void onUpdate() {
-        if (matchEndTimer > 0.0) {
-            matchEndTimer -= GameProperties.frameTime;
-            if (matchEndTimer <= 0.0) {
-                SoundPlay.stopBackgroundMusic();
-                showGameResult(lastPointWinner == 1 ? "玩家 1" : "玩家 2");
-                deactivate();
-                return;
-            }
+        if (netClient == null) {
+            // 单机模式：正常更新
+            updateLocalBallState();
+        } else {
+            // 联网模式：不更新本地球状态，等待服务端
+            // 但可以更新其他如玩家动画
         }
-        if (ballHitGroundTimer > 0.0) { // 羽毛球落地后到记分牌改变前等待时间
-            ballHitGroundTimer -= GameProperties.frameTime;
-            if (ballHitGroundTimer <= 0.0) {
-                changeScore();
-                ballHitGroundTimer = 0.0;
-                scoreChangeTimer = 2.0;
-                serveSide = lastPointWinner;
-            }
+    }
+
+    private void updateLocalBallState() {
+        // 单机模式的球更新逻辑
+    }
+
+    // 由服务端数据更新球状态
+    public void applyBallState(double x, double y, double vx, double vy) {
+        BadmintonNet badminton = (BadmintonNet) inRoom.getObject("badminton");
+        if (badminton != null) {
+            badminton.setPosition(x, y);
+            badminton.speedX = vx;
+            badminton.speedY = vy;
+            // 更新其他属性如果需要
         }
-        else if (scoreChangeTimer > 0.0) { // 记分牌改变后到重置玩家和球的位置等待时间
-            scoreChangeTimer -= GameProperties.frameTime;
-            if (scoreChangeTimer <= 0.0) {
-                if (serveSide == StickMan.sideLeft) {
-                    StickMan stickmanRight = (StickMan) inRoom.getObject("stickman_right");
-                    if (stickmanRight.isShotting)
-                        scoreChangeTimer = 0.04;
-                    else {
-                        scoreChangeTimer = 0.0;
-                        stickmanRight.setY(GameProperties.floorY - GameProperties.playerHeight - 11);
-                        stickmanRight.isJumping = false;
-                        stickmanRight.isShotting = false;
-                        stickmanRight.isReadyingServe = true;
-                        resetBall();
-                    }
-                }
-                else {
-                    StickMan stickmanLeft = (StickMan) inRoom.getObject("stickman_left");
-                    if (stickmanLeft.isShotting)
-                        scoreChangeTimer = 0.04;
-                    else {
-                        scoreChangeTimer = 0.0;
-                        stickmanLeft.setY(GameProperties.floorY - GameProperties.playerHeight - 11);
-                        stickmanLeft.isJumping = false;
-                        stickmanLeft.isShotting = false;
-                        stickmanLeft.isReadyingServe = true;
-                        resetBall();
-                    }
-                }
-            }
+    }
+
+    // 示例：击球事件
+    public void onPlayerHit(double angle, boolean isHeavy) {
+        if (netClient != null) {
+            netClient.sendHit(angle, isHeavy);
+        } else {
+            // 单机处理
         }
-        if (playBGMTimer <= 1.5) {
-            playBGMTimer += GameProperties.frameTime;
-            if (playBGMTimer > 1.5) {
-                SoundPlay.setBackgroundMusic("ingame_bgm.mp3");
-                SoundPlay.playBackgroundMusic();
-            }
+    }
+
+    // 示例：球落地
+    public void onBallGroundHit(int side) {
+        if (isHost && netClient != null) {
+            // 主机计算得分并广播
+            // 但根据要求，服务器已处理
+        } else {
+            // 客户端忽略本地落地
         }
     }
 }
