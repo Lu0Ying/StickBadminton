@@ -78,7 +78,7 @@ public class RoomNetJoin extends Room {
 
         // 加入模式控件：默认隐藏
         ipField = new UITextField("服务器地址");
-        ipField.setPrefWidth(360);
+        ipField.setPrefWidth(270);
         addUiObject(ipField, 320, 180);
         ipField.setVisible(false);
 

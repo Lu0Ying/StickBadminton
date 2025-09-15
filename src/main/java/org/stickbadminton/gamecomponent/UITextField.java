@@ -25,6 +25,8 @@ public class UITextField extends UIObject {
         field.setBackground(Background.EMPTY);
         field.setPadding(new Insets(6, 10, 6, 10));
         field.setPrefHeight(32);
+        field.setStyle("-fx-background-color: linear-gradient(to right, rgba(0,0,0,0.45), rgba(255,255,255,0.45));" +
+                "-fx-text-fill: #ffffff;-fx-border-color: #ffffff;");
     }
 
     @Override
