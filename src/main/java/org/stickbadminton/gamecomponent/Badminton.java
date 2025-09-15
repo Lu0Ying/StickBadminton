@@ -222,7 +222,7 @@ public class Badminton extends GameObject {
         inRoom.addObject(hf);
         hf.setRotation(FXRotation);
     }
-
+    //1
     //触地判断
     public void onHitGround() {
         if (isShotable) {
