@@ -52,7 +52,8 @@ public class RoomNetJoin extends Room {
 
         // 创建房间（默认请求 p1）
         btnCreateHost = new UIImageButton("button_create.png");
-        addUiObject(btnCreateHost, 400, 180);
+        addUiObject(btnCreateHost, 395, 180);
+
         btnCreateHost.setOnAction(e -> {
             SoundPlay.playSound("button_select.mp3", 100);
             onCreateHost();
@@ -60,7 +61,7 @@ public class RoomNetJoin extends Room {
 
         // 加入房间（进入加入模式）
         btnJoin = new UIImageButton("button_join.png");
-        addUiObject(btnJoin, 400, 250);
+        addUiObject(btnJoin, 415, 250);
         btnJoin.setOnAction(e -> {
             SoundPlay.playSound("button_select.mp3", 100);
             enterJoinMode();
