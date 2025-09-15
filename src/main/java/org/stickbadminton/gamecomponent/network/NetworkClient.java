@@ -363,7 +363,7 @@ public class NetworkClient {
             }
         });
     }
-//1
+
     private Set<KeyCode> parseKeyList(String csv) {
         Set<KeyCode> set = Collections.synchronizedSet(new HashSet<>());
         if (csv == null || csv.isBlank()) return set;
@@ -382,7 +382,7 @@ public class NetworkClient {
             return null;
         }
     }
-//1
+
     private boolean isWatcher() {
         String id = assignedId;
         return id == null || id.startsWith("w");
