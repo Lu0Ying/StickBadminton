@@ -33,7 +33,6 @@ public class RoomStickmanSelectNet extends Room{
     private final String serverHost;
     private final int serverPort;
     private final String desiredId; // 新增：HELLO 期望席位
-
     public RoomStickmanSelectNet(){
         this(
                 System.getProperty("stb.server.host",
