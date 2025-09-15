@@ -295,7 +295,7 @@ public class RoomStickmanSelectNet extends Room {
             Platform.runLater(r);
         }
     }
-
+//1
     public int getTeam1() { return team1; }
     public int getTeam2() { return team2; }
 }
