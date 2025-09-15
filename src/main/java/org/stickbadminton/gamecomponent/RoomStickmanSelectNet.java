@@ -54,13 +54,13 @@ public class RoomStickmanSelectNet extends Room{
 
         // Ready / Waiting 指示
         buttonReady1 = new UIImageButton("button_ready.png");
-        addUiObject(buttonReady1, 250, 200);
+        addUiObject(buttonReady1, 130, 170);
         buttonReady2 = new UIImageButton("button_ready.png");
-        addUiObject(buttonReady2, 650, 200);
+        addUiObject(buttonReady2, 130, 170);
         buttonWaiting1 = new UIImageButton("button_waiting.png");
-        addUiObject(buttonWaiting1, 250, 250);
+        addUiObject(buttonWaiting1, 720, 170);
         buttonWaiting2 = new UIImageButton("button_waiting.png");
-        addUiObject(buttonWaiting2, 650, 250);
+        addUiObject(buttonWaiting2, 720, 170);
 
         // 点击自己一侧 Ready/Waiting 区域切换就绪
         buttonReady1.setOnAction(e -> tryToggleReady("p1"));

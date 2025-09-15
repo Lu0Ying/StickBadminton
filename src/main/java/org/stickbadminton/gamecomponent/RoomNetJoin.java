@@ -33,7 +33,7 @@ public class RoomNetJoin extends Room {
     private UIImageButton btnJoinConfirm;
     private UIImageButton btnBack;
 
-    private static final int DEFAULT_PORT = 8888;
+    private static final int DEFAULT_PORT = 8889;
 
     // 本机服务器（仅当“创建房间”时启动一次）
     private static volatile GameServer localServer = null;
@@ -51,16 +51,16 @@ public class RoomNetJoin extends Room {
         addObject(new GameObject("background", new Image("stickmanselect_background_clear.png"))).setOpacity(0.85);
 
         // 创建房间（默认请求 p1）
-        btnCreateHost = new UIImageButton("button_play.png");
-        addUiObject(btnCreateHost, 360, 180);
+        btnCreateHost = new UIImageButton("button_create.png");
+        addUiObject(btnCreateHost, 400, 180);
         btnCreateHost.setOnAction(e -> {
             SoundPlay.playSound("button_select.mp3", 100);
             onCreateHost();
         });
 
         // 加入房间（进入加入模式）
-        btnJoin = new UIImageButton("button_2player.png");
-        addUiObject(btnJoin, 360, 250);
+        btnJoin = new UIImageButton("button_join.png");
+        addUiObject(btnJoin, 400, 250);
         btnJoin.setOnAction(e -> {
             SoundPlay.playSound("button_select.mp3", 100);
             enterJoinMode();
@@ -76,12 +76,12 @@ public class RoomNetJoin extends Room {
         });
 
         // 加入模式控件：默认隐藏
-        ipField = new UITextField("服务器地址，可填 IP 或 IP:端口（如 192.168.1.23 或 192.168.1.23:8888）");
+        ipField = new UITextField("服务器地址");
         ipField.setPrefWidth(360);
         addUiObject(ipField, 320, 180);
         ipField.setVisible(false);
 
-        portField = new UITextField("端口，默认 8888（仅数字）");
+        portField = new UITextField("端口，默认 8889（仅数字）");
         portField.setPrefWidth(180);
         portField.setText(String.valueOf(DEFAULT_PORT)); // 有效默认值
         addUiObject(portField, 360, 230);
