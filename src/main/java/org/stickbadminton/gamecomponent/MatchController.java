@@ -17,24 +17,25 @@ public class MatchController extends GameObject{
     private double matchEndTimer = 0.0;
 
     // 添加字段
-    private boolean isHost = false;
-    private NetworkClient netClient = null;
+    private static boolean isHost = false;
+    private static NetworkClient netClient = null;
+
 
     // 添加 setter 方法
-    public void setHost(boolean isHost) {
-        this.isHost = isHost;
+    public void setHost(boolean Host) {
+        isHost = Host;
     }
 
-    public void setNetClient(NetworkClient netClient) {
-        this.netClient = netClient;
+    public void setNetClient(NetworkClient Client) {
+        netClient = Client;
     }
 
     // 可选：添加 getter
-    public boolean isHost() {
+    public static boolean isHost() {
         return isHost;
     }
 
-    public NetworkClient getNetClient() {
+    public static NetworkClient getNetClient() {
         return netClient;
     }
 
@@ -47,16 +48,20 @@ public class MatchController extends GameObject{
         Badminton ball = (Badminton) inRoom.getObject("badminton");
         if (ball == null) return;
 
-        // 标记为网络控制，防止本地物理逻辑干扰
+        double lerpFactor = 0.2;
+        ball.setPositionWithCenter(
+                ball.getCenterX() + (x - ball.getCenterX()) * lerpFactor,
+                ball.getCenterY() + (y - ball.getCenterY()) * lerpFactor
+        );
+        ball.speedX = ball.speedX + (speedX - ball.speedX) * lerpFactor;
+        ball.speedY = ball.speedY + (speedY - ball.speedY) * lerpFactor;
+
+        // 新增: 重置预测
+        ball.lastSpeedX = speedX;
+        ball.lastSpeedY = speedY;
+        ball.predictTimer = 0;
+
         ball.isNetworkControlled = true;
-
-        // 同步位置和速度
-        ball.setCenterPosition(x, y);
-        ball.speedX = speedX;
-        ball.speedY = speedY;
-
-        // 可选：平滑插值（Lerp）以减少网络抖动
-        // ball.targetX = x; ball.targetY = y; ...
     }
 
     public void matchStart() {
@@ -67,6 +72,17 @@ public class MatchController extends GameObject{
     public void onBallGroundHit(int winner) {
         ballHitGroundTimer = 1.0;
         lastPointWinner = winner;
+
+        // 新增: 主机发送得分
+        if (isHost) {
+            UIObject scoreLeft = inRoom.getUiObject("score_left");
+            UIObject scoreRight = inRoom.getUiObject("score_right");
+            int leftScore = (scoreLeft instanceof UIDigitView) ? ((UIDigitView) scoreLeft).getCurrentNumber() : 0;
+            int rightScore = (scoreRight instanceof UIDigitView) ? ((UIDigitView) scoreRight).getCurrentNumber() : 0;
+            if (winner == -1) rightScore = (rightScore + 1) % 10;
+            else leftScore = (leftScore + 1) % 10;
+            netClient.sendLine(String.format("SCORE:%d:%d", leftScore, rightScore));
+        }
     }
     public void changeScore() {
         SoundPlay.playSound("add_score.mp3", 1.0);
@@ -106,6 +122,12 @@ public class MatchController extends GameObject{
         badminton.setPosition(450 - 200 * serveSide, 700);
         badminton.speedX = 0;
         badminton.speedY = 0;
+
+        // 新增: 主机立即发送新状态
+        if (isHost&& netClient != null) {
+            String ballState = String.format("BALL:%.2f:%.2f:%.2f:%.2f", badminton.getCenterX(), badminton.getCenterY(), 0.0, 0.0);
+            netClient.sendLine(ballState);
+        }
     }
 
     private void showGameResult(String winner) {

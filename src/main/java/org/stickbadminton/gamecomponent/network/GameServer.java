@@ -982,6 +982,32 @@ public class GameServer {
                     }
                     return;
                 }
+                if (line.startsWith("HIT_REQUEST:")) {
+                    if (isPlayer() && "IN_PROGRESS".equals(gameStatus)) {  // 只玩家，在游戏中
+                        String[] parts = line.split(":");
+                        if (parts.length == 5) {
+                            try {
+                                String type = parts[1];
+                                double angle = Double.parseDouble(parts[2]);
+                                double hitX = Double.parseDouble(parts[3]);
+                                double hitY = Double.parseDouble(parts[4]);
+                                // 验证: 轮到此玩家 (示例: p1 左场 <450, p2 右场 >450)
+                                boolean valid = ("p1".equals(id) && hitX < 450) || ("p2".equals(id) && hitX > 450);
+                                if (valid) {
+                                    // 广播 HIT:
+                                    broadcast(String.format("HIT:%s:%.2f:%.2f:%.2f", type, angle, hitX, hitY));
+                                    // 立即广播最新 BALL: (如果有 lastBallState)
+                                    if (lastBallState != null) broadcast(lastBallState);
+                                } else {
+                                    System.out.println("[Server] Invalid HIT_REQUEST from " + id + ": " + line);
+                                }
+                            } catch (NumberFormatException e) {
+                                System.out.println("[Server] Invalid HIT_REQUEST format: " + line);
+                            }
+                        }
+                    }
+                    return;
+                }
             } catch (Exception ex) {
                 System.out.println("[Server] parse error: " + line + " -> " + ex.getMessage());
             }

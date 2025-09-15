@@ -11,6 +11,12 @@ import org.stickbadminton.*;
 public class Badminton extends GameObject {
 
     public boolean isNetworkControlled = false; // 是否由网络同步控制
+    private double sendTimer = 0;  // 控制发送频率
+
+    // 新增: 客户端预测用（上一个接收速度/时间）
+    double lastSpeedX = 0;
+    double lastSpeedY = 0;
+    double predictTimer = 0;
 
     public static int sideServe = 0; // 当前发球人
     public static double airResistance = 0;  //空气阻力加速度
@@ -21,6 +27,7 @@ public class Badminton extends GameObject {
     public boolean isShotable = true; // 是否能被打出
     ParticleEmitter emitter = ParticleFX.fire();
     ParticleComponent particleComponent = new ParticleComponent(emitter);
+
     public Badminton() {
         super("badminton", new Image("badminton.png"));
         speedY = -100;
@@ -48,8 +55,57 @@ public class Badminton extends GameObject {
     @Override
     public void onUpdate() {
 
+        //方向修正
+        // 始终运行渲染逻辑（旋转、粒子）
+        if (!isTouchedGround || Math.pow(speedY, 2) > 50) {
+            double targetRotation;
+            double p = (Math.sqrt(Math.pow(speedX, 2) + Math.pow(speedY, 2))) / 800;
+            if (speedX == 0)
+                targetRotation = speedY > 0 ? 180 : 0;
+            else if (speedX > 0)
+                targetRotation = 90 + Math.toDegrees(Math.atan(speedY / speedX));
+            else
+                targetRotation = -90 + Math.toDegrees(Math.atan(speedY / speedX));
+            if (isHitted) {
+                rotation = targetRotation;
+                isHitted = false;
+            } else
+                rotation = targetRotation * p + rotation * (1 - p);
+        }
+
+
+        // 新增: 只在主机发送球状态
+        if (MatchController.isHost()) {  // 假设 MatchController 有静态 isHost()，或注入方式获取
+            // 定时发送：添加一个计时器（类成员：private double sendTimer = 0;）
+            sendTimer += GameProperties.frameTime;
+            if (sendTimer >= 0.1) {  // 每100ms 发送一次，调整为适合你的帧率
+                String ballState = String.format("BALL:%.2f:%.2f:%.2f:%.2f", getCenterX(), getCenterY(), speedX, speedY);
+                MatchController.getNetClient().sendLine(ballState);  // 通过 netClient 发送到服务器
+                sendTimer = 0;
+            }
+        }
+
+        if (TouchedTime > 10)
+            ParticleFX.updataFire(emitter, speedX, speedY);
+        else {
+            ParticleFX.closeParticle(emitter);
+            TouchedTime++;
+        }
+
         if (isNetworkControlled) {
-            // 如果是网络控制，不运行物理逻辑
+            // 客户端: 短暂预测物理（模拟弧线，避免匀速）
+            predictTimer += GameProperties.frameTime;
+            if (predictTimer < 0.05) {  // 只预测50ms，避免分叉
+                airResistance = 0.00001 * (Math.pow(lastSpeedX, 2) + Math.pow(lastSpeedY, 2));
+                speedY += GameProperties.badmintonGravity * GameProperties.frameTime;
+                double totalSpeed = Math.sqrt(Math.pow(speedX, 2) + Math.pow(speedY, 2));
+                if (totalSpeed > 0) {
+                    speedX -= airResistance * speedX / totalSpeed * GameProperties.frameTime;
+                    speedY -= airResistance * speedY / totalSpeed * GameProperties.frameTime;
+                }
+                x += speedX * GameProperties.frameTime;
+                y += speedY * GameProperties.frameTime;
+            }
             return;
         }
 
@@ -73,6 +129,11 @@ public class Badminton extends GameObject {
                 isFrozen = false;
                 speedX = 250 * sideServe;
                 speedY = 300;
+            }
+            // 新增: 主机发送初始球状态
+            if (MatchController.isHost()) {
+                String ballState = String.format("BALL:%.2f:%.2f:%.2f:%.2f", getCenterX(), getCenterY(), speedX, speedY);
+                MatchController.getNetClient().sendLine(ballState);
             }
             return;
         }
@@ -133,23 +194,17 @@ public class Badminton extends GameObject {
                 speedY = speedY * 0.4;
                 speedX = -speedX * 0.4;
             }
+            // 主机: 定时发送状态
+            if (MatchController.isHost()) {
+                sendTimer += GameProperties.frameTime;
+                if (sendTimer >= 0.05) {  // 改成50ms，提高频率减少匀速感
+                    String ballState = String.format("BALL:%.2f:%.2f:%.2f:%.2f", getCenterX(), getCenterY(), speedX, speedY);
+                    MatchController.getNetClient().sendLine(ballState);
+                    sendTimer = 0;
+                }
+            }
         }
-        //方向修正
-        if (!isTouchedGround || Math.pow(speedY, 2) > 50) {
-            double targetRotation;
-            double p = (Math.sqrt(Math.pow(speedX, 2) + Math.pow(speedY, 2))) / 800;
-            if (speedX == 0)
-                targetRotation = speedY > 0 ? 180 : 0;
-            else if (speedX > 0)
-                targetRotation = 90 + Math.toDegrees(Math.atan(speedY / speedX));
-            else
-                targetRotation = -90 + Math.toDegrees(Math.atan(speedY / speedX));
-            if (isHitted) {
-                rotation = targetRotation;
-                isHitted = false;
-            } else
-                rotation = targetRotation * p + rotation * (1 - p);
-        }
+
         //拖尾粒子发射
         if(TouchedTime>10)
             ParticleFX.updataFire(emitter, speedX, speedY);
@@ -183,6 +238,13 @@ public class Badminton extends GameObject {
         speedX = speed * Math.cos(Math.toRadians(angle));
         emitter.setNumParticles(4);
         onHit();
+        if (MatchController.isHost()) {
+            // 主机: 发送击球事件 + 立即状态（渲染后）
+            String hitMsg = String.format("HIT:LIGHT:%.2f:%.2f:%.2f", angle, getCenterX(), getCenterY());
+            MatchController.getNetClient().sendLine(hitMsg);
+            String ballState = String.format("BALL:%.2f:%.2f:%.2f:%.2f", getCenterX(), getCenterY(), speedX, speedY);
+            MatchController.getNetClient().sendLine(ballState);  // 立即发送，确保同步
+        }
     }
 
     public void heavyHit(double angle) {
@@ -210,6 +272,13 @@ public class Badminton extends GameObject {
 
         emitter.setNumParticles(4);
         onHit();
+
+        if (MatchController.isHost()) {
+            String hitMsg = String.format("HIT:HEAVY:%.2f:%.2f:%.2f", angle, getCenterX(), getCenterY());
+            MatchController.getNetClient().sendLine(hitMsg);
+            String ballState = String.format("BALL:%.2f:%.2f:%.2f:%.2f", getCenterX(), getCenterY(), speedX, speedY);
+            MatchController.getNetClient().sendLine(ballState);
+        }
     }
 
     //播放触网动画，在触网判断中被调用

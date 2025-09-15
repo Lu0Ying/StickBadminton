@@ -79,6 +79,7 @@ public class RoomGameplay extends Room {
 
     // ========== 新增：设置网络监听 ==========
     private void setupNetworkListeners() {
+        netClient.setInRoom(this);
         netClient.addConnectionListener(new NetworkClient.ConnectionListener() {
             @Override
             public void onBallState(double x, double y, double speedX, double speedY) {
@@ -127,7 +128,19 @@ public class RoomGameplay extends Room {
         // 注入 netClient，用于发送
         matchController.setNetClient(netClient);
 
+        // 新增: 如果是客户端，初始化球为网络控制
+        if (!isHost) {
+            Badminton ball = (Badminton) getObject("badminton");  // 假设buildScene后球已创建
+            if (ball != null) ball.isNetworkControlled = true;
+        }
+
         addObject(matchController);
+
+        matchController.resetBall();  // 立即创建并重置球
+        if (!isHost) {
+            Badminton ball = (Badminton) getObject("badminton");
+            if (ball != null) ball.isNetworkControlled = true;
+        }
 
         NetAnimation net = new NetAnimation();
         addObject(net, "net");

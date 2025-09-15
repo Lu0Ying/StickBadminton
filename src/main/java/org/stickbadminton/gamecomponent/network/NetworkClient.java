@@ -704,6 +704,8 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.event.Event;
 import org.stickbadminton.KeyInput;
+import org.stickbadminton.Room;
+import org.stickbadminton.gamecomponent.Badminton;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -730,6 +732,8 @@ public class NetworkClient {
     private final String host;
     private final int port;
     private final String desiredPlayerId; // 可为空，非空时用于请求 p1/p2
+    private Room inRoom;
+    public void setInRoom(Room inRoom) { this.inRoom = inRoom; }
 
     // I/O
     private volatile boolean running = false;
@@ -949,6 +953,30 @@ public class NetworkClient {
         // System.out.println("[Client] <= " + line);
 
         try {
+            if (line.startsWith("HIT:")) {
+                String[] parts = line.split(":");
+                if (parts.length == 5) {
+                    try {
+                        String type = parts[1];
+                        double angle = Double.parseDouble(parts[2]);
+                        double hitX = Double.parseDouble(parts[3]);
+                        double hitY = Double.parseDouble(parts[4]);
+                        runOnFxThreadOrNow(() -> {
+                            Badminton ball = (Badminton) inRoom.getObject("badminton");
+                            if (ball != null) {
+                                ball.setPositionWithCenter(hitX, hitY);  // 临时设置位置触发特效
+                                if ("LIGHT".equals(type)) {
+                                    ball.lightHit(angle);  // 触发特效，不改速度 (BALL: 会校正)
+                                } else if ("HEAVY".equals(type)) {
+                                    ball.heavyHit(angle);
+                                }
+                            }
+                        });
+                    } catch (NumberFormatException e) {
+                        System.out.println("[Client] Invalid HIT format: " + line);
+                    }
+                }
+            }
             if (line.startsWith("ASSIGN:")) {
                 String id = line.substring("ASSIGN:".length());
                 notifyAssigned(id);
@@ -1030,22 +1058,7 @@ public class NetworkClient {
                 }
                 return;
             }
-            if (line.startsWith("BALL:")) {
-                String[] parts = line.split(":");
-                if (parts.length == 5) {
-                    try {
-                        double x = Double.parseDouble(parts[1]);
-                        double y = Double.parseDouble(parts[2]);
-                        double vx = Double.parseDouble(parts[3]);
-                        double vy = Double.parseDouble(parts[4]);
-                        GameplaySyncListener gl = gameplayListener;
-                        if (gl != null) {
-                            runOnFxThreadOrNow(() -> gl.onBall(x, y, vx, vy));
-                        }
-                    } catch (NumberFormatException ignored) {}
-                }
-                return;
-            }
+
 
             if (line.startsWith("KEY_DOWN:") || line.startsWith("KEY_UP:")) {
                 // KEY_DOWN:<p1|p2>:<KEY>
@@ -1169,7 +1182,7 @@ public class NetworkClient {
         return false;
     }
 
-    private void sendLine(String s) {
+    public void sendLine(String s) {
         if (out != null) {
             out.println(s);
             out.flush();
