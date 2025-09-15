@@ -37,6 +37,15 @@ public class RoomStickmanSelect extends Room{
             SoundPlay.playSound("button_select.mp3", 100);
             onUndoButtonClick();
         });
+
+        UIImageButton infiniteEnergyButton=new UIImageButton("button_rectanglerounded.png");
+        addUiObject(infiniteEnergyButton, 380, 410);
+        infiniteEnergyButton.setOnAction(e->{
+            SoundPlay.playSound("button_select.mp3", 100);
+            GameProperties.infiniteEnergyMode = ! GameProperties.infiniteEnergyMode;
+        });
+        addObject(new InfiniteEnergySettingDisplay()).setPosition(375, 405);
+
         addCharacterButton(1,320,120);
         addCharacterButton(2,420,120);
         addCharacterButton(3,520,120);

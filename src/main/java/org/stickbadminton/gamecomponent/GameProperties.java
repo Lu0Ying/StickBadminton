@@ -71,4 +71,6 @@ public class GameProperties {
     public static int characterType2 = 1;
     // 单人模式(1) 还是双人模式(2)
     public static int matchMode = 2;
+    // 无限体力模式
+    public static boolean infiniteEnergyMode = false;
 }

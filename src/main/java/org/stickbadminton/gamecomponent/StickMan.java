@@ -224,7 +224,7 @@ public class StickMan extends GameObject {
             }
         }
         // 体力恢复
-        if (!isJumping) {
+        if (!isJumping && !GameProperties.infiniteEnergyMode) {
             if (speedX == 0)
                 energyRemain += GameProperties.idleEnergyRecover * GameProperties.frameTime;
             else energyRemain += GameProperties.moveEnergyRecover * GameProperties.frameTime;
@@ -253,7 +253,7 @@ public class StickMan extends GameObject {
                 jumpCooldownTimer = 0;
             }
         }
-        else if (energyRemain < GameProperties.jumpEnergy) {
+        else if (!GameProperties.infiniteEnergyMode && energyRemain < GameProperties.jumpEnergy) {
             // 体力不足时禁用跳跃
             // do nothing
         }
@@ -263,14 +263,16 @@ public class StickMan extends GameObject {
         }
         else if (isAIControlled) {
             if (decision.isJump == true) {
-                energyRemain -= GameProperties.jumpEnergy;
+                if (!GameProperties.infiniteEnergyMode)
+                    energyRemain -= GameProperties.jumpEnergy;
                 isJumping = true;
                 jumpCooldownTimer = GameProperties.jumpCooldown;
                 speedY = -GameProperties.jumpSpeedY;
             }
         }
         else if ((KeyInput.isKeyHolding(KeyCode.W) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.I) && side == sideLeft)) {
-            energyRemain -= GameProperties.jumpEnergy;
+            if (!GameProperties.infiniteEnergyMode)
+                energyRemain -= GameProperties.jumpEnergy;
             isJumping = true;
             jumpCooldownTimer = GameProperties.jumpCooldown;
             speedY = -GameProperties.jumpSpeedY;
@@ -412,7 +414,9 @@ public class StickMan extends GameObject {
                 if ((KeyInput.isKeyHolding(KeyCode.Q) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.U) && side == sideLeft))
                     isHeavyShot = false;
                 else if ((KeyInput.isKeyHolding(KeyCode.E) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.O) && side == sideLeft)) {
-                    if (energyRemain > GameProperties.heavyShotEnergy) { // 剩余体力大于 重击所耗体力 时消耗体力，否则无法重击，只能轻击
+                    if (GameProperties.infiniteEnergyMode)
+                        isHeavyShot = true;
+                    else if (energyRemain > GameProperties.heavyShotEnergy) { // 剩余体力大于 重击所耗体力 时消耗体力，否则无法重击，只能轻击
                         isHeavyShot = true;
                         energyRemain -= GameProperties.heavyShotEnergy;
                     }
