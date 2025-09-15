@@ -53,14 +53,15 @@ public class RoomStickmanSelectNet extends Room{
         addObject(new GameObject("background",new Image("stickmanselect_background.png")));
 
         // Ready / Waiting 指示
-        buttonReady1 = new UIImageButton("button_ready.png");
-        addUiObject(buttonReady1, 130, 170);
-        buttonReady2 = new UIImageButton("button_ready.png");
-        addUiObject(buttonReady2, 130, 170);
         buttonWaiting1 = new UIImageButton("button_waiting.png");
         addUiObject(buttonWaiting1, 720, 170);
         buttonWaiting2 = new UIImageButton("button_waiting.png");
         addUiObject(buttonWaiting2, 720, 170);
+        buttonReady1 = new UIImageButton("button_ready.png");
+        addUiObject(buttonReady1, 130, 170);
+        buttonReady2 = new UIImageButton("button_ready.png");
+        addUiObject(buttonReady2, 130, 170);
+
 
         // 点击自己一侧 Ready/Waiting 区域切换就绪
         buttonReady1.setOnAction(e -> tryToggleReady("p1"));
