@@ -64,7 +64,7 @@ public class GameProperties {
     // 站着不动时所恢复体力 (单位：体力/秒)
     public static final double idleEnergyRecover = 20.0;
     // 体力为 0 时的移动速度 (插值用)
-    public static final double moveSpeed0 = 190.0;
+    public static final double moveSpeed0 = 100.0;
 
 
     // 以下为变量
