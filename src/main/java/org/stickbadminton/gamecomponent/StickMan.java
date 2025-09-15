@@ -180,26 +180,28 @@ public class StickMan extends GameObject {
         else decision = new ComputerDecision();
 
         // 水平移动相关
+        double moveSpeed = energyRemain > 40 ? GameProperties.moveSpeed
+                : (GameProperties.moveSpeed0 + (GameProperties.moveSpeed - GameProperties.moveSpeed0) * energyRemain / 40.0);
         if (isAIControlled) {
             if (decision.isMoveRight == true) {
                 if (getCenterY() + GameProperties.playerHeight >= GameProperties.floorY)
                     isMoving = true;
-                speedX = GameProperties.moveSpeed;
+                speedX = moveSpeed;
             } else if (decision.isMoveLeft == true) {
                 if (getCenterY() + GameProperties.playerHeight >= GameProperties.floorY)
                     isMoving = true;
-                speedX = -GameProperties.moveSpeed;
+                speedX = -moveSpeed;
             }
         }
         else {
             if ((KeyInput.isKeyHolding(KeyCode.D) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.L) && side == sideLeft)) {
                 if (getCenterY() + GameProperties.playerHeight >= GameProperties.floorY)
                     isMoving = true;
-                speedX = GameProperties.moveSpeed;
+                speedX = moveSpeed;
             } else if ((KeyInput.isKeyHolding(KeyCode.A) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.J) && side == sideLeft)) {
                 if (getCenterY() + GameProperties.playerHeight >= GameProperties.floorY)
                     isMoving = true;
-                speedX = -GameProperties.moveSpeed;
+                speedX = -moveSpeed;
             }
         }
 
@@ -396,6 +398,26 @@ public class StickMan extends GameObject {
                     isShotting = true;
                     hasShotted = false;
                     isHeavyShot = decision.isHeavyhit;
+                    if (isHeavyShot) {
+                        if (GameProperties.infiniteEnergyMode)
+                            isHeavyShot = true;
+                        else if (energyRemain > GameProperties.heavyShotEnergy) {
+                            isHeavyShot = true;
+                            energyRemain -= GameProperties.heavyShotEnergy;
+                        }
+                        else {
+                            isHeavyShot = false;
+                            energyRemain -= GameProperties.lightShotEnergy;
+                            if (energyRemain < 0)
+                                energyRemain = 0;
+                        }
+                    }
+                    else {
+                        isHeavyShot = false;
+                        energyRemain -= GameProperties.lightShotEnergy;
+                        if (energyRemain < 0)
+                            energyRemain = 0;
+                    }
                     shotCooldownTimer = GameProperties.shotCooldown;
                     shotType = shotTypeUp;
                     if (badminton != null) {
@@ -411,8 +433,12 @@ public class StickMan extends GameObject {
                     || (KeyInput.isKeyHolding(KeyCode.E) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.O) && side == sideLeft)) {
                 isShotting = true;
                 hasShotted = false;
-                if ((KeyInput.isKeyHolding(KeyCode.Q) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.U) && side == sideLeft))
+                if ((KeyInput.isKeyHolding(KeyCode.Q) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.U) && side == sideLeft)) {
                     isHeavyShot = false;
+                    energyRemain -= GameProperties.lightShotEnergy;
+                    if (energyRemain < 0)
+                        energyRemain = 0;
+                }
                 else if ((KeyInput.isKeyHolding(KeyCode.E) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.O) && side == sideLeft)) {
                     if (GameProperties.infiniteEnergyMode)
                         isHeavyShot = true;
@@ -420,7 +446,12 @@ public class StickMan extends GameObject {
                         isHeavyShot = true;
                         energyRemain -= GameProperties.heavyShotEnergy;
                     }
-                    else isHeavyShot = false;
+                    else {
+                        isHeavyShot = false;
+                        energyRemain -= GameProperties.lightShotEnergy;
+                        if (energyRemain < 0)
+                            energyRemain = 0;
+                    }
                 }
                 shotCooldownTimer = GameProperties.shotCooldown;
                 shotType = shotTypeUp;
