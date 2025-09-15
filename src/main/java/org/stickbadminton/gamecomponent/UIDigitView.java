@@ -8,14 +8,14 @@ import org.stickbadminton.UIObject;
 
 import java.util.Objects;
 
-public class  UIDigitView extends UIObject {
-    private final ImageView digitView; // 用于更新显示的数字
+public class UIDigitView extends UIObject {
+    private final ImageView digitView;
     @Override
     public Node getUINode() {
         return digitView;
     }
 
-    private int currentNumber; // 当前显示的数字
+    private int currentNumber;
     public int getCurrentNumber() {
         return currentNumber;
     }
@@ -32,7 +32,6 @@ public class  UIDigitView extends UIObject {
         this.currentNumber = currentNumber;
         digitView = createDigitImageView(currentNumber);
     }
-    //创建数字图片视图
     private ImageView createDigitImageView(int number) {
         String imagePath = "/digital_" + number + ".png";
         try {
@@ -43,11 +42,10 @@ public class  UIDigitView extends UIObject {
             return imageView;
         } catch (Exception e) {
             System.err.println("无法加载数字图片: " + imagePath);
-            return new ImageView(); // 返回空ImageView
+            return new ImageView();
         }
     }
 
-    //更新数字图片
     private void updateDigitImage(int number) {
         String imagePath = "/digital_" + number + ".png";
         try {

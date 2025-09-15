@@ -43,20 +43,21 @@ public class GameServer {
     // —— 新增：比赛权威快照（由服务端维护）—— //
     private volatile int scoreLeft = 0;
     private volatile int scoreRight = 0;
-    private volatile int serveSide = 1; // 1=左发球, -1=右发球
+    private volatile int serveSide = 1; // 1=左(p1)发球, -1=右(p2)发球
 
     // —— 新增：球的权威状态 —— //
     private volatile BallState ball = new BallState();
     private volatile long lastBallUpdateTime = System.currentTimeMillis();
-    private static final double BADMINTON_GRAVITY = 980; // 重力加速度
-    private static final double FRAME_TIME = 0.016; // 约60FPS
-    private static final double PLAY_FIELD_LEFT = 0;
-    private static final double PLAY_FIELD_RIGHT = 900;
-    private static final double FLOOR_BALL_Y = 500;
-    private static final double NET_HEIGHT = 100;
-    private static final double NET_POSITION = 450;
-    private static final double POWER_DISTANCE = 100; // 假设值，需要从 GameProperties 获取
-    // 假设 GameProperties.powerDistance = 100;
+
+    // 硬编码 GameProperties 值（假设）
+    private static final double FRAME_TIME = 0.016;
+    private static final double BADMINTON_GRAVITY = 980.0;
+    private static final double FLOOR_BALL_Y = 500.0;
+    private static final double PLAY_FIELD_LEFT = 0.0;
+    private static final double PLAY_FIELD_RIGHT = 900.0;
+    private static final double NET_HEIGHT = 100.0;
+    private static final double NET_POSITION = 450.0;
+    private static final double POWER_DISTANCE = 100.0; // 假设
 
     // 球状态类
     private static class BallState {
@@ -76,12 +77,11 @@ public class GameServer {
 
     public void start() throws IOException {
         if (running) return;
-        resetStateToLobby(); // 启动即重置到 LOBBY
+        resetStateToLobby();
         running = true;
         serverSocket = new ServerSocket(port);
         System.out.println("[Server] listening on " + port);
 
-        // 接收线程
         new Thread(() -> {
             while (running) {
                 try {
@@ -89,16 +89,13 @@ public class GameServer {
                     socket.setTcpNoDelay(true);
                     ClientHandler handler = new ClientHandler(socket);
                     clients.add(handler);
-                    new Thread(handler, "Client-" + socket.getRemoteSocketAddress()).start();
+                    new Thread(handler).start();
                 } catch (IOException e) {
-                    if (running) {
-                        System.out.println("[Server] accept error: " + e.getMessage());
-                    }
+                    if (running) System.out.println("[Server] accept error: " + e.getMessage());
                 }
             }
-        }, "Acceptor").start();
+        }).start();
 
-        // 心跳：广播当前按下集合，修复长按不同步
         new Thread(() -> {
             while (running) {
                 try {
@@ -107,25 +104,22 @@ public class GameServer {
                     Thread.sleep(100);
                 } catch (InterruptedException ignored) {}
             }
-        }, "KeyHeartbeat").start();
+        }).start();
 
-        // —— 新增：球状态更新线程 —— //
         new Thread(() -> {
             while (running) {
                 try {
                     updateBallState();
                     broadcastBallState();
-                    Thread.sleep(16); // ~60 FPS
+                    Thread.sleep((long) (FRAME_TIME * 1000));
                 } catch (InterruptedException ignored) {}
             }
-        }, "BallUpdate").start();
+        }).start();
     }
 
     public void stop() {
         running = false;
-        try {
-            if (serverSocket != null) serverSocket.close();
-        } catch (IOException ignored) {}
+        try { serverSocket.close(); } catch (IOException ignored) {}
         clients.forEach(ClientHandler::close);
         clients.clear();
     }
@@ -154,20 +148,15 @@ public class GameServer {
         if (newStatus.equals(gameStatus)) return;
         gameStatus = newStatus;
         broadcast("GAME_STATUS:" + newStatus);
-        if ("LOBBY".equals(newStatus)) {
-            resetStateToLobby();
-        }
+        if ("LOBBY".equals(newStatus)) resetStateToLobby();
     }
 
     private void tryStartIfReady() {
-        if (p1Holder == null || p2Holder == null) return;
-        if (!p1Ready || !p2Ready) return;
-        if (p1Select <= 0 || p2Select <= 0) return;
-        if ("IN_PROGRESS".equals(gameStatus)) return;
+        if (p1Holder == null || p2Holder == null || !p1Ready || !p2Ready || p1Select <= 0 || p2Select <= 0 || "IN_PROGRESS".equals(gameStatus)) return;
 
         setGameStatus("IN_PROGRESS");
         broadcast("START:" + p1Select + ":" + p2Select);
-        resetBallAfterScore(serveSide); // 初始化球
+        resetBallAfterScore(serveSide);
     }
 
     private void resetBallAfterScore(int newServeSide) {
@@ -180,14 +169,10 @@ public class GameServer {
         ball.isShotable = true;
         ball.rotation = serveSide == 1 ? 225 : -225;
         ball.isHitted = false;
-        ball.y = 419; // 假设值 500 - 100 -11 +30
-        if (serveSide == 1) {
-            ball.x = 221; // 200 +21
-        } else {
-            ball.x = 700;
-        }
         ball.speedX = 0;
         ball.speedY = 0;
+        ball.y = 419.0;
+        ball.x = serveSide == 1 ? 221.0 : 700.0;
         broadcastBallState();
     }
 
@@ -208,49 +193,35 @@ public class GameServer {
         double deltaTime = (currentTime - lastBallUpdateTime) / 1000.0;
         lastBallUpdateTime = currentTime;
 
+        double airResistance = 0.0;
+
         if (ball.isFrozen) {
-            // 发球状态处理
             ball.speedY = 0;
             ball.speedX = 0;
-            if (serveSide == 1) {
-                ball.x = 221;
-                ball.y = 419;
-            } else {
-                ball.x = 700;
-                ball.y = 419;
+            ball.y = 419.0;
+            ball.x = serveSide == 1 ? 221.0 : 700.0;
+            // 检查发球按键
+            Set<String> pressed = serveSide == 1 ? pressedP1 : pressedP2;
+            String qe = serveSide == 1 ? "Q" : "U";
+            String eo = serveSide == 1 ? "E" : "O";
+            if (pressed.contains(qe) || pressed.contains(eo)) {
+                ball.isFrozen = false;
+                ball.speedX = 250 * serveSide;
+                ball.speedY = 300;
             }
             return;
         }
 
-        // 更新球位置
-        double newX = ball.x + ball.speedX * deltaTime;
-        double newY = ball.y + ball.speedY * deltaTime;
-
-        // 触网判断
-        if (newY >= FLOOR_BALL_Y - NET_HEIGHT + 20
-                && ((newX >= NET_POSITION - 18 && ball.x <= NET_POSITION - 18)
-                || (newX <= NET_POSITION - 8 && ball.x >= NET_POSITION - 8))) {
-            ball.touchedTime = 0;
-            broadcast("NET_CRASH");
-            if (ball.y < FLOOR_BALL_Y - NET_HEIGHT + 25) {
-                newY = FLOOR_BALL_Y - NET_HEIGHT + 20;
-                ball.speedY *= 0.1;
-                ball.speedX *= 0.8;
-            } else {
-                if (ball.speedX > 0) {
-                    newX = NET_POSITION - 23;
-                } else {
-                    newX = NET_POSITION - 3;
-                }
-                ball.speedY *= 0.4;
-                ball.speedX = -ball.speedX * 0.4;
-            }
+        // 落地判断
+        if (ball.y + ball.speedY * deltaTime >= FLOOR_BALL_Y) {
+            ball.isTouchedGround = true;
+            onHitGround();
+        } else {
+            ball.isTouchedGround = false;
         }
 
-        // 落地判断
-        if (newY >= FLOOR_BALL_Y) {
-            ball.isTouchedGround = true;
-            newY = FLOOR_BALL_Y;
+        if (ball.isTouchedGround) {
+            ball.y = FLOOR_BALL_Y;
             if (ball.speedY >= 400) {
                 ball.speedY = - (ball.speedY * 0.4);
                 ball.speedX *= 0.3;
@@ -260,41 +231,49 @@ public class GameServer {
             } else {
                 ball.speedY = 0;
                 ball.speedX = 0;
-                if (ball.isShotable) {
-                    ball.isShotable = false;
-                    int side = newX > NET_POSITION ? 1 : -1;
-                    if (side == 1) {
-                        scoreLeft++;
-                    } else {
-                        scoreRight++;
-                    }
-                    broadcast("SCORE:" + scoreLeft + ":" + scoreRight);
-                    resetBallAfterScore(-side); // 对方发球
-                }
             }
         } else {
-            ball.isTouchedGround = false;
-            double airResistance = 0.00001 * (Math.pow(ball.speedX, 2) + Math.pow(ball.speedY, 2));
-            ball.speedY += BADMINTON_GRAVITY * deltaTime - 0.5 * airResistance *
-                    (ball.speedY / Math.sqrt(Math.pow(ball.speedX, 2) + Math.pow(ball.speedY, 2)));
-            ball.speedX -= 2.7 * airResistance *
-                    (ball.speedX / Math.sqrt(Math.pow(ball.speedX, 2) + Math.pow(ball.speedY, 2)));
+            if (ball.speedY == 0 && ball.speedX == 0) {
+                ball.speedY += BADMINTON_GRAVITY * deltaTime;
+            } else {
+                airResistance = 0.00001 * (Math.pow(ball.speedX, 2) + Math.pow(ball.speedY, 2));
+                ball.speedY += BADMINTON_GRAVITY * deltaTime - 0.5 * airResistance * (ball.speedY / Math.sqrt(Math.pow(ball.speedX, 2) + Math.pow(ball.speedY, 2)));
+                ball.speedX -= 2.7 * airResistance * (ball.speedX / Math.sqrt(Math.pow(ball.speedX, 2) + Math.pow(ball.speedY, 2)));
+            }
         }
 
         // 触墙判断
-        if (newX <= PLAY_FIELD_LEFT || newX >= PLAY_FIELD_RIGHT) {
+        if (ball.x + ball.speedX * deltaTime <= PLAY_FIELD_LEFT || ball.x + ball.speedX * deltaTime >= PLAY_FIELD_RIGHT) {
             ball.touchedTime = 0;
-            newX = Math.max(PLAY_FIELD_LEFT, Math.min(newX, PLAY_FIELD_RIGHT));
+            ball.x = ball.x < (PLAY_FIELD_RIGHT + PLAY_FIELD_LEFT) / 2 ? PLAY_FIELD_LEFT : PLAY_FIELD_RIGHT;
             ball.speedX = -ball.speedX * 0.6;
         }
 
-        ball.x = newX;
-        ball.y = newY;
+        // 触网判断
+        if (ball.y + ball.speedY * deltaTime >= FLOOR_BALL_Y - NET_HEIGHT + 20
+                && ((ball.x + ball.speedX * deltaTime >= NET_POSITION - 18 && ball.x <= NET_POSITION - 18)
+                || (ball.x + ball.speedX * deltaTime <= NET_POSITION - 8 && ball.x >= NET_POSITION - 8))) {
+            ball.touchedTime = 0;
+            broadcast("NET_CRASH");
+            if (ball.y < FLOOR_BALL_Y - NET_HEIGHT + 25) {
+                ball.y = FLOOR_BALL_Y - NET_HEIGHT + 20;
+                ball.speedY *= 0.1;
+                ball.speedX *= 0.8;
+            } else {
+                if (ball.speedX > 0) {
+                    ball.x = NET_POSITION - 23;
+                } else {
+                    ball.x = NET_POSITION - 3;
+                }
+                ball.speedY *= 0.4;
+                ball.speedX = -ball.speedX * 0.4;
+            }
+        }
 
         // 方向修正
         if (!ball.isTouchedGround || Math.pow(ball.speedY, 2) > 50) {
             double targetRotation;
-            double p = Math.sqrt(Math.pow(ball.speedX, 2) + Math.pow(ball.speedY, 2)) / 800;
+            double p = Math.sqrt(Math.pow(ball.speedX, 2) + Math.pow(ball.speedY, 2)) / 800.0;
             if (ball.speedX == 0) {
                 targetRotation = ball.speedY > 0 ? 180 : 0;
             } else if (ball.speedX > 0) {
@@ -310,9 +289,21 @@ public class GameServer {
             }
         }
 
-        // TouchedTime
-        if (ball.touchedTime <= 10) {
-            ball.touchedTime++;
+        ball.x += ball.speedX * deltaTime;
+        ball.y += ball.speedY * deltaTime;
+    }
+
+    private void onHitGround() {
+        if (ball.isShotable) {
+            ball.isShotable = false;
+            int landSide = ball.x > NET_POSITION ? 1 : -1;
+            if (landSide == 1) {
+                scoreLeft++;
+            } else {
+                scoreRight++;
+            }
+            broadcast("SCORE:" + scoreLeft + ":" + scoreRight);
+            resetBallAfterScore(landSide == 1 ? 1 : -1); // 得分方发球
         }
     }
 
@@ -324,24 +315,21 @@ public class GameServer {
 
         ball.isHitted = true;
         double speed;
-        if (angle < 180) { // 扣球
+        if (angle < 180) {
             speed = isHeavy ? 2500 : 1200;
-        } else if (ball.x >= NET_POSITION - POWER_DISTANCE
-                && ball.x <= NET_POSITION + POWER_DISTANCE) { // 近场
+        } else if (ball.x >= NET_POSITION - POWER_DISTANCE && ball.x <= NET_POSITION + POWER_DISTANCE) {
             speed = isHeavy ? 900 : 500;
-        } else if (ball.x <= NET_POSITION - POWER_DISTANCE * 2
-                || ball.x >= NET_POSITION + POWER_DISTANCE * 2) { // 远场
+        } else if (ball.x <= NET_POSITION - POWER_DISTANCE * 2 || ball.x >= NET_POSITION + POWER_DISTANCE * 2) {
             speed = isHeavy ? 1300 : 900;
         } else {
             speed = isHeavy ? 1100 : 700;
         }
         ball.speedY = speed * Math.sin(Math.toRadians(angle));
         ball.speedX = speed * Math.cos(Math.toRadians(angle));
-        ball.touchedTime = 11; // 重置
+        ball.touchedTime = 11;
         broadcast("HIT:" + playerId + ":" + (isHeavy ? "HEAVY" : "LIGHT"));
     }
 
-    // 发送当前在线快照给新客户端
     private void sendPresenceSnapshot(ClientHandler newClient) {
         if (p1Holder != null) {
             newClient.send("PLAYER_STATE:p1:true");
@@ -364,13 +352,11 @@ public class GameServer {
                 + ball.isFrozen + ":" + ball.isTouchedGround + ":" + ball.touchedTime + ":" + ball.isShotable + ":" + ball.isHitted);
     }
 
-    // 通知所有客户端分配变更
     private void onClientAssignedChanged() {
         broadcast("PLAYER_STATE:p1:" + (p1Holder != null ? "true" : "false"));
         broadcast("PLAYER_STATE:p2:" + (p2Holder != null ? "true" : "false"));
     }
 
-    // 重置指定侧状态
     private void resetSide(String id) {
         if ("p1".equals(id)) {
             p1Ready = false;
@@ -392,7 +378,7 @@ public class GameServer {
         private BufferedReader in;
         private PrintWriter out;
         private volatile boolean alive = true;
-        private volatile String id; // "p1" | "p2" | "w<seq>"
+        private volatile String id;
 
         ClientHandler(Socket socket) {
             this.socket = socket;
@@ -411,39 +397,11 @@ public class GameServer {
                 while (alive && (line = in.readLine()) != null) {
                     handleLine(line.trim());
                 }
-            } catch (Exception e) {
-                System.out.println("[Server] Client error: " + e.getMessage());
+            } catch (IOException e) {
+                if (alive) System.out.println("[Server] Client IO error: " + e.getMessage());
             } finally {
                 onClose();
             }
-        }
-
-        private void assignRole(String desired) {
-            if ("p1".equalsIgnoreCase(desired) && p1Holder == null) {
-                p1Holder = this;
-                id = "p1";
-            } else if ("p2".equalsIgnoreCase(desired) && p2Holder == null) {
-                p2Holder = this;
-                id = "p2";
-            } else if (p1Holder == null) {
-                p1Holder = this;
-                id = "p1";
-            } else if (p2Holder == null) {
-                p2Holder = this;
-                id = "p2";
-            } else {
-                id = "w" + watcherSeq.getAndIncrement();
-            }
-
-            if ("p1".equals(id) || "p2".equals(id)) {
-                setGameStatus("LOBBY");
-                resetSide(id);
-            }
-
-            send("ASSIGN:" + id);
-            sendPresenceSnapshot(this);
-            onClientAssignedChanged();
-            System.out.println("[Server] assigned " + socket.getRemoteSocketAddress() + " as " + id);
         }
 
         private void handleLine(String line) {
@@ -461,18 +419,8 @@ public class GameServer {
                     String[] parts = line.split(":");
                     if (parts.length == 3) {
                         double angle = Double.parseDouble(parts[1]);
-                        boolean isHeavy = "HEAVY".equals(parts[2].toUpperCase());
+                        boolean isHeavy = "HEAVY".equalsIgnoreCase(parts[2]);
                         handleHit(id, angle, isHeavy);
-                    }
-                    return;
-                }
-
-                if (line.startsWith("SERVE")) {
-                    if (!isPlayer()) return;
-                    if (("p1".equals(id) && serveSide == 1) || ("p2".equals(id) && serveSide == -1)) {
-                        ball.isFrozen = false;
-                        ball.speedX = 250 * serveSide;
-                        ball.speedY = 300;
                     }
                     return;
                 }
@@ -488,20 +436,17 @@ public class GameServer {
 
                 if (line.startsWith("SELECT:")) {
                     if (!isPlayer()) return;
-                    String val = line.substring("SELECT:".length());
-                    try {
-                        int c = Integer.parseInt(val);
-                        if ("p1".equals(id)) p1Select = c; else p2Select = c;
-                        broadcast("SELECT:" + id + ":" + c);
-                        tryStartIfReady();
-                    } catch (NumberFormatException ignored) {}
+                    int c = Integer.parseInt(line.substring("SELECT:".length()));
+                    if ("p1".equals(id)) p1Select = c; else p2Select = c;
+                    broadcast("SELECT:" + id + ":" + c);
+                    tryStartIfReady();
                     return;
                 }
 
                 if (line.startsWith("KEY_DOWN:") || line.startsWith("KEY_UP:")) {
                     if (!isPlayer()) return;
                     boolean down = line.startsWith("KEY_DOWN:");
-                    String key = line.substring(down ? "KEY_DOWN:".length() : "KEY_UP:".length()).trim().toUpperCase(Locale.ROOT);
+                    String key = line.substring(down ? "KEY_DOWN:".length() : "KEY_UP:".length()).trim().toUpperCase();
                     if (key.isEmpty()) return;
 
                     Set<String> whitelist = "p1".equals(id) ? P1_WHITELIST : P2_WHITELIST;
@@ -517,15 +462,8 @@ public class GameServer {
 
         private void applyKey(String pid, String key, boolean down) {
             Set<String> pressed = "p1".equals(pid) ? pressedP1 : pressedP2;
-            if (down) {
-                if (pressed.add(key)) {
-                    broadcast("KEY_DOWN:" + pid + ":" + key);
-                }
-            } else {
-                if (pressed.remove(key)) {
-                    broadcast("KEY_UP:" + pid + ":" + key);
-                }
-            }
+            if (down) pressed.add(key); else pressed.remove(key);
+            broadcast(down ? "KEY_DOWN:" + pid + ":" + key : "KEY_UP:" + pid + ":" + key);
         }
 
         private boolean isPlayer() {
@@ -546,46 +484,61 @@ public class GameServer {
             try { if (socket != null && !socket.isClosed()) socket.close(); } catch (IOException ignored) {}
         }
 
+        private void assignRole(String desired) {
+            if ("p1".equalsIgnoreCase(desired) && p1Holder == null) {
+                id = "p1";
+                p1Holder = this;
+            } else if ("p2".equalsIgnoreCase(desired) && p2Holder == null) {
+                id = "p2";
+                p2Holder = this;
+            } else if (p1Holder == null) {
+                id = "p1";
+                p1Holder = this;
+            } else if (p2Holder == null) {
+                id = "p2";
+                p2Holder = this;
+            } else {
+                id = "w" + watcherSeq.getAndIncrement();
+            }
+            if ("p1".equals(id) || "p2".equals(id)) {
+                setGameStatus("LOBBY");
+                resetSide(id);
+            }
+            send("ASSIGN:" + id);
+            sendPresenceSnapshot(this);
+            onClientAssignedChanged();
+            System.out.println("[Server] assigned as " + id);
+        }
+
         private void onClose() {
             close();
             clients.remove(this);
-            boolean changed = false;
             if (this == p1Holder) {
                 p1Holder = null;
                 resetSide("p1");
                 broadcast("PLAYER_LEFT:p1");
-                changed = true;
+                onClientAssignedChanged();
+                setGameStatus("LOBBY");
             } else if (this == p2Holder) {
                 p2Holder = null;
                 resetSide("p2");
                 broadcast("PLAYER_LEFT:p2");
-                changed = true;
-            }
-            if (changed) {
                 onClientAssignedChanged();
                 setGameStatus("LOBBY");
-                scoreLeft = 0;
-                scoreRight = 0;
-                serveSide = 1;
-                ball = new BallState();
             }
+            scoreLeft = 0;
+            scoreRight = 0;
+            serveSide = 1;
+            ball = new BallState();
             System.out.println("[Server] client closed: " + id);
         }
     }
 
     public static void main(String[] args) throws Exception {
-        int port = 8888;
-        if (args != null && args.length > 0) {
-            try {
-                port = Integer.parseInt(args[0]);
-            } catch (NumberFormatException ignored) {}
-        }
+        int port = args.length > 0 ? Integer.parseInt(args[0]) : 8888;
         GameServer server = new GameServer(port);
         server.start();
-        System.out.println("[Server] started. Press Ctrl+C to stop.");
-
-        Runtime.getRuntime().addShutdownHook(new Thread(server::stop, "ServerShutdown"));
-
+        Runtime.getRuntime().addShutdownHook(new Thread(server::stop));
         new CountDownLatch(1).await();
     }
 }
