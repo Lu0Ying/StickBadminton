@@ -25,7 +25,7 @@ public class RoomTitle extends Room{
             RoomStickmanSelect rsr = new RoomStickmanSelect();
             new SwitchRoomEffect(this, rsr);
         });
-        addUiObject(button_start, 650, 400);
+        addUiObject(button_start, 650, 350);
 
         UIImageButton button_players = new UIImageButton("button_2player.png");
         button_players.setOnAction(e -> {
@@ -34,6 +34,15 @@ public class RoomTitle extends Room{
             RoomStickmanSelect rsr = new RoomStickmanSelect();
             new SwitchRoomEffect(this, rsr);
         });
-        addUiObject(button_players, 650, 470);
+        addUiObject(button_players, 650, 420);
+
+        UIImageButton button_netplay = new UIImageButton("button_netplay.png");
+        button_netplay.setOnAction(e -> {
+            SoundPlay.playSound("button_select.mp3", 100);
+            GameProperties.matchMode = 2;
+            RoomNetJoin rnj = new RoomNetJoin();
+            new SwitchRoomEffect(this, rnj);
+        });
+        addUiObject(button_netplay, 650, 490);
     }
 }

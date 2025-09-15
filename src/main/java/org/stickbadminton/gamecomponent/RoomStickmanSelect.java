@@ -21,6 +21,8 @@ public class RoomStickmanSelect extends Room{
     public RoomStickmanSelect(){
         // 选人界面
 
+
+
         addObject(new GameObject("background",new Image("stickmanselect_background.png")));
         UIImageButton startButton=new UIImageButton("button_start.png");
         addUiObject(startButton, 380, 480);

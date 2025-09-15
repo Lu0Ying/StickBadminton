@@ -102,7 +102,7 @@ public class ComputerDecision {
     }
 
 
-        // 更新墙反弹冷却（跨帧记忆）
+        // 更新墙反弹冷却
         updateWallBounceCooldown();
 
         // 预判球的落点
@@ -121,12 +121,12 @@ public class ComputerDecision {
             offBallPositioning(side);
         }
 
-        // 记忆当前球状态，供下帧使用
+        // 记忆当前球状态
         prevBallX = badmintonX;
         prevBallVX = badmintonSpeedX;
     }
 
-    // 无球时的基础站位（左右镜像合理锚点）
+    // 无球时的基础站位
     private void offBallPositioning(int side) {
         // 左侧玩家可移动区间中心大约在 260（[91, 429] 中点）
         final double anchorLeft  = 260.0;
@@ -166,21 +166,21 @@ public class ComputerDecision {
     }
 
     private void executeStrategy(int side, boolean isShotCooldown) {
-        // 0) 杀球防守（优先，且难度无关）
+        //杀球防守
         if (handleSmashDefense(side, isShotCooldown)) return;
 
-        // 1) 网前优先：预测拦截点对位 + 禁跳 + 轻击
+        //预测拦截
         if (handleFrontCourt(side, isShotCooldown)) return;
 
-        // 2) 常规位置调整
+        //位置调整
         adjustPosition();
 
-        // 3) 常规击球策略（先考虑击球，再决定跳跃，避免起跳破坏站位）
+        //常规击球
         if (!isShotCooldown && getDistance() < (hitAreaRadius + racketRadius)) {
             decideShotStrategy();
         }
 
-        // 4) 再考虑跳跃（非网前）
+        //考虑跳跃
         if (getDistance() < (100 + hitAreaRadius + racketRadius) &&
                 (GameProperties.netPosition - opponentX > 100) &&
                 Math.abs(computerX - badmintonX) < 16)
@@ -188,8 +188,7 @@ public class ComputerDecision {
             moveVertical();
         }
     }
-
-    // ========== 新增：杀球防守 ==========
+    //杀球防守
     private boolean handleSmashDefense(int side, boolean isShotCooldown) {
         if (!isIncomingSmash(side)) return false;
 
@@ -201,7 +200,6 @@ public class ComputerDecision {
         );
         double targetY = computerY - offset;
 
-        // 若球已低于该高度，降一点点再试
         if (badmintonY > targetY) {
             targetY = computerY - Math.max(10.0, SMASH_INTERCEPT_Y_MIN);
         }
@@ -225,7 +223,7 @@ public class ComputerDecision {
         }
         desiredX = clamp(desiredX, leftBound, rightBound);
 
-        // 横移就位（带死区）
+        // 横移就位
         double dx = desiredX - computerX;
         if (Math.abs(dx) > NET_ALIGN_DEADZONE) {
             if (dx > 0) { isMoveRight = true; isMoveLeft = false; }
@@ -243,9 +241,9 @@ public class ComputerDecision {
             isLighthit = true;
             isHeavyhit = false;
 
-            // 防守角度：左侧向右后场（约300°），右侧向左后场（约240°），加入轻微扰动
+            // 防守角度
             double base = (side == 1) ? 300.0 : 240.0;
-            superShotAngleDeg = base + (random.nextDouble() - 0.5) * 16.0; // ±8°
+            superShotAngleDeg = base;
             return true; // 已完成处理
         }
 
@@ -269,9 +267,9 @@ public class ComputerDecision {
 
         return onMySideOrEntering && comingToMe && fastDown && speedHigh && notTooLow;
     }
-    // ========== 杀球防守结束 ==========
+    //杀球防守结束
 
-    // 网前专用：预测球在网带附近可控高度的X，去对位；禁跳，优先轻击
+    // 网前对位
     private boolean handleFrontCourt(int side, boolean isShotCooldown) {
         if (!isFrontCourtScenario(side)) return false;
 
@@ -299,7 +297,7 @@ public class ComputerDecision {
         }
         desiredX = clamp(desiredX, leftBound, rightBound);
 
-        // 就位（带死区）
+        // 就位
         double dx = desiredX - computerX;
         if (Math.abs(dx) > NET_ALIGN_DEADZONE) {
             if (dx > 0) { isMoveRight = true; isMoveLeft = false; }
@@ -311,13 +309,13 @@ public class ComputerDecision {
         // 网前禁止起跳
         isJump = false;
 
-        // 近距离命中检测 + 轻击（压网/搓球）
+        // 近距离命中检测 + 轻击
         if (!isShotCooldown && getDistance() < (hitAreaRadius + racketRadius + 8)) {
             isShot = true;
             isLighthit = true;
             isHeavyhit = false;
 
-            // 给出一个向对角下压的建议角度，供上层读取（可选）
+            //向对角下压角度
             superShotAngleDeg = (side == 1)
                     ? 20.0  + (random.nextDouble() - 0.5) * 12.0
                     : 160.0 + (random.nextDouble() - 0.5) * 12.0;
@@ -351,7 +349,6 @@ public class ComputerDecision {
         double distance = idealX - computerX;
         double maxMoveDistance = GameProperties.moveSpeed * GameProperties.frameTime;
 
-        // 低难度也不缩小太多，保证能动到位0.34a
         if(difficultyLevel == 1) {
             distance *= 1.0;
         } else {
@@ -475,7 +472,7 @@ public class ComputerDecision {
         }
     }
 
-    // 垂直跳跃决策（更强的“末刻取消”）
+    // 垂直跳跃
     public void moveVertical() {
         if (isJump || isJumpCooldown) return;
         if (isLikelyRecentWallBounce()) return;
