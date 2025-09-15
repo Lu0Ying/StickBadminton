@@ -20,9 +20,22 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * 文本协议客户端，新增大厅协议：
- * - 发送：SELECT:<characterId>，READY:<0|1>，START
- * - 接收：SELECT:<playerId>:<characterId>，READY:<playerId>:<0|1>，START:<ct1>:<ct2>
+ * 文本协议客户端（服务端权威，同步回显）：
+ *
+ * 发送：
+ * - KEY:PRESS/RELEASE:<KEYCODE>
+ * - ACTION:<任意占位>:<COMMAND>（服务端会盖章为你的身份）
+ * - SELECT:<characterId>，READY:<0|1>，START
+ *
+ * 接收（仅以此驱动游戏状态，拦截本地物理按键，防止本地自算）：
+ * - KEY:<p1|p2>:PRESS/RELEASE:<KEYCODE>
+ * - ACTION:<p1|p2>:<COMMAND>
+ * - SELECT:<playerId>:<characterId>，READY:<playerId>:<0|1>，START:<ct1>:<ct2>
+ *
+ * 输入限制（客户端侧也做软约束，服务端有强校验）：
+ * - p1 仅采集/发送 q w e a s d
+ * - p2 仅采集/发送 u i o j k l
+ * - watcher 不发送 KEY/ACTION
  */
 public class NetworkClient {
 
@@ -109,13 +122,19 @@ public class NetworkClient {
     private BufferedReader in;
     private PrintWriter out;
 
+    // 由服务端回显注入的按键集合，用于区分物理输入与网络注入，避免回显->本地转发
     private final Set<KeyCode> pressedByClient = Collections.synchronizedSet(new HashSet<>());
+    // 本地物理按下状态，用于只在第一次按下时发送 PRESS，释放时发送 RELEASE
     private final Set<KeyCode> pressedLocally = Collections.synchronizedSet(new HashSet<>());
 
     private final Map<String, Map<Action, KeyCode>> perPlayerKeyMap = new ConcurrentHashMap<>();
     private final Set<Scene> attachedScenes = Collections.newSetFromMap(new IdentityHashMap<>());
 
     private volatile String assignedId;
+
+    // 本地键位白名单（客户端侧软校验）
+    private static final EnumSet<KeyCode> P1_KEYS = EnumSet.of(KeyCode.Q, KeyCode.W, KeyCode.E, KeyCode.A, KeyCode.S, KeyCode.D);
+    private static final EnumSet<KeyCode> P2_KEYS = EnumSet.of(KeyCode.U, KeyCode.I, KeyCode.O, KeyCode.J, KeyCode.K, KeyCode.L);
 
     public NetworkClient(String host, int port) {
         this(host, port, null);
@@ -180,7 +199,18 @@ public class NetworkClient {
         sendLine("START");
     }
 
-    // 按键转发绑定（原有）
+    private boolean isController() {
+        return "p1".equalsIgnoreCase(assignedId) || "p2".equalsIgnoreCase(assignedId);
+    }
+
+    private boolean isKeyAllowedForThisClient(KeyCode code) {
+        if (!isController()) return false;
+        if ("p1".equalsIgnoreCase(assignedId)) return P1_KEYS.contains(code);
+        if ("p2".equalsIgnoreCase(assignedId)) return P2_KEYS.contains(code);
+        return false;
+    }
+
+    // 按键转发绑定（拦截物理输入，避免客户端自算；仅发送到服务器）
     public void attachToScene(Scene scene) {
         if (scene == null) return;
         if (attachedScenes.contains(scene)) return;
@@ -189,18 +219,44 @@ public class NetworkClient {
         scene.addEventFilter(KeyEvent.KEY_PRESSED, ev -> {
             KeyCode code = ev.getCode();
             if (code == null) return;
+
+            // 如果是由本客户端注入的网络回显事件，则放行给游戏，不发送、不消费
             if (pressedByClient.contains(code)) return;
+
+            // watcher 或未分配 或 非法键位：消费事件，禁止本地生效，不发送
+            if (!isKeyAllowedForThisClient(code)) {
+                ev.consume();
+                return;
+            }
+
+            // 仅首次按下发送 PRESS
             if (pressedLocally.add(code)) {
                 sendKeyPress(code);
             }
+            // 消费物理事件，防止本地立即生效
+            ev.consume();
         });
+
         scene.addEventFilter(KeyEvent.KEY_RELEASED, ev -> {
             KeyCode code = ev.getCode();
             if (code == null) return;
+
+            // 回显释放事件：放行
             if (pressedByClient.contains(code)) return;
+
+            // watcher/未分配/非法键位：消费，且清理可能残留状态
+            if (!isKeyAllowedForThisClient(code)) {
+                pressedLocally.remove(code);
+                ev.consume();
+                return;
+            }
+
+            // 只在本地记为按下过时发送 RELEASE
             if (pressedLocally.remove(code)) {
                 sendKeyRelease(code);
             }
+            // 同样消费物理事件，防止本地立即生效
+            ev.consume();
         });
 
         System.out.println("[Client] input attached to Scene@" + Integer.toHexString(System.identityHashCode(scene)));
@@ -254,16 +310,20 @@ public class NetworkClient {
 
     public void sendKeyPress(KeyCode code) {
         if (code == null) return;
+        if (!isKeyAllowedForThisClient(code)) return; // 软限制
         sendLine("KEY:PRESS:" + code.name());
     }
 
     public void sendKeyRelease(KeyCode code) {
         if (code == null) return;
+        if (!isKeyAllowedForThisClient(code)) return; // 软限制
         sendLine("KEY:RELEASE:" + code.name());
     }
 
     public void sendAction(Action action) {
         if (action == null) return;
+        if (!isController()) return; // watcher 不发送
+        // 发送的 playerId 服务端会覆盖为实际分配的 assignedId，这里传什么都可以
         String pid = assignedId != null ? assignedId : (desiredPlayerId != null ? desiredPlayerId : "p1");
         sendLine("ACTION:" + pid + ":" + action.name());
     }
@@ -398,11 +458,13 @@ public class NetworkClient {
     }
 
     private void handleKeyLine(String line) {
+        // KEY:<playerId>:PRESS/RELEASE:<KEYCODE>
         String[] parts = line.split(":");
-        if (parts.length != 3) return;
+        if (parts.length != 4) return;
 
-        String op = parts[1].trim().toUpperCase();
-        String keyName = parts[2].trim().toUpperCase();
+        // String playerId = parts[1].trim().toLowerCase(); // 如需区分来源可使用
+        String op = parts[2].trim().toUpperCase();
+        String keyName = parts[3].trim().toUpperCase();
 
         final KeyCode code;
         try {
@@ -425,6 +487,7 @@ public class NetworkClient {
     }
 
     private void handleActionLine(String line) {
+        // ACTION:<playerId>:<COMMAND>
         String[] parts = line.split(":");
         if (parts.length != 3) return;
 

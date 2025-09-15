@@ -8,12 +8,15 @@ import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * 文本协议服务器：
+ * 文本协议服务器（服务端同步、服务端回显）：
+ *
  * 客户端 -> 服务器：
  * - HELLO:<p1|p2>(可选)
  * - KEY:PRESS/RELEASE:<KEYCODE>
@@ -26,10 +29,20 @@ import java.util.concurrent.atomic.AtomicInteger;
  * - ASSIGN:<p1|p2|watcherN>
  * - INFO:PLAYER_STATE:<p1|p2>:READY|WAITING   // 占位/离线状态（存在性）
  * - INFO:PLAYER_LEFT:<p1|p2>
- * - KEY:..., ACTION:...                       // 转发
- * - SELECT:<p1|p2>:<characterId>             // 选择（0 表示清空）
+ * - KEY:<p1|p2>:PRESS/RELEASE:<KEYCODE>       // 服务端回显（包含来源玩家）
+ * - ACTION:<p1|p2>:<COMMAND>                  // 服务端回显（包含来源玩家）
+ * - SELECT:<p1|p2>:<characterId>              // 选择（0 表示清空）
  * - READY:<p1|p2>:<0|1>                       // 就绪状态
  * - START:<ct1>:<ct2>                         // 开始游戏
+ *
+ * 约束：
+ * - p1 仅允许按键 q w e a s d
+ * - p2 仅允许按键 u i o j k l
+ * - 旁观者（watcherN）不允许发送 KEY/ACTION
+ *
+ * 说明：
+ * - 为实现“同步服务端，不进行自己计算”，服务器对 KEY/ACTION 不再只转发给其他客户端，
+ *   而是向“所有客户端（包括发送者自身）”进行广播回显。客户端应仅依据服务器回显进行状态更新。
  */
 public class GameServer {
 
@@ -50,6 +63,27 @@ public class GameServer {
     private volatile int p2Select = 0;
 
     private final AtomicInteger watcherSeq = new AtomicInteger(1);
+
+    // 允许按键集合（统一使用大写比较）
+    private static final Set<String> P1_KEYS = new HashSet<>();
+    private static final Set<String> P2_KEYS = new HashSet<>();
+    static {
+        // p1: q w e a s d
+        P1_KEYS.add("Q");
+        P1_KEYS.add("W");
+        P1_KEYS.add("E");
+        P1_KEYS.add("A");
+        P1_KEYS.add("S");
+        P1_KEYS.add("D");
+
+        // p2: u i o j k l
+        P2_KEYS.add("U");
+        P2_KEYS.add("I");
+        P2_KEYS.add("O");
+        P2_KEYS.add("J");
+        P2_KEYS.add("K");
+        P2_KEYS.add("L");
+    }
 
     public GameServer(int port) {
         this.port = port;
@@ -208,6 +242,20 @@ public class GameServer {
                 && p1Select > 0 && p2Select > 0;
     }
 
+    private static String normalizeKey(String key) {
+        return key == null ? "" : key.trim().toUpperCase();
+    }
+
+    private static boolean isKeyAllowed(String playerId, String keyCode) {
+        String k = normalizeKey(keyCode);
+        if ("P1".equalsIgnoreCase(playerId)) {
+            return P1_KEYS.contains(k);
+        } else if ("P2".equalsIgnoreCase(playerId)) {
+            return P2_KEYS.contains(k);
+        }
+        return false;
+    }
+
     private final class ClientHandler implements Runnable {
         private final Socket socket;
         private BufferedReader in;
@@ -257,17 +305,49 @@ public class GameServer {
                         continue;
                     }
 
+                    // KEY 同步（服务端校验并回显至所有客户端）
                     if (line.startsWith("KEY:")) {
-                        relayToOthers(this, line);
+                        if (assignedId != null && (assignedId.startsWith("watcher"))) {
+                            send("ERROR:WATCHER_CANNOT_CONTROL");
+                            continue;
+                        }
+                        // 解析 KEY:ACTION:KEYCODE
+                        String payload = line.substring("KEY:".length()).trim();
+                        int colonIdx = payload.indexOf(':');
+                        if (colonIdx <= 0 || colonIdx >= payload.length() - 1) {
+                            send("ERROR:BAD_KEY_FORMAT");
+                            continue;
+                        }
+                        String action = payload.substring(0, colonIdx).trim().toUpperCase(); // PRESS / RELEASE
+                        String keyCode = payload.substring(colonIdx + 1).trim();
+
+                        if (!"PRESS".equals(action) && !"RELEASE".equals(action)) {
+                            send("ERROR:BAD_KEY_ACTION");
+                            continue;
+                        }
+
+                        // 校验按键是否合法（p1: qweasd, p2: uiojkl）
+                        if (!isKeyAllowed(assignedId, keyCode)) {
+                            send("ERROR:KEY_NOT_ALLOWED_FOR_" + assignedId.toUpperCase());
+                            continue;
+                        }
+
+                        // 服务端回显到所有客户端（包括自己），并携带来源玩家ID
+                        broadcast("KEY:" + assignedId + ":" + action + ":" + keyCode);
                         continue;
                     }
 
+                    // ACTION 同步（服务端盖章ID，并回显至所有客户端）
                     if (line.startsWith("ACTION:")) {
+                        if (assignedId != null && (assignedId.startsWith("watcher"))) {
+                            send("ERROR:WATCHER_CANNOT_ACTION");
+                            continue;
+                        }
                         int firstColon = line.indexOf(':');
                         int secondColon = line.indexOf(':', firstColon + 1);
                         if (firstColon > 0 && secondColon > firstColon) {
                             String command = line.substring(secondColon + 1).trim();
-                            relayToOthers(this, "ACTION:" + assignedId + ":" + command);
+                            broadcast("ACTION:" + assignedId + ":" + command);
                         } else {
                             send("ERROR:BAD_ACTION_FORMAT");
                         }

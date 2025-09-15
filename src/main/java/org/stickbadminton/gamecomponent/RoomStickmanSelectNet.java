@@ -61,7 +61,6 @@ public class RoomStickmanSelectNet extends Room{
         buttonReady2 = new UIImageButton("button_ready.png");
         addUiObject(buttonReady2, 130, 170);
 
-
         // 点击自己一侧 Ready/Waiting 区域切换就绪
         buttonReady1.setOnAction(e -> tryToggleReady("p1"));
         buttonWaiting1.setOnAction(e -> tryToggleReady("p1"));
@@ -261,7 +260,8 @@ public class RoomStickmanSelectNet extends Room{
     private void updateNetReadyUi(){
         Runnable r = () -> {
             if (buttonReady1 != null) buttonReady1.setVisible(p1Ready);
-            if (buttonWaiting1 != null) buttonWaiting1.setVisible(!p1Ready);if (buttonWaiting2 != null) buttonWaiting2.setVisible(!p2Ready);
+            if (buttonWaiting1 != null) buttonWaiting1.setVisible(!p1Ready);
+            if (buttonWaiting2 != null) buttonWaiting2.setVisible(!p2Ready);
         };
         if (Platform.isFxApplicationThread()) r.run(); else Platform.runLater(r);
     }
