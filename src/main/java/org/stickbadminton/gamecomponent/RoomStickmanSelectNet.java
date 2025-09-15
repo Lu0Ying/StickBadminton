@@ -1,3 +1,4 @@
+// RoomStickmanSelectNet.java
 package org.stickbadminton.gamecomponent;
 
 import javafx.application.Platform;
@@ -146,13 +147,8 @@ public class RoomStickmanSelectNet extends Room {
 
                 @Override
                 public void onPlayerLeft(String playerId) {
-                    if ("p1".equalsIgnoreCase(playerId)) {
-                        setP1Present(false);
-                        applySelect("p1", 0);
-                    } else if ("p2".equalsIgnoreCase(playerId)) {
-                        setP2Present(false);
-                        applySelect("p2", 0);
-                    }
+                    if ("p1".equalsIgnoreCase(playerId)) setP1Present(false);
+                    else if ("p2".equalsIgnoreCase(playerId)) setP2Present(false);
                 }
 
                 @Override
@@ -166,7 +162,6 @@ public class RoomStickmanSelectNet extends Room {
                     applySelect(playerId, characterId);
                 }
 
-                // 监听到服务器下发 START 后
                 @Override
                 public void onStartGame(int ct1, int ct2) {
                     GameProperties.characterType1 = ct1;
@@ -179,7 +174,12 @@ public class RoomStickmanSelectNet extends Room {
 
                 @Override
                 public void onGameStatusChanged(String status) {
-                    System.out.println("[SelectNet] Game status: " + status);
+                    // 处理游戏状态变更，如果需要
+                }
+
+                @Override
+                public void onDisconnected() {
+                    // 处理断连，如果需要
                 }
             });
             netClient.connect();

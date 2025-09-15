@@ -1,8 +1,7 @@
+// UIDigitView.java
 package org.stickbadminton.gamecomponent;
 
-import javafx.collections.FXCollections;
 import javafx.scene.Node;
-import javafx.scene.control.ComboBox;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import org.stickbadminton.UIObject;
