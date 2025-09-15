@@ -9,6 +9,8 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -48,6 +50,9 @@ public class GameServer {
 
     private volatile int p1Select = 0;
     private volatile int p2Select = 0;
+    // 长按集合 + 白名单
+    private final Set<String> pressedP1 = new HashSet<>();
+    private final Set<String> pressedP2 = new HashSet<>();
 
     private final AtomicInteger watcherSeq = new AtomicInteger(1);
 
@@ -76,6 +81,16 @@ public class GameServer {
                 }
             }
         }, "Acceptor").start();
+        // 心跳：广播当前按下集合，修复长按不同步
+        new Thread(() -> {
+            while (running) {
+                try {
+                    broadcast("KEY_STATE:p1:" + String.join(",", pressedP1));
+                    broadcast("KEY_STATE:p2:" + String.join(",", pressedP2));
+                    Thread.sleep(100);
+                } catch (InterruptedException ignored) {}
+            }
+        }, "KeyHeartbeat").start();
     }
 
     public void stop() {
@@ -94,6 +109,8 @@ public class GameServer {
         p2Holder = null;
         p1Ready = p2Ready = false;
         p1Select = p2Select = 0;
+        pressedP1.clear();
+        pressedP2.clear();
         System.out.println("[Server] stopped");
     }
 
@@ -117,6 +134,9 @@ public class GameServer {
         target.send("READY:p2:" + (p2Ready ? "1" : "0"));
         target.send("SELECT:p1:" + p1Select);
         target.send("SELECT:p2:" + p2Select);
+        // 初始推送按键状态，避免第一帧错位
+        target.send("KEY_STATE:p1:" + String.join(",", pressedP1));
+        target.send("KEY_STATE:p2:" + String.join(",", pressedP2));
     }
 
     private synchronized String assignSlot(ClientHandler handler, String desired) {
@@ -168,14 +188,14 @@ public class GameServer {
         if (Objects.equals(p1Holder, handler)) {
             p1Holder = null;
             p1Ready = false;
-            p1Select = 0;
+            p1Select = 0; pressedP1.clear();
             System.out.println("[Server] release p1");
             broadcast("READY:p1:0");
             broadcast("SELECT:p1:0");
         } else if (Objects.equals(p2Holder, handler)) {
             p2Holder = null;
             p2Ready = false;
-            p2Select = 0;
+            p2Select = 0; pressedP2.clear();
             System.out.println("[Server] release p2");
             broadcast("READY:p2:0");
             broadcast("SELECT:p2:0");
@@ -258,7 +278,24 @@ public class GameServer {
                     }
 
                     if (line.startsWith("KEY:")) {
-                        relayToOthers(this, line);
+                        // KEY:PRESS/RELEASE:CODE（客户端只发送自己的物理输入）
+                        String payload = line.substring("KEY:".length()).trim();
+                        int colonIdx = payload.indexOf(':');
+                        if (colonIdx <= 0 || colonIdx >= payload.length() - 1) {
+                            send("ERROR:BAD_KEY_FORMAT");
+                            continue;
+                        }
+                        String action = payload.substring(0, colonIdx).trim().toUpperCase();
+                        String keyCode = payload.substring(colonIdx + 1).trim().toUpperCase();
+                        boolean allowed = ("p1".equals(assignedId) && java.util.Set.of("Q","W","E","A","S","D").contains(keyCode))
+                                || ("p2".equals(assignedId) && java.util.Set.of("U","I","O","J","K","L").contains(keyCode));
+                        if (!allowed) { send("ERROR:KEY_NOT_ALLOWED"); continue; }
+                        if ("PRESS".equals(action)) {
+                            if ("p1".equals(assignedId)) pressedP1.add(keyCode); else if ("p2".equals(assignedId)) pressedP2.add(keyCode);
+                        } else if ("RELEASE".equals(action)) {
+                            if ("p1".equals(assignedId)) pressedP1.remove(keyCode); else if ("p2".equals(assignedId)) pressedP2.remove(keyCode);
+                        } else { send("ERROR:BAD_KEY_ACTION"); continue; }
+                        broadcast("KEY:" + assignedId + ":" + action + ":" + keyCode);
                         continue;
                     }
 
