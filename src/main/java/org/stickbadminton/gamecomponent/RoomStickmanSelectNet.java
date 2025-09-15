@@ -181,6 +181,11 @@ public class RoomStickmanSelectNet extends Room {
                 public void onDisconnected() {
                     // 处理断连，如果需要
                 }
+
+                @Override
+                public void onBallState(double x, double y, double speedX, double speedY) {
+
+                }
             });
             netClient.connect();
         } catch (Exception e) {

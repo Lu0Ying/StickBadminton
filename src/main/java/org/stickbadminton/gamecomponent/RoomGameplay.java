@@ -16,12 +16,18 @@ public class RoomGameplay extends Room {
     private NetworkClient netClient; // 可空：兼容单机
     private boolean inputAttached = false;
 
+    private MatchController matchController; // 引用 MatchController
+    private boolean isHost = false; // 是否为主机（p1 是主机）
+
     public RoomGameplay() {
         buildScene();
     }
 
     public RoomGameplay(NetworkClient netClient) {
         this.netClient = netClient;
+        if (netClient.getAssignedId() != null) {
+            isHost = "p1".equalsIgnoreCase(netClient.getAssignedId());
+        }
         buildScene();
     }
 
@@ -64,14 +70,63 @@ public class RoomGameplay extends Room {
         // 关键：进入联机对战后，启用“只接收服务器回显”的输入模式
         KeyInput.enableNetworkMode();
 
+        // ========== 关键：添加网络监听 ==========
+        setupNetworkListeners();
+
         inputAttached = true;
         System.out.println("[RoomGameplay] attachScene ok");
+    }
+
+    // ========== 新增：设置网络监听 ==========
+    private void setupNetworkListeners() {
+        netClient.addConnectionListener(new NetworkClient.ConnectionListener() {
+            @Override
+            public void onBallState(double x, double y, double speedX, double speedY) {
+                Platform.runLater(() -> {
+                    if (matchController != null) {
+                        matchController.applyBallState(x, y, speedX, speedY);
+                    }
+                });
+            }
+
+            @Override
+            public void onAssigned(String id) {
+                // 可选：记录或日志
+                System.out.println("[RoomGameplay] Assigned ID: " + id);
+                // 如果需要根据 assignedId 更新 isHost，也可以在这里做
+            }
+
+            @Override
+            public void onSelected(String playerId, int characterId) {}
+
+            @Override
+            public void onReadyState(String playerId, boolean ready) {}
+
+            @Override
+            public void onStartGame(int ct1, int ct2) {}
+
+            @Override
+            public void onPlayerState(String playerId, boolean present) {}
+
+            @Override
+            public void onPlayerLeft(String id) {
+                // 可选处理玩家离开
+            }
+
+            @Override
+            public void onGameStatusChanged(String status) {}
+        });
     }
 
     private void buildScene() {
         SoundPlay.stopBackgroundMusic();
         addObject(new GameObject("background", new Image("ingame_background.png")));
-        MatchController matchController = new MatchController();
+        matchController = new MatchController();
+        // 设置是否为主机，用于决定是否广播
+        matchController.setHost(isHost);
+        // 注入 netClient，用于发送
+        matchController.setNetClient(netClient);
+
         addObject(matchController);
 
         NetAnimation net = new NetAnimation();
