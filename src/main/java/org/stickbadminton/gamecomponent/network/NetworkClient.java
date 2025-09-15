@@ -382,7 +382,7 @@ public class NetworkClient {
             return null;
         }
     }
-
+//1
     private boolean isWatcher() {
         String id = assignedId;
         return id == null || id.startsWith("w");
