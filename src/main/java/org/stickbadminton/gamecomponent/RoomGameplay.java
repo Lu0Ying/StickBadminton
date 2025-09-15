@@ -30,8 +30,10 @@ public class RoomGameplay extends Room {
         stickmanLeft.setName("stickman_left");
 
         //体力
-        addObject(new EnergyDisplay(1)).setPosition(100, 30);
-        addObject(new EnergyDisplay(-1)).setPosition(800 - 200, 30);
+        if (!GameProperties.infiniteEnergyMode) {
+            addObject(new EnergyDisplay(1)).setPosition(100, 30);
+            addObject(new EnergyDisplay(-1)).setPosition(800 - 200, 30);
+        }
 
         //显示数字，电子显像管风格
         UIDigitView digitView = new UIDigitView(0);

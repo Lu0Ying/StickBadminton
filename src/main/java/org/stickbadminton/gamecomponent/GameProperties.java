@@ -54,13 +54,17 @@ public class GameProperties {
     // 人物移动速度
     public static final double moveSpeed = 250.0;
     // 重击所耗体力 (人物体力满格为 100)
-    public static final double heavyShotEnergy = 30.0;
+    public static final double heavyShotEnergy = 35.0;
+    // 轻击所耗体力 (体力归0时也能轻击)
+    public static final double lightShotEnergy = 8.0;
     // 跳跃所耗体力
-    public static final double jumpEnergy = 40.0;
+    public static final double jumpEnergy = 25.0;
     // 平地移动时所恢复体力 (单位：体力/秒)
     public static final double moveEnergyRecover = 3.0;
     // 站着不动时所恢复体力 (单位：体力/秒)
     public static final double idleEnergyRecover = 20.0;
+    // 体力为 0 时的移动速度 (插值用)
+    public static final double moveSpeed0 = 190.0;
 
 
     // 以下为变量
@@ -71,4 +75,6 @@ public class GameProperties {
     public static int characterType2 = 1;
     // 单人模式(1) 还是双人模式(2)
     public static int matchMode = 2;
+    // 无限体力模式
+    public static boolean infiniteEnergyMode = false;
 }
