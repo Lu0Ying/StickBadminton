@@ -25,7 +25,6 @@ public class UITextField extends UIObject {
         field.setBackground(Background.EMPTY);
         field.setPadding(new Insets(6, 10, 6, 10));
         field.setPrefHeight(32);
-        // 如需统一字号：field.setStyle("-fx-font-size: 16px;");
     }
 
     @Override

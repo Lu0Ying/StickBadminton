@@ -13,13 +13,23 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * 行文本协议服务器，匹配 NetworkClient:
- * - 客户端可发送：HELLO:<p1|p2>（可选），ACTION:<playerId>:<COMMAND>，KEY:PRESS/RELEASE:<KEYCODE>，PING
- * - 服务器会：分配 ASSIGN:<p1|p2|watcherN>，并将收到的 ACTION/KEY 转发给其他客户端
+ * 文本协议服务器：
+ * 客户端 -> 服务器：
+ * - HELLO:<p1|p2>(可选)
+ * - KEY:PRESS/RELEASE:<KEYCODE>
+ * - ACTION:<playerId>:<COMMAND>
+ * - SELECT:<characterId>
+ * - READY:<0|1>
+ * - START
  *
- * 补充：
- * - 当 p1/p2 的占用状态变化时，广播 INFO:PLAYER_STATE:<p1|p2>:READY|WAITING
- * - 新客户端分配后，推送当前 p1/p2 状态快照
+ * 服务器 -> 客户端：
+ * - ASSIGN:<p1|p2|watcherN>
+ * - INFO:PLAYER_STATE:<p1|p2>:READY|WAITING   // 占位/离线状态（存在性）
+ * - INFO:PLAYER_LEFT:<p1|p2>
+ * - KEY:..., ACTION:...                       // 转发
+ * - SELECT:<p1|p2>:<characterId>             // 选择（0 表示清空）
+ * - READY:<p1|p2>:<0|1>                       // 就绪状态
+ * - START:<ct1>:<ct2>                         // 开始游戏
  */
 public class GameServer {
 
@@ -32,6 +42,12 @@ public class GameServer {
 
     private volatile ClientHandler p1Holder = null;
     private volatile ClientHandler p2Holder = null;
+
+    private volatile boolean p1Ready = false;
+    private volatile boolean p2Ready = false;
+
+    private volatile int p1Select = 0;
+    private volatile int p2Select = 0;
 
     private final AtomicInteger watcherSeq = new AtomicInteger(1);
 
@@ -76,6 +92,8 @@ public class GameServer {
         clients.clear();
         p1Holder = null;
         p2Holder = null;
+        p1Ready = p2Ready = false;
+        p1Select = p2Select = 0;
         System.out.println("[Server] stopped");
     }
 
@@ -85,15 +103,24 @@ public class GameServer {
         }
     }
 
+    private void relayToOthers(ClientHandler from, String line) {
+        for (ClientHandler c : clients) {
+            if (c != from) c.send(line);
+        }
+    }
+
     private void sendPresenceSnapshot(ClientHandler target) {
         target.send("INFO:PLAYER_STATE:p1:" + (p1Holder != null ? "READY" : "WAITING"));
         target.send("INFO:PLAYER_STATE:p2:" + (p2Holder != null ? "READY" : "WAITING"));
+        // 同步就绪与选择
+        target.send("READY:p1:" + (p1Ready ? "1" : "0"));
+        target.send("READY:p2:" + (p2Ready ? "1" : "0"));
+        target.send("SELECT:p1:" + p1Select);
+        target.send("SELECT:p2:" + p2Select);
     }
 
     private synchronized String assignSlot(ClientHandler handler, String desired) {
-        if (handler.assignedId != null) {
-            return handler.assignedId;
-        }
+        if (handler.assignedId != null) return handler.assignedId;
 
         String request = desired != null ? desired.trim().toLowerCase() : "";
 
@@ -118,12 +145,20 @@ public class GameServer {
         System.out.println("[Server] " + handler.remote() + " assigned as " + handler.assignedId +
                 (desired != null ? " (desired=" + desired + ")" : ""));
 
-        // 给新客户端推送当前快照
+        // 给新客户端推送快照
         sendPresenceSnapshot(handler);
 
-        // p1/p2 占位 -> 广播 READY
+        // 占位广播（存在性）
         if ("p1".equals(handler.assignedId) || "p2".equals(handler.assignedId)) {
             broadcast("INFO:PLAYER_STATE:" + handler.assignedId + ":READY");
+            // 初始就绪默认为 0
+            if ("p1".equals(handler.assignedId)) {
+                p1Ready = false;
+                broadcast("READY:p1:0");
+            } else if ("p2".equals(handler.assignedId)) {
+                p2Ready = false;
+                broadcast("READY:p2:0");
+            }
         }
 
         return handler.assignedId;
@@ -132,19 +167,45 @@ public class GameServer {
     private synchronized void releaseSlot(ClientHandler handler) {
         if (Objects.equals(p1Holder, handler)) {
             p1Holder = null;
+            p1Ready = false;
+            p1Select = 0;
             System.out.println("[Server] release p1");
+            broadcast("READY:p1:0");
+            broadcast("SELECT:p1:0");
         } else if (Objects.equals(p2Holder, handler)) {
             p2Holder = null;
+            p2Ready = false;
+            p2Select = 0;
             System.out.println("[Server] release p2");
+            broadcast("READY:p2:0");
+            broadcast("SELECT:p2:0");
         }
     }
 
-    private void relayToOthers(ClientHandler from, String line) {
-        for (ClientHandler c : clients) {
-            if (c != from) {
-                c.send(line);
-            }
+    private synchronized void setReady(String id, boolean ready) {
+        if ("p1".equals(id)) {
+            p1Ready = ready;
+            broadcast("READY:p1:" + (ready ? "1" : "0"));
+        } else if ("p2".equals(id)) {
+            p2Ready = ready;
+            broadcast("READY:p2:" + (ready ? "1" : "0"));
         }
+    }
+
+    private synchronized void setSelect(String id, int characterId) {
+        if ("p1".equals(id)) {
+            p1Select = characterId;
+            broadcast("SELECT:p1:" + characterId);
+        } else if ("p2".equals(id)) {
+            p2Select = characterId;
+            broadcast("SELECT:p2:" + characterId);
+        }
+    }
+
+    private synchronized boolean canStart() {
+        return p1Holder != null && p2Holder != null
+                && p1Ready && p2Ready
+                && p1Select > 0 && p2Select > 0;
     }
 
     private final class ClientHandler implements Runnable {
@@ -209,6 +270,34 @@ public class GameServer {
                             relayToOthers(this, "ACTION:" + assignedId + ":" + command);
                         } else {
                             send("ERROR:BAD_ACTION_FORMAT");
+                        }
+                        continue;
+                    }
+
+                    if (line.startsWith("SELECT:")) {
+                        String s = line.substring("SELECT:".length()).trim();
+                        int cid = 0;
+                        try { cid = Integer.parseInt(s); } catch (NumberFormatException ignored) {}
+                        setSelect(assignedId, cid);
+                        continue;
+                    }
+
+                    if (line.startsWith("READY:")) {
+                        String s = line.substring("READY:".length()).trim();
+                        boolean r = "1".equals(s) || "true".equalsIgnoreCase(s);
+                        setReady(assignedId, r);
+                        continue;
+                    }
+
+                    if ("START".equalsIgnoreCase(line)) {
+                        if (canStart()) {
+                            broadcast("START:" + p1Select + ":" + p2Select);
+                        } else {
+                            System.out.println("[Server] reject START: "
+                                    + "p1Present=" + (p1Holder != null) + ", p2Present=" + (p2Holder != null)
+                                    + ", p1Ready=" + p1Ready + ", p2Ready=" + p2Ready
+                                    + ", p1Select=" + p1Select + ", p2Select=" + p2Select);
+                            send("ERROR:START_CONDITION_NOT_MET");
                         }
                         continue;
                     }

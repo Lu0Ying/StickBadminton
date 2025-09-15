@@ -6,6 +6,7 @@ import javafx.event.Event;
 import javafx.scene.Scene;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
+import javafx.stage.Stage;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -19,17 +20,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * 行文本协议客户端，匹配 GameServer：
- * - KEY:PRESS:<KEYCODE>
- * - KEY:RELEASE:<KEYCODE>
- * - ACTION:<playerId>:<COMMAND>
- * - ASSIGN:<playerId>（来自服务器）
- * - INFO:PLAYER_STATE:<p1|p2>:READY|WAITING（来自服务器）
- * - INFO:PLAYER_LEFT:<p1|p2>（兼容）
- *
- * 与游戏联通：
- * - attachToScene/attachToPrimaryScene：把本地按键事件转发到服务器
- * - 收到远端按键/动作时，注入到 JavaFX Scene（若 Scene 不存在则跳过注入，仅日志）
+ * 文本协议客户端，新增大厅协议：
+ * - 发送：SELECT:<characterId>，READY:<0|1>，START
+ * - 接收：SELECT:<playerId>:<characterId>，READY:<playerId>:<0|1>，START:<ct1>:<ct2>
  */
 public class NetworkClient {
 
@@ -42,45 +35,67 @@ public class NetworkClient {
         HEAVY_HIT_UP, HEAVY_HIT_DOWN
     }
 
-    // 网络状态监听
+    // 网络状态/大厅事件监听
     public interface ConnectionListener {
         default void onAssigned(String playerId) {}
-        default void onPlayerState(String playerId, boolean ready) {}
+        default void onPlayerState(String playerId, boolean present) {} // 连接占位（READY/WAITING）
         default void onPlayerLeft(String playerId) {}
+
+        // 新增：就绪与选人、开始
+        default void onReadyState(String playerId, boolean ready) {}
+        default void onSelected(String playerId, int characterId) {}
+        default void onStartGame(int ct1, int ct2) {}
     }
 
     private final List<ConnectionListener> connectionListeners = new CopyOnWriteArrayList<>();
 
-    public void addConnectionListener(ConnectionListener l) {
-        if (l != null) connectionListeners.add(l);
-    }
-    public void removeConnectionListener(ConnectionListener l) {
-        connectionListeners.remove(l);
+    public void addConnectionListener(ConnectionListener l) { if (l != null) connectionListeners.add(l); }
+    public void removeConnectionListener(ConnectionListener l) { connectionListeners.remove(l); }
+
+    private void runOnFxThreadOrNow(Runnable r) {
+        try {
+            if (Platform.isFxApplicationThread()) r.run();
+            else Platform.runLater(r);
+        } catch (IllegalStateException e) {
+            try { r.run(); } catch (Exception ignored) {}
+        }
     }
 
     private void notifyAssigned(String id) {
         this.assignedId = id;
-        Platform.runLater(() -> {
-            for (ConnectionListener l : connectionListeners) {
-                try { l.onAssigned(id); } catch (Exception ignored) {}
-            }
-        });
+        runOnFxThreadOrNow(() -> connectionListeners.forEach(l -> {
+            try { l.onAssigned(id); } catch (Exception ignored) {}
+        }));
     }
 
-    private void notifyPlayerState(String id, boolean ready) {
-        Platform.runLater(() -> {
-            for (ConnectionListener l : connectionListeners) {
-                try { l.onPlayerState(id, ready); } catch (Exception ignored) {}
-            }
-        });
+    private void notifyPlayerState(String id, boolean present) {
+        runOnFxThreadOrNow(() -> connectionListeners.forEach(l -> {
+            try { l.onPlayerState(id, present); } catch (Exception ignored) {}
+        }));
     }
 
     private void notifyPlayerLeft(String id) {
-        Platform.runLater(() -> {
-            for (ConnectionListener l : connectionListeners) {
-                try { l.onPlayerLeft(id); } catch (Exception ignored) {}
-            }
-        });
+        runOnFxThreadOrNow(() -> connectionListeners.forEach(l -> {
+            try { l.onPlayerLeft(id); } catch (Exception ignored) {}
+        }));
+    }
+
+    private void notifyReady(String id, boolean ready) {
+        runOnFxThreadOrNow(() -> connectionListeners.forEach(l -> {
+            try { l.onReadyState(id, ready); } catch (Exception ignored) {}
+        }));
+    }
+
+    private void notifySelected(String id, int characterId) {
+        runOnFxThreadOrNow(() -> connectionListeners.forEach(l -> {
+            try { l.onSelected(id, characterId); } catch (Exception ignored) {}
+        }));
+    }
+
+    private void notifyStart(int ct1, int ct2) {
+        runOnFxThreadOrNow(() -> connectionListeners.forEach(l -> {
+            try { l.onStartGame(ct1, ct2); } catch (Exception ignored) {}
+        }));
     }
 
     private final String host;
@@ -94,15 +109,12 @@ public class NetworkClient {
     private BufferedReader in;
     private PrintWriter out;
 
-    // 本客户端注入的按键（远端来的），用于避免回环转发
     private final Set<KeyCode> pressedByClient = Collections.synchronizedSet(new HashSet<>());
-    // 本地用户按下（捕捉到并转发出去）的按键，防抖去重
     private final Set<KeyCode> pressedLocally = Collections.synchronizedSet(new HashSet<>());
 
-    // 每个玩家动作到按键映射（用于 ACTION -> KeyEvent）
     private final Map<String, Map<Action, KeyCode>> perPlayerKeyMap = new ConcurrentHashMap<>();
+    private final Set<Scene> attachedScenes = Collections.newSetFromMap(new IdentityHashMap<>());
 
-    // 分配到的玩家位（ASSIGN 收到后设置）
     private volatile String assignedId;
 
     public NetworkClient(String host, int port) {
@@ -116,9 +128,7 @@ public class NetworkClient {
         initDefaultKeyMaps();
     }
 
-    public String getAssignedId() {
-        return assignedId;
-    }
+    public String getAssignedId() { return assignedId; }
 
     private void initDefaultKeyMaps() {
         Map<Action, KeyCode> p1 = new EnumMap<>(Action.class);
@@ -156,15 +166,30 @@ public class NetworkClient {
         perPlayerKeyMap.put(playerId, new EnumMap<>(map));
     }
 
-    // 绑定到某个 JavaFX Scene，把本地键盘事件转发到服务器
+    // 大厅发送
+    public void sendSelect(int characterId) {
+        // 允许发送 0（撤销）
+        sendLine("SELECT:" + characterId);
+    }
+
+    public void sendReady(boolean ready) {
+        sendLine("READY:" + (ready ? "1" : "0"));
+    }
+
+    public void sendStartRequest() {
+        sendLine("START");
+    }
+
+    // 按键转发绑定（原有）
     public void attachToScene(Scene scene) {
         if (scene == null) return;
+        if (attachedScenes.contains(scene)) return;
+        attachedScenes.add(scene);
+
         scene.addEventFilter(KeyEvent.KEY_PRESSED, ev -> {
             KeyCode code = ev.getCode();
             if (code == null) return;
-            // 远端注入的按键，不向外转发，避免回环
             if (pressedByClient.contains(code)) return;
-            // 本地防抖
             if (pressedLocally.add(code)) {
                 sendKeyPress(code);
             }
@@ -177,10 +202,10 @@ public class NetworkClient {
                 sendKeyRelease(code);
             }
         });
+
+        System.out.println("[Client] input attached to Scene@" + Integer.toHexString(System.identityHashCode(scene)));
     }
 
-    // 尝试绑定到 FXGL PrimaryStage 的 Scene
-    // 返回是否绑定成功
     public boolean attachToPrimaryScene() {
         Scene s = getScene();
         if (s != null) {
@@ -188,6 +213,23 @@ public class NetworkClient {
             return true;
         }
         return false;
+    }
+
+    public void attachToPrimaryStageAuto() {
+        runOnFxThreadOrNow(() -> {
+            Stage stage;
+            try { stage = FXGL.getPrimaryStage(); }
+            catch (Exception e) { System.out.println("[Client] getPrimaryStage failed: " + e.getMessage()); return; }
+            if (stage == null) return;
+
+            Scene current = stage.getScene();
+            if (current != null) attachToScene(current);
+
+            stage.sceneProperty().addListener((obs, oldScene, newScene) -> {
+                if (newScene != null) attachToScene(newScene);
+            });
+            System.out.println("[Client] primary stage auto-attach enabled");
+        });
     }
 
     public synchronized void start() {
@@ -223,7 +265,6 @@ public class NetworkClient {
     public void sendAction(Action action) {
         if (action == null) return;
         String pid = assignedId != null ? assignedId : (desiredPlayerId != null ? desiredPlayerId : "p1");
-        // 服务器会强制写入真实 assignedId，这里使用当前可知的 id
         sendLine("ACTION:" + pid + ":" + action.name());
     }
 
@@ -257,7 +298,7 @@ public class NetworkClient {
                 System.out.println("[Client] server closed connection");
             } catch (IOException e) {
                 System.out.println("[Client] connect/read error: " + e.getMessage());
-                sleep(1000); // 简单重连
+                sleep(1000);
             } finally {
                 closeSilently();
             }
@@ -293,6 +334,12 @@ public class NetworkClient {
                 notifyAssigned(assigned);
             } else if (line.startsWith("INFO:")) {
                 handleInfoLine(line);
+            } else if (line.startsWith("READY:")) {
+                handleReadyLine(line);
+            } else if (line.startsWith("SELECT:")) {
+                handleSelectLine(line);
+            } else if (line.startsWith("START:")) {
+                handleStartLine(line);
             } else if (line.startsWith("ERROR:")) {
                 System.out.println("[Client] server error: " + line);
             }
@@ -308,8 +355,8 @@ public class NetworkClient {
         if ("INFO".equals(parts[0]) && "PLAYER_STATE".equals(parts[1]) && parts.length >= 4) {
             String playerId = parts[2].trim().toLowerCase();
             String state = parts[3].trim().toUpperCase();
-            boolean ready = "READY".equals(state) || "1".equals(state) || "CONNECTED".equals(state);
-            notifyPlayerState(playerId, ready);
+            boolean present = "READY".equals(state) || "1".equals(state) || "CONNECTED".equals(state);
+            notifyPlayerState(playerId, present);
             return;
         }
 
@@ -320,8 +367,37 @@ public class NetworkClient {
         }
     }
 
+    private void handleReadyLine(String line) {
+        // READY:<playerId>:<0|1>
+        String[] p = line.split(":");
+        if (p.length != 3) return;
+        String pid = p[1].trim().toLowerCase();
+        String v = p[2].trim();
+        boolean r = "1".equals(v) || "true".equalsIgnoreCase(v);
+        notifyReady(pid, r);
+    }
+
+    private void handleSelectLine(String line) {
+        // SELECT:<playerId>:<characterId>
+        String[] p = line.split(":");
+        if (p.length != 3) return;
+        String pid = p[1].trim().toLowerCase();
+        int cid = 0;
+        try { cid = Integer.parseInt(p[2].trim()); } catch (NumberFormatException ignored) {}
+        notifySelected(pid, cid);
+    }
+
+    private void handleStartLine(String line) {
+        // START:<ct1>:<ct2>
+        String[] p = line.split(":");
+        if (p.length != 3) return;
+        int ct1 = 0, ct2 = 0;
+        try { ct1 = Integer.parseInt(p[1].trim()); } catch (NumberFormatException ignored) {}
+        try { ct2 = Integer.parseInt(p[2].trim()); } catch (NumberFormatException ignored) {}
+        notifyStart(ct1, ct2);
+    }
+
     private void handleKeyLine(String line) {
-        // KEY:PRESS:<KEYCODE> 或 KEY:RELEASE:<KEYCODE>
         String[] parts = line.split(":");
         if (parts.length != 3) return;
 
@@ -349,11 +425,10 @@ public class NetworkClient {
     }
 
     private void handleActionLine(String line) {
-        // ACTION:<playerId>:<COMMAND>
         String[] parts = line.split(":");
         if (parts.length != 3) return;
 
-        String playerId = parts[1].trim(); // "p1" / "p2"
+        String playerId = parts[1].trim();
         String cmd = parts[2].trim().toUpperCase();
 
         final Action action;
@@ -411,7 +486,7 @@ public class NetworkClient {
             return;
         }
 
-        Platform.runLater(() -> {
+        runOnFxThreadOrNow(() -> {
             KeyEvent ev = new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, false, false, false, false);
             Event.fireEvent(scene, ev);
         });
@@ -427,7 +502,7 @@ public class NetworkClient {
             return;
         }
 
-        Platform.runLater(() -> {
+        runOnFxThreadOrNow(() -> {
             KeyEvent ev = new KeyEvent(KeyEvent.KEY_RELEASED, "", "", code, false, false, false, false);
             Event.fireEvent(scene, ev);
         });
@@ -441,7 +516,7 @@ public class NetworkClient {
         }
         Set<KeyCode> snapshot = new HashSet<>(pressedByClient);
         pressedByClient.clear();
-        Platform.runLater(() -> {
+        runOnFxThreadOrNow(() -> {
             for (KeyCode code : snapshot) {
                 KeyEvent ev = new KeyEvent(KeyEvent.KEY_RELEASED, "", "", code, false, false, false, false);
                 Event.fireEvent(scene, ev);

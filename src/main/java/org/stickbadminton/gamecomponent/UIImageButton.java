@@ -19,15 +19,13 @@ public class UIImageButton extends UIObject {
 
     public UIImageButton(String sourceUrl) {
         button = new Button(sourceUrl);
-        //常态图片样式
+        // 常态与悬停图片
         Image imgNormal = new Image(sourceUrl);
-        //鼠标悬停时图片样式
         StringBuffer sb = new StringBuffer(sourceUrl);
         sb.insert(sb.length() - 4, "_hover");
         Image imgHover = new Image(sb.toString());
-        //默认常态
-        ImageView iv = new ImageView(imgNormal);
 
+        ImageView iv = new ImageView(imgNormal);
         iv.setPreserveRatio(true);
         iv.setFitHeight(48);
 
@@ -36,14 +34,13 @@ public class UIImageButton extends UIObject {
         button.setBackground(Background.EMPTY);
         button.setPadding(Insets.EMPTY);
 
-        // 添加悬停效果
         button.setOnMouseEntered(e -> iv.setImage(imgHover));
         button.setOnMouseExited(e -> iv.setImage(imgNormal));
     }
 
     public void setOnAction(EventHandler<ActionEvent> eventHandler) {button.setOnAction(eventHandler);}
 
-    // 新增：对外暴露可见性（同时设置 managed，避免占位）
+    // 对外暴露显隐，便于界面切换（同时影响布局占位）
     public void setVisible(boolean visible) {
         button.setVisible(visible);
         button.setManaged(visible);
