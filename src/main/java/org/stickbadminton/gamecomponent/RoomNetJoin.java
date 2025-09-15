@@ -2,9 +2,13 @@ package org.stickbadminton.gamecomponent;
 
 import javafx.application.Platform;
 import javafx.beans.value.ChangeListener;
+import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextFormatter;
 import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.text.Font;
+import javafx.scene.text.Text;
 import org.stickbadminton.GameObject;
 import org.stickbadminton.Room;
 import org.stickbadminton.SoundPlay;
@@ -26,6 +30,10 @@ public class RoomNetJoin extends Room {
     private UIImageButton btnCreateHost;
     private UIImageButton btnJoin;
     private UIImageButton btnBackToMenu;
+
+    //文本
+    private UITextLabel serverAddressLabel;
+    private UITextLabel portLabel;
 
     // 加入模式 UI
     private UITextField ipField;
@@ -76,10 +84,25 @@ public class RoomNetJoin extends Room {
             new SwitchRoomEffect(this, title);
         });
 
+
+        // 创建文本标签
+        serverAddressLabel = new UITextLabel("服务器地址");
+        serverAddressLabel.getTextNode().setFont(Font.font("Arial", 14));
+        serverAddressLabel.getTextNode().setStyle("-fx-fill: white;");
+        addUiObject(serverAddressLabel, 320, 160);
+        serverAddressLabel.setVisible(false);
+
+        portLabel = new UITextLabel("端口，默认 8889（仅数字）");
+        portLabel.getTextNode().setFont(Font.font("Arial", 14));
+        portLabel.getTextNode().setStyle("-fx-fill: white;");
+        addUiObject(portLabel, 360, 222);
+        portLabel.setVisible(false);
+
+
         // 加入模式控件：默认隐藏
         ipField = new UITextField("服务器地址");
         ipField.setPrefWidth(270);
-        addUiObject(ipField, 320, 180);
+        addUiObject(ipField, 320, 170);
         ipField.setVisible(false);
 
         portField = new UITextField("端口，默认 8889（仅数字）");
@@ -130,6 +153,9 @@ public class RoomNetJoin extends Room {
         ipField.setText("");
         portField.setText(String.valueOf(DEFAULT_PORT));
 
+        serverAddressLabel.setVisible(true);
+        portLabel.setVisible(true);
+
         ipField.setVisible(true);
         portField.setVisible(true);
         btnJoinConfirm.setVisible(true);
@@ -155,6 +181,9 @@ public class RoomNetJoin extends Room {
     }
 
     private void leaveJoinMode() {
+        serverAddressLabel.setVisible(false);
+        portLabel.setVisible(false);
+
         ipField.setVisible(false);
         portField.setVisible(false);
         btnJoinConfirm.setVisible(false);
