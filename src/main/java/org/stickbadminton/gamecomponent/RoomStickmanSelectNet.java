@@ -7,8 +7,9 @@ import org.stickbadminton.Room;
 import org.stickbadminton.SoundPlay;
 import org.stickbadminton.SwitchRoomEffect;
 import org.stickbadminton.gamecomponent.network.NetworkClient;
+import org.stickbadminton.gamecomponent.GameProperties;
 
-public class RoomStickmanSelectNet extends Room{
+public class RoomStickmanSelectNet extends Room {
     private int team1;
     private int team2;
 
@@ -33,7 +34,8 @@ public class RoomStickmanSelectNet extends Room{
     private final String serverHost;
     private final int serverPort;
     private final String desiredId; // 新增：HELLO 期望席位
-    public RoomStickmanSelectNet(){
+
+    public RoomStickmanSelectNet() {
         this(
                 System.getProperty("stb.server.host",
                         System.getenv().getOrDefault("STB_SERVER_HOST", "127.0.0.1")),
@@ -49,7 +51,7 @@ public class RoomStickmanSelectNet extends Room{
         this.serverPort = (port >= 1 && port <= 65535) ? port : 8888;
         this.desiredId = desiredId;
 
-        addObject(new GameObject("background",new Image("stickmanselect_background.png")));
+        addObject(new GameObject("background", new Image("stickmanselect_background.png")));
 
         // Ready / Waiting 指示
         buttonWaiting1 = new UIImageButton("button_waiting.png");
@@ -61,21 +63,27 @@ public class RoomStickmanSelectNet extends Room{
         buttonReady2 = new UIImageButton("button_ready.png");
         addUiObject(buttonReady2, 130, 170);
 
+        // 设置初始状态为 waiting（关键修复）
+        buttonReady1.setVisible(false);
+        buttonWaiting1.setVisible(true);
+        buttonReady2.setVisible(false);
+        buttonWaiting2.setVisible(true);
+
         // 点击自己一侧 Ready/Waiting 区域切换就绪
         buttonReady1.setOnAction(e -> tryToggleReady("p1"));
         buttonWaiting1.setOnAction(e -> tryToggleReady("p1"));
         buttonReady2.setOnAction(e -> tryToggleReady("p2"));
         buttonWaiting2.setOnAction(e -> tryToggleReady("p2"));
 
-        updateNetReadyUi();
+        updateNetReadyUi(); // 确保状态同步
 
-        // 开始按钮：发送 START 请求，由服务器校验并广播
-        UIImageButton startButton=new UIImageButton("button_start.png");
+        // 开始按钮
+        UIImageButton startButton = new UIImageButton("button_start.png");
         addUiObject(startButton, 380, 480);
-        startButton.setOnAction(e->{
+        startButton.setOnAction(e -> {
             SoundPlay.playSound("button_select.mp3", 100);
             if (netClient != null) {
-                // 若我方已选人但未就绪，先自动就绪一次，减少误操作
+                // 若我方已选人但未就绪，先自动就绪一次（减少误操作）
                 if ("p1".equalsIgnoreCase(myId) && !p1Ready && team1 > 0) {
                     netClient.sendReady(true);
                 } else if ("p2".equalsIgnoreCase(myId) && !p2Ready && team2 > 0) {
@@ -91,22 +99,22 @@ public class RoomStickmanSelectNet extends Room{
             }
         });
 
-        // 撤销按钮（仅影响自己侧选择：清空为 0）
-        UIImageButton undoButton=new UIImageButton("button_undo.png");
+        // 撤销按钮
+        UIImageButton undoButton = new UIImageButton("button_undo.png");
         addUiObject(undoButton, 400, 350);
-        undoButton.setOnAction(e-> {
+        undoButton.setOnAction(e -> {
             SoundPlay.playSound("button_select.mp3", 100);
             onUndoButtonClick();
         });
 
-        // 角色选择按钮：只能更改自己一侧
-        addCharacterButton(1,320,120);
-        addCharacterButton(2,420,120);
-        addCharacterButton(3,520,120);
-        addCharacterButton(4,370,220);
-        addCharacterButton(5,470,220);
+        // 角色选择按钮
+        addCharacterButton(1, 320, 120);
+        addCharacterButton(2, 420, 120);
+        addCharacterButton(3, 520, 120);
+        addCharacterButton(4, 370, 220);
+        addCharacterButton(5, 470, 220);
 
-        // 模式提示与 AI 提示
+        // 模式提示
         addObject(new GameObject("modeHint", new Image(
                 GameProperties.matchMode == 1 ? "stickmanselect_mode1hint.png" : "stickmanselect_mode2hint.png"
         ))).setOpacity(0.2);
@@ -116,18 +124,17 @@ public class RoomStickmanSelectNet extends Room{
             addObject(hintAIDifficulty);
         }
 
-        view1=new UIStickmanPlayer();
-        view2=new UIStickmanPlayer();
+        view1 = new UIStickmanPlayer();
+        view2 = new UIStickmanPlayer();
         view2.setFlipped(true);
-        addUiObject(view1,65,320);
-        addUiObject(view2,840,320);
+        addUiObject(view1, 65, 320);
+        addUiObject(view2, 840, 320);
 
         initNetStatusListener();
     }
 
     private void initNetStatusListener() {
         try {
-            // 把 desiredId 传入，让服务器尽量分配对应席位
             netClient = new NetworkClient(serverHost, serverPort, desiredId);
             netClient.addConnectionListener(new NetworkClient.ConnectionListener() {
                 @Override
@@ -135,11 +142,13 @@ public class RoomStickmanSelectNet extends Room{
                     myId = playerId;
                     System.out.println("[SelectNet] I am assigned as " + myId);
                 }
+
                 @Override
                 public void onPlayerState(String playerId, boolean present) {
                     if ("p1".equalsIgnoreCase(playerId)) setP1Present(present);
                     else if ("p2".equalsIgnoreCase(playerId)) setP2Present(present);
                 }
+
                 @Override
                 public void onPlayerLeft(String playerId) {
                     if ("p1".equalsIgnoreCase(playerId)) {
@@ -150,15 +159,18 @@ public class RoomStickmanSelectNet extends Room{
                         applySelect("p2", 0);
                     }
                 }
+
                 @Override
                 public void onReadyState(String playerId, boolean ready) {
                     if ("p1".equalsIgnoreCase(playerId)) setP1Ready(ready);
                     else if ("p2".equalsIgnoreCase(playerId)) setP2Ready(ready);
                 }
+
                 @Override
                 public void onSelected(String playerId, int characterId) {
                     applySelect(playerId, characterId);
                 }
+
                 @Override
                 public void onStartGame(int ct1, int ct2) {
                     GameProperties.characterType1 = ct1;
@@ -176,26 +188,25 @@ public class RoomStickmanSelectNet extends Room{
 
     private void addCharacterButton(int characterId, int x, int y) {
         UIImageButton button = new UIImageButton("selectbutton_" + characterId + ".png");
-        button.setOnAction(e-> {
+        button.setOnAction(e -> {
             SoundPlay.playSound("button_select.mp3", 100);
             onCharacterSelect(characterId);
         });
         addUiObject(button, x, y);
     }
 
-    private void onCharacterSelect(int characterId){
-        // 只能选择自己一侧
+    private void onCharacterSelect(int characterId) {
         if ("p1".equalsIgnoreCase(myId)) {
             applySelect("p1", characterId);
             if (netClient != null) netClient.sendSelect(characterId);
-            // 选中有效角色且尚未就绪时，自动就绪，减少误操作
+            // ✅ 可选：选人后自动就绪（若希望手动就绪，可注释下一行）
             if (characterId > 0 && !p1Ready && netClient != null) netClient.sendReady(true);
         } else if ("p2".equalsIgnoreCase(myId)) {
             applySelect("p2", characterId);
             if (netClient != null) netClient.sendSelect(characterId);
+            // ✅ 可选：选人后自动就绪
             if (characterId > 0 && !p2Ready && netClient != null) netClient.sendReady(true);
         } else {
-            // 观战者不允许改
             System.out.println("[SelectNet] watcher cannot select");
         }
     }
@@ -204,7 +215,6 @@ public class RoomStickmanSelectNet extends Room{
         if ("p1".equalsIgnoreCase(myId) && team1 != 0) {
             applySelect("p1", 0);
             if (netClient != null) netClient.sendSelect(0);
-            // 清空选择后自动取消就绪
             if (p1Ready && netClient != null) netClient.sendReady(false);
         } else if ("p2".equalsIgnoreCase(myId) && team2 != 0) {
             applySelect("p2", 0);
@@ -226,12 +236,12 @@ public class RoomStickmanSelectNet extends Room{
 
     private void tryToggleReady(String side) {
         if (myId == null) return;
-        if (!myId.equalsIgnoreCase(side)) return; // 只能切换自己一侧
+        if (!myId.equalsIgnoreCase(side)) return;
         boolean target = "p1".equalsIgnoreCase(side) ? !p1Ready : !p2Ready;
         if (netClient != null) netClient.sendReady(target);
     }
 
-    private void updatePlayerViews(){
+    private void updatePlayerViews() {
         view1.setCurrentNumber(team1);
         view2.setFlipped(true);
         view2.setCurrentNumber(team2);
@@ -257,15 +267,18 @@ public class RoomStickmanSelectNet extends Room{
         updateNetReadyUi();
     }
 
-    private void updateNetReadyUi(){
+    // ✅ 修复：完整更新所有按钮状态
+    private void updateNetReadyUi() {
         Runnable r = () -> {
             if (buttonReady1 != null) buttonReady1.setVisible(p1Ready);
             if (buttonWaiting1 != null) buttonWaiting1.setVisible(!p1Ready);
+            if (buttonReady2 != null) buttonReady2.setVisible(p2Ready);        // ⬅️ 修复：之前缺失
             if (buttonWaiting2 != null) buttonWaiting2.setVisible(!p2Ready);
         };
-        if (Platform.isFxApplicationThread()) r.run(); else Platform.runLater(r);
+        if (Platform.isFxApplicationThread()) r.run();
+        else Platform.runLater(r);
     }
 
-    public int getTeam1(){ return team1; }
-    public int getTeam2(){ return team2; }
+    public int getTeam1() { return team1; }
+    public int getTeam2() { return team2; }
 }

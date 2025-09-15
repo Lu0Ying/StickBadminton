@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * - SELECT:<p1|p2>:<characterId>              // 选择（0 表示清空）
  * - READY:<p1|p2>:<0|1>                       // 就绪状态
  * - START:<ct1>:<ct2>                         // 开始游戏
+ * - GAME_STATE:<json_data>                    // 游戏状态同步
  *
  * 约束：
  * - p1 仅允许按键 q w e a s d
@@ -41,8 +42,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * - 旁观者（watcherN）不允许发送 KEY/ACTION
  *
  * 说明：
- * - 为实现“同步服务端，不进行自己计算”，服务器对 KEY/ACTION 不再只转发给其他客户端，
- *   而是向“所有客户端（包括发送者自身）”进行广播回显。客户端应仅依据服务器回显进行状态更新。
+ * - 为实现"同步服务端，不进行自己计算"，服务器对 KEY/ACTION 不再只转发给其他客户端，
+ *   而是向"所有客户端（包括发送者自身）"进行广播回显。客户端应仅依据服务器回显进行状态更新。
  */
 public class GameServer {
 
@@ -61,6 +62,9 @@ public class GameServer {
 
     private volatile int p1Select = 0;
     private volatile int p2Select = 0;
+
+    // 游戏状态 - 服务端权威
+    private volatile boolean gameStarted = false;
 
     private final AtomicInteger watcherSeq = new AtomicInteger(1);
 
@@ -128,10 +132,12 @@ public class GameServer {
         p2Holder = null;
         p1Ready = p2Ready = false;
         p1Select = p2Select = 0;
+        gameStarted = false;
         System.out.println("[Server] stopped");
     }
 
     private void broadcast(String line) {
+        System.out.println("[Server] BROADCAST: " + line);
         for (ClientHandler c : clients) {
             c.send(line);
         }
@@ -151,6 +157,11 @@ public class GameServer {
         target.send("READY:p2:" + (p2Ready ? "1" : "0"));
         target.send("SELECT:p1:" + p1Select);
         target.send("SELECT:p2:" + p2Select);
+
+        // 如果游戏已开始，同步游戏状态
+        if (gameStarted) {
+            target.send("GAME_STATUS:STARTED");
+        }
     }
 
     private synchronized String assignSlot(ClientHandler handler, String desired) {
@@ -206,6 +217,7 @@ public class GameServer {
             System.out.println("[Server] release p1");
             broadcast("READY:p1:0");
             broadcast("SELECT:p1:0");
+            broadcast("INFO:PLAYER_STATE:p1:WAITING");
         } else if (Objects.equals(p2Holder, handler)) {
             p2Holder = null;
             p2Ready = false;
@@ -213,6 +225,14 @@ public class GameServer {
             System.out.println("[Server] release p2");
             broadcast("READY:p2:0");
             broadcast("SELECT:p2:0");
+            broadcast("INFO:PLAYER_STATE:p2:WAITING");
+        }
+
+        // 如果游戏进行中且有玩家离开，结束游戏
+        if (gameStarted && (p1Holder == null || p2Holder == null)) {
+            gameStarted = false;
+            broadcast("GAME_STATUS:ENDED");
+            System.out.println("[Server] Game ended due to player disconnection");
         }
     }
 
@@ -239,7 +259,8 @@ public class GameServer {
     private synchronized boolean canStart() {
         return p1Holder != null && p2Holder != null
                 && p1Ready && p2Ready
-                && p1Select > 0 && p2Select > 0;
+                && p1Select > 0 && p2Select > 0
+                && !gameStarted;
     }
 
     private static String normalizeKey(String key) {
@@ -248,9 +269,9 @@ public class GameServer {
 
     private static boolean isKeyAllowed(String playerId, String keyCode) {
         String k = normalizeKey(keyCode);
-        if ("P1".equalsIgnoreCase(playerId)) {
+        if ("p1".equalsIgnoreCase(playerId)) {
             return P1_KEYS.contains(k);
-        } else if ("P2".equalsIgnoreCase(playerId)) {
+        } else if ("p2".equalsIgnoreCase(playerId)) {
             return P2_KEYS.contains(k);
         }
         return false;
@@ -286,7 +307,7 @@ public class GameServer {
                     line = line.trim();
                     if (line.isEmpty()) continue;
 
-                    System.out.println("[Server] RX from " + remote() + " -> " + line);
+                    System.out.println("[Server] RX from " + remote() + " (" + assignedId + ") -> " + line);
 
                     if (line.startsWith("HELLO:")) {
                         String desired = line.substring("HELLO:".length()).trim();
@@ -328,7 +349,7 @@ public class GameServer {
 
                         // 校验按键是否合法（p1: qweasd, p2: uiojkl）
                         if (!isKeyAllowed(assignedId, keyCode)) {
-                            send("ERROR:KEY_NOT_ALLOWED_FOR_" + assignedId.toUpperCase());
+                            send("ERROR:KEY_NOT_ALLOWED_FOR_" + assignedId.toUpperCase() + "_KEY_" + keyCode);
                             continue;
                         }
 
@@ -355,6 +376,10 @@ public class GameServer {
                     }
 
                     if (line.startsWith("SELECT:")) {
+                        if (assignedId != null && assignedId.startsWith("watcher")) {
+                            send("ERROR:WATCHER_CANNOT_SELECT");
+                            continue;
+                        }
                         String s = line.substring("SELECT:".length()).trim();
                         int cid = 0;
                         try { cid = Integer.parseInt(s); } catch (NumberFormatException ignored) {}
@@ -363,6 +388,10 @@ public class GameServer {
                     }
 
                     if (line.startsWith("READY:")) {
+                        if (assignedId != null && assignedId.startsWith("watcher")) {
+                            send("ERROR:WATCHER_CANNOT_READY");
+                            continue;
+                        }
                         String s = line.substring("READY:".length()).trim();
                         boolean r = "1".equals(s) || "true".equalsIgnoreCase(s);
                         setReady(assignedId, r);
@@ -371,12 +400,16 @@ public class GameServer {
 
                     if ("START".equalsIgnoreCase(line)) {
                         if (canStart()) {
+                            gameStarted = true;
                             broadcast("START:" + p1Select + ":" + p2Select);
+                            broadcast("GAME_STATUS:STARTED");
+                            System.out.println("[Server] Game started: p1=" + p1Select + ", p2=" + p2Select);
                         } else {
                             System.out.println("[Server] reject START: "
                                     + "p1Present=" + (p1Holder != null) + ", p2Present=" + (p2Holder != null)
                                     + ", p1Ready=" + p1Ready + ", p2Ready=" + p2Ready
-                                    + ", p1Select=" + p1Select + ", p2Select=" + p2Select);
+                                    + ", p1Select=" + p1Select + ", p2Select=" + p2Select
+                                    + ", gameStarted=" + gameStarted);
                             send("ERROR:START_CONDITION_NOT_MET");
                         }
                         continue;
@@ -393,11 +426,13 @@ public class GameServer {
 
         void send(String line) {
             try {
-                if (out != null) {
+                if (out != null && alive) {
                     out.println(line);
                     out.flush();
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                System.out.println("[Server] Send error to " + remote() + ": " + e.getMessage());
+            }
         }
 
         void close() {
@@ -414,10 +449,9 @@ public class GameServer {
 
             if (id != null && (id.equals("p1") || id.equals("p2"))) {
                 relayToOthers(this, "INFO:PLAYER_LEFT:" + id);
-                broadcast("INFO:PLAYER_STATE:" + id + ":WAITING");
             }
 
-            System.out.println("[Server] disconnected: " + remote());
+            System.out.println("[Server] disconnected: " + remote() + " (was " + id + ")");
         }
     }
 
