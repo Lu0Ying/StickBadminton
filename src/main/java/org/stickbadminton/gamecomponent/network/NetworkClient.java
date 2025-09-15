@@ -426,6 +426,7 @@ public class NetworkClient {
                 String assigned = line.substring("ASSIGN:".length()).trim();
                 System.out.println("[Client] assigned as " + assigned);
                 notifyAssigned(assigned);
+                //1
             } else if (line.startsWith("INFO:")) {
                 handleInfoLine(line);
             } else if (line.startsWith("READY:")) {
