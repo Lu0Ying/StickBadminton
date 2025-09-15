@@ -1,3 +1,4 @@
+// GameServer.java
 package org.stickbadminton.gamecomponent.network;
 
 import java.io.*;
@@ -8,22 +9,22 @@ import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.CountDownLatch;
-
+import org.stickbadminton.gamecomponent.GameProperties;
 /**
  * 权威 GameServer：
  * - 负责分配 p1/p2/watchers
  * - 校验按键白名单并广播 KEY_DOWN/KEY_UP
  * - 周期广播 KEY_STATE（心跳纠偏）
  * - 广播 READY/SELECT/START/GAME_STATUS/PLAYER_STATE/PLAYER_LEFT
+ * - 新增：模拟羽毛球物理，广播 BALL_STATE，处理 HIT 请求，广播事件如 GROUND_HIT/NET_CRASH
  */
 public class GameServer {
-
     private final int port;
     private volatile boolean running = false;
 
     private ServerSocket serverSocket;
 
-    private final CopyOnWriteArrayList<ClientHandler> clients = new CopyOnWriteArrayList<>();
+    private static final CopyOnWriteArrayList<ClientHandler> clients = new CopyOnWriteArrayList<>();
 
     private volatile ClientHandler p1Holder = null;
     private volatile ClientHandler p2Holder = null;
@@ -46,6 +47,16 @@ public class GameServer {
 
     // 游戏状态机
     private volatile String gameStatus = "LOBBY"; // LOBBY | IN_PROGRESS
+
+    // 新增：羽毛球模拟器
+    private BadmintonSimulator ballSimulator;
+
+    // 新增：模拟线程
+    private Thread simulationThread;
+
+    // 新增：上次击球时间，用于防重复击球
+    private long lastHitTime = 0;
+    private static final long HIT_COOLDOWN_MS = 200; // 0.2秒冷却
 
     public GameServer(int port) {
         this.port = port;
@@ -99,6 +110,9 @@ public class GameServer {
             c.close();
         }
         clients.clear();
+        if (simulationThread != null) {
+            simulationThread.interrupt();
+        }
         resetStateToLobby();
         System.out.println("[Server] stopped");
     }
@@ -113,6 +127,7 @@ public class GameServer {
         pressedP1.clear();
         pressedP2.clear();
         setGameStatus("LOBBY");
+        ballSimulator = null;
     }
 
     private void resetSide(String pid) {
@@ -133,7 +148,7 @@ public class GameServer {
         }
     }
 
-    private void broadcast(String line) {
+    private static void broadcast(String line) {
         for (ClientHandler c : clients) {
             c.send(line);
         }
@@ -163,19 +178,54 @@ public class GameServer {
         if (!Objects.equals(gameStatus, status)) {
             gameStatus = status;
             broadcast("GAME_STATUS:" + gameStatus);
-            System.out.println("[Server] Game status -> " + gameStatus);
+            System.out.println("[Server] Game status -> " + status);
+            if ("IN_PROGRESS".equals(status)) {
+                startSimulation();
+            }
         }
     }
 
     private void tryStartIfReady() {
         // 仅在 LOBBY -> IN_PROGRESS 转换时触发
         if (!"LOBBY".equals(gameStatus)) return;
-        boolean canStart = (p1Holder != null && p2Holder != null &&
-                p1Ready && p2Ready && p1Select > 0 && p2Select > 0);
+        boolean canStart = (p1Holder != null && p2Holder != null && p1Ready && p2Ready && p1Select > 0 && p2Select > 0);
         if (canStart) {
             broadcast("START:" + p1Select + ":" + p2Select);
             setGameStatus("IN_PROGRESS");
         }
+    }
+
+    // 新增：启动羽毛球模拟
+    private void startSimulation() {
+        ballSimulator = new BadmintonSimulator();
+        ballSimulator.init(0); // 初始发球方，根据游戏逻辑设置
+
+        simulationThread = new Thread(() -> {
+            long lastTime = System.nanoTime();
+            int broadcastCounter = 0;
+            final int broadcastInterval = 3; // 每3帧广播一次状态（约50ms）
+
+            while ("IN_PROGRESS".equals(gameStatus) && running) {
+                long currentTime = System.nanoTime();
+                double dt = (currentTime - lastTime) / 1_000_000_000.0;
+                lastTime = currentTime;
+
+                ballSimulator.update(dt, pressedP1, pressedP2);
+
+                // 广播状态
+                broadcastCounter++;
+                if (broadcastCounter >= broadcastInterval) {
+                    broadcast(ballSimulator.getStateMessage());
+                    broadcastCounter = 0;
+                }
+
+                try {
+                    Thread.sleep(16); // ~60 FPS
+                } catch (InterruptedException ignored) {}
+            }
+        }, "BallSimulation");
+        simulationThread.setDaemon(true);
+        simulationThread.start();
     }
 
     // ============== 客户端处理 ==============
@@ -261,7 +311,8 @@ public class GameServer {
                     // READY:<0|1>
                     if (!isPlayer()) return;
                     boolean ready = "1".equals(line.substring("READY:".length()));
-                    if ("p1".equals(id)) p1Ready = ready; else p2Ready = ready;
+                    if ("p1".equals(id)) p1Ready = ready;
+                    else p2Ready = ready;
                     broadcast("READY:" + id + ":" + (ready ? "1" : "0"));
                     tryStartIfReady();
                     return;
@@ -272,7 +323,8 @@ public class GameServer {
                     String val = line.substring("SELECT:".length());
                     try {
                         int c = Integer.parseInt(val);
-                        if ("p1".equals(id)) p1Select = c; else p2Select = c;
+                        if ("p1".equals(id)) p1Select = c;
+                        else p2Select = c;
                         broadcast("SELECT:" + id + ":" + c);
                         tryStartIfReady();
                     } catch (NumberFormatException ignored) {}
@@ -291,6 +343,36 @@ public class GameServer {
                     } else {
                         if (P2_WHITELIST.contains(key)) {
                             applyKey("p2", key, down);
+                        }
+                    }
+                    return;
+                }
+                // 新增：处理击球请求 HIT:<type>:<angle>
+                if (line.startsWith("HIT:")) {
+                    if (!isPlayer() || ballSimulator == null) return;
+                    String[] parts = line.split(":", 3);
+                    if (parts.length == 3) {
+                        String type = parts[1];
+                        double angle;
+                        try {
+                            angle = Double.parseDouble(parts[2]);
+                        } catch (NumberFormatException ignored) {
+                            return;
+                        }
+                        // 校验是否可以击球：球在该玩家侧，冷却时间等
+                        long now = System.currentTimeMillis();
+                        if (now - lastHitTime < HIT_COOLDOWN_MS) return;
+                        boolean isP1 = "p1".equals(id);
+                        double centerX = ballSimulator.getCenterX();
+                        if ((isP1 && centerX < GameProperties.netPosition) || (!isP1 && centerX > GameProperties.netPosition)) {
+                            if (!ballSimulator.isFrozen && !ballSimulator.isTouchedGround) {
+                                if ("light".equals(type)) {
+                                    ballSimulator.lightHit(angle);
+                                } else if ("heavy".equals(type)) {
+                                    ballSimulator.heavyHit(angle);
+                                }
+                                lastHitTime = now;
+                            }
                         }
                     }
                     return;
@@ -326,9 +408,15 @@ public class GameServer {
 
         void close() {
             alive = false;
-            try { if (in != null) in.close(); } catch (IOException ignored) {}
-            try { if (out != null) out.close(); } catch (Exception ignored) {}
-            try { if (socket != null && !socket.isClosed()) socket.close(); } catch (IOException ignored) {}
+            try {
+                if (in != null) in.close();
+            } catch (IOException ignored) {}
+            try {
+                if (out != null) out.close();
+            } catch (Exception ignored) {}
+            try {
+                if (socket != null && !socket.isClosed()) socket.close();
+            } catch (IOException ignored) {}
         }
 
         private void onClose() {
@@ -358,6 +446,184 @@ public class GameServer {
                 setGameStatus("LOBBY");
             }
             System.out.println("[Server] client closed: " + id);
+        }
+    }
+
+    // 新增：羽毛球模拟类（纯Java物理模拟）
+    private static class BadmintonSimulator {
+        public double x, y, speedX, speedY, rotation;
+        public boolean isFrozen = true;
+        public boolean isTouchedGround = false;
+        public boolean isHitted = false;
+        public int TouchedTime = 11;
+        public boolean isShotable = true;
+        public int sideServe = 0; // 初始发球方
+
+        // 其他需要的常量，从GameProperties复制
+        private static final double badmintonGravity = GameProperties.badmintonGravity; // 假设值
+        private static final double floorBallY = GameProperties.floorBallY;
+        private static final double playFieldLeft = GameProperties.playFieldLeft;
+        private static final double playFieldRight = GameProperties.playFieldRight;
+        private static final double netPosition = GameProperties.netPosition;
+        private static final double netHeight = GameProperties.netHeight;
+
+        public void init(int _sideServe) {
+            sideServe = _sideServe;
+            speedY = -100;
+            // 初始位置根据发球方
+            double initialX = (sideServe == 1) ? 200 + 21 : 700;
+            double initialY = GameProperties.floorY - GameProperties.playerHeight - 11 + 30;
+            setPosition(initialX, initialY);
+            rotation = (sideServe == 1) ? 225 : -225;
+        }
+
+        public void update(double dt, Set<String> pressedP1, Set<String> pressedP2) {
+            if (isFrozen) {
+                // 检查发球键（假设 Q/E 为 p1 发球键，U/O 为 p2）
+                Set<String> servePressed = (sideServe == 1) ? pressedP1 : pressedP2;
+                boolean serveKeyPressed = (sideServe == 1) ? (servePressed.contains("Q") || servePressed.contains("E")) : (servePressed.contains("U") || servePressed.contains("O"));
+                if (serveKeyPressed) {
+                    isFrozen = false;
+                    speedX = 250 * sideServe;
+                    speedY = 300;
+                }
+                // 位置固定到初始（近似，不模拟球员位置）
+                return;
+            }
+
+            // 复制 Badminton.onUpdate 的物理逻辑
+            double airResistance = 0;
+            if (speedY == 0 && speedX == 0) {
+                speedY += badmintonGravity;
+            } else {
+                airResistance = 0.00001 * (Math.pow(speedX, 2) + Math.pow(speedY, 2));
+                speedY += badmintonGravity - 0.5 * airResistance * (speedY / Math.sqrt(Math.pow(speedX, 2) + Math.pow(speedY, 2)));
+                speedX -= 2.7 * airResistance * (speedX / Math.sqrt(Math.pow(speedX, 2) + Math.pow(speedY, 2)));
+            }
+
+            // 落地判断
+            if (y + speedY * dt >= floorBallY) {
+                isTouchedGround = true;
+                if (isShotable) {
+                    isShotable = false;
+                    int side = (getCenterX() > 450) ? 1 : -1;
+                    broadcast("GROUND_HIT:" + side);
+                    // 可在此重置球状态，根据游戏逻辑
+                    // 如 isFrozen = true; init(newSideServe);
+                }
+                y = floorBallY;
+                if (speedY >= 400) {
+                    speedY = -(speedY * 0.4);
+                    speedX *= 0.3;
+                } else if (speedY > 50) {
+                    speedY = -(speedY * 0.4);
+                    speedX *= 0.5;
+                } else {
+                    speedY = 0;
+                    speedX = 0;
+                }
+            } else {
+                isTouchedGround = false;
+            }
+
+            // 触墙判断
+            if (x + speedX * dt <= playFieldLeft || x + speedX * dt >= playFieldRight) {
+                TouchedTime = 0;
+                x = (x - playFieldLeft < playFieldRight - x) ? playFieldLeft : playFieldRight;
+                speedX = -speedX * 0.6;
+            }
+
+            // 触网判断
+            if (y + speedY * dt >= floorBallY - netHeight + 20 && ((x + speedX * dt >= netPosition - 18 && x <= netPosition - 18) || (x + speedX * dt <= netPosition - 8 && x >= netPosition - 8))) {
+                TouchedTime = 0;
+                broadcast("NET_CRASH");
+                if (y < floorBallY - netHeight + 25) {
+                    y = floorBallY - netHeight + 20;
+                    speedY = speedY * 0.1;
+                    speedX = speedX * 0.8;
+                } else {
+                    if (speedX > 0) {
+                        x = netPosition - 23;
+                    } else {
+                        x = netPosition - 3;
+                    }
+                    speedY = speedY * 0.4;
+                    speedX = -speedX * 0.4;
+                }
+            }
+
+            // 更新位置
+            x += speedX * dt;
+            y += speedY * dt;
+
+            // 方向修正
+            if (!isTouchedGround || Math.pow(speedY, 2) > 50) {
+                double targetRotation;
+                if (speedX == 0) {
+                    targetRotation = speedY > 0 ? 180 : 0;
+                } else if (speedX > 0) {
+                    targetRotation = 90 + Math.toDegrees(Math.atan(speedY / speedX));
+                } else {
+                    targetRotation = -90 + Math.toDegrees(Math.atan(speedY / speedX));
+                }
+                double p = Math.sqrt(Math.pow(speedX, 2) + Math.pow(speedY, 2)) / 800;
+                if (isHitted) {
+                    rotation = targetRotation;
+                    isHitted = false;
+                } else {
+                    rotation = targetRotation * p + rotation * (1 - p);
+                }
+            }
+        }
+
+        public String getStateMessage() {
+            return "BALL_STATE:" + x + ":" + y + ":" + speedX + ":" + speedY + ":" + rotation;
+        }
+
+        public double getCenterX() {
+            return x + 10.5;
+        }
+
+        public double getCenterY() {
+            return y + 3;
+        }
+
+        public void setPosition(double _x, double _y) {
+            x = _x;
+            y = _y;
+        }
+
+        public void lightHit(double angle) {
+            // 复制 Badminton.lightHit 逻辑
+            while (angle < 0) angle += 360;
+            while (angle > 360) angle -= 360;
+            isHitted = true;
+            double speed;
+            double centerX = getCenterX();
+            if (angle < 180) speed = 1200;
+            else if (centerX >= netPosition - GameProperties.powerDistance && centerX <= netPosition + GameProperties.powerDistance) speed = 500;
+            else if (centerX <= netPosition - GameProperties.powerDistance * 2 || centerX >= netPosition + GameProperties.powerDistance * 2) speed = 900;
+            else speed = 700;
+            speedY = speed * Math.sin(Math.toRadians(angle));
+            speedX = speed * Math.cos(Math.toRadians(angle));
+            // 假设无粒子
+            // onHit(); 但服务器无视觉
+        }
+
+        public void heavyHit(double angle) {
+            // 类似复制 heavyHit
+            while (angle < 0) angle += 360;
+            while (angle > 360) angle -= 360;
+            isHitted = true;
+            double speed;
+            double centerX = getCenterX();
+            if (angle < 180) speed = 2500;
+            else if (centerX >= netPosition - GameProperties.powerDistance && centerX <= netPosition + GameProperties.powerDistance) speed = 900;
+            else if (centerX <= netPosition - GameProperties.powerDistance * 2 || centerX >= netPosition + GameProperties.powerDistance * 2) speed = 1300;
+            else speed = 1100;
+            speedY = speed * Math.sin(Math.toRadians(angle));
+            speedX = speed * Math.cos(Math.toRadians(angle));
+            // 假设无粒子
         }
     }
 

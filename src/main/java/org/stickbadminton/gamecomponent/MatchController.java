@@ -6,8 +6,7 @@ import org.stickbadminton.SoundPlay;
 import org.stickbadminton.UIObject;
 import org.stickbadminton.gamecomponent.network.NetworkClient;
 
-
-public class MatchController extends GameObject{
+public class MatchController extends GameObject {
     private double ballHitGroundTimer = 0.0;
     private double scoreChangeTimer = 0.0;
     private int lastPointWinner = 0; // -1 -> 右侧, 1 -> 左侧
@@ -43,20 +42,24 @@ public class MatchController extends GameObject{
         setVisible(false);
     }
 
-    public void applyBallState(double x, double y, double speedX, double speedY) {
-        Badminton ball = (Badminton) inRoom.getObject("badminton");
-        if (ball == null) return;
-
-        // 标记为网络控制，防止本地物理逻辑干扰
-        ball.isNetworkControlled = true;
-
-        // 同步位置和速度
-        ball.setCenterPosition(x, y);
-        ball.speedX = speedX;
-        ball.speedY = speedY;
-
-        // 可选：平滑插值（Lerp）以减少网络抖动
-        // ball.targetX = x; ball.targetY = y; ...
+    public void applyBallState(double x, double y, double speedX, double speedY, double rotation) {
+        GameObject ballObj = inRoom.getObject("badminton");
+        if (ballObj instanceof BadmintonNet) {
+            BadmintonNet ball = (BadmintonNet) ballObj;
+            // 标记为网络控制，防止本地物理逻辑干扰
+            ball.isNetworkControlled = true;
+            // 使用 BadmintonNet 的 applyServerState 方法
+            ball.applyServerState(x, y, speedX, speedY, rotation);
+        } else if (ballObj instanceof Badminton) {
+            Badminton ball = (Badminton) ballObj;
+            // 标记为网络控制，防止本地物理逻辑干扰
+            ball.isNetworkControlled = true;
+            // 同步位置和速度
+            ball.setCenterPosition(x, y);
+            ball.speedX = speedX;
+            ball.speedY = speedY;
+            ball.setRotation(rotation);
+        }
     }
 
     public void matchStart() {
@@ -64,10 +67,12 @@ public class MatchController extends GameObject{
         scoreChangeTimer = 0.01;
         playBGMTimer = 0.0;
     }
+
     public void onBallGroundHit(int winner) {
         ballHitGroundTimer = 1.0;
         lastPointWinner = winner;
     }
+
     public void changeScore() {
         SoundPlay.playSound("add_score.mp3", 1.0);
         if (lastPointWinner == -1) {
@@ -84,7 +89,7 @@ public class MatchController extends GameObject{
             }
         }
 
-        //判断获胜
+        // 判断获胜
         UIObject scoreLeft = inRoom.getUiObject("score_left");
         UIObject scoreRight = inRoom.getUiObject("score_right");
 
@@ -102,7 +107,9 @@ public class MatchController extends GameObject{
     public void resetBall() {
         if (inRoom.getObject("badminton") != null)
             inRoom.removeObject(inRoom.getObject("badminton"));
-        GameObject badminton = inRoom.addObject(new Badminton(serveSide));
+        GameObject badminton = inRoom.addObject(
+                (netClient != null) ? new BadmintonNet(serveSide, netClient) : new Badminton(serveSide)
+        );
         badminton.setPosition(450 - 200 * serveSide, 700);
         badminton.speedX = 0;
         badminton.speedY = 0;
@@ -124,6 +131,7 @@ public class MatchController extends GameObject{
             // 可以添加一个游戏暂停的状态变量来控制更新逻辑
         }
     }
+
     @Override
     public void onUpdate() {
         if (matchEndTimer > 0.0) {
@@ -143,8 +151,7 @@ public class MatchController extends GameObject{
                 scoreChangeTimer = 2.0;
                 serveSide = lastPointWinner;
             }
-        }
-        else if (scoreChangeTimer > 0.0) { // 记分牌改变后到重置玩家和球的位置等待时间
+        } else if (scoreChangeTimer > 0.0) { // 记分牌改变后到重置玩家和球的位置等待时间
             scoreChangeTimer -= GameProperties.frameTime;
             if (scoreChangeTimer <= 0.0) {
                 if (serveSide == StickMan.sideLeft) {
@@ -159,8 +166,7 @@ public class MatchController extends GameObject{
                         stickmanRight.isReadyingServe = true;
                         resetBall();
                     }
-                }
-                else {
+                } else {
                     StickMan stickmanLeft = (StickMan) inRoom.getObject("stickman_left");
                     if (stickmanLeft.isShotting)
                         scoreChangeTimer = 0.04;
