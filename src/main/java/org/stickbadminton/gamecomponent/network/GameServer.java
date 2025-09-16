@@ -637,14 +637,14 @@ import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.CountDownLatch;
-
+import org.stickbadminton.gamecomponent.GameProperties;
 /**
  * 权威 GameServer：
  * - 负责分配 p1/p2/watchers
  * - 校验按键白名单并广播 KEY_DOWN/KEY_UP
  * - 周期广播 KEY_STATE（心跳纠偏）
  * - 广播 READY/SELECT/START/GAME_STATUS/PLAYER_STATE/PLAYER_LEFT
- * - 新增：保存并转发比赛权威状态（SCORE/SERVE/BALL），用于两端轨迹/比分对齐
+ * - 新增：模拟羽毛球物理，广播 BALL_STATE，处理 HIT 请求，广播事件如 GROUND_HIT/NET_CRASH
  */
 public class GameServer {
 
