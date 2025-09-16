@@ -182,6 +182,8 @@ public class StickMan extends GameObject {
         // 水平移动相关
         double moveSpeed = energyRemain > 40 ? GameProperties.moveSpeed
                 : (GameProperties.moveSpeed0 + (GameProperties.moveSpeed - GameProperties.moveSpeed0) * energyRemain / 40.0);
+        if (GameProperties.infiniteEnergyMode)
+            moveSpeed = GameProperties.moveSpeed;
         if (isAIControlled) {
             if (decision.isMoveRight == true) {
                 if (getCenterY() + GameProperties.playerHeight >= GameProperties.floorY)
