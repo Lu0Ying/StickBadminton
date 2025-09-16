@@ -183,18 +183,8 @@ public class RoomStickmanSelectNet extends Room {
                 }
 
                 @Override
-                public void onBallState(double x, double y, double speedX, double speedY, double rotation) {
-                    // 留空，选择角色阶段不处理球状态
-                }
+                public void onBallState(double x, double y, double speedX, double speedY) {
 
-                @Override
-                public void onGroundHit(int side) {
-                    // 留空
-                }
-
-                @Override
-                public void onNetCrash() {
-                    // 留空
                 }
             });
             netClient.connect();
@@ -258,7 +248,7 @@ public class RoomStickmanSelectNet extends Room {
 
     private void updatePlayerViews() {
         view1.setCurrentNumber(team1);
-        view2.setFlipped(true); // 确保翻转
+        view2.setFlipped(true);
         view2.setCurrentNumber(team2);
     }
 
@@ -289,13 +279,10 @@ public class RoomStickmanSelectNet extends Room {
             if (buttonReady2 != null) buttonReady2.setVisible(p2Ready);
             if (buttonWaiting2 != null) buttonWaiting2.setVisible(!p2Ready);
         };
-        if (Platform.isFxApplicationThread()) {
-            r.run();
-        } else {
-            Platform.runLater(r);
-        }
+        if (Platform.isFxApplicationThread()) r.run();
+        else Platform.runLater(r);
     }
-//1
+
     public int getTeam1() { return team1; }
     public int getTeam2() { return team2; }
 }

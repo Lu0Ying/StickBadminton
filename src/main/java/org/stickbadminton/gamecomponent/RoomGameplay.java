@@ -1,4 +1,3 @@
-// RoomGameplay.java
 package org.stickbadminton.gamecomponent;
 
 import com.almasb.fxgl.dsl.FXGL;
@@ -13,6 +12,7 @@ import org.stickbadminton.UIObject;
 import org.stickbadminton.gamecomponent.network.NetworkClient;
 
 public class RoomGameplay extends Room {
+
     private NetworkClient netClient; // 可空：兼容单机
     private boolean inputAttached = false;
 
@@ -67,7 +67,7 @@ public class RoomGameplay extends Room {
         }
 
         netClient.attachScene(scene);
-        // 关键：进入联机对战后，启用"只接收服务器回显"的输入模式
+        // 关键：进入联机对战后，启用“只接收服务器回显”的输入模式
         KeyInput.enableNetworkMode();
 
         // ========== 关键：添加网络监听 ==========
@@ -82,33 +82,11 @@ public class RoomGameplay extends Room {
         netClient.setInRoom(this);
         netClient.addConnectionListener(new NetworkClient.ConnectionListener() {
             @Override
-            public void onBallState(double x, double y, double speedX, double speedY, double rotation) {
+            public void onBallState(double x, double y, double speedX, double speedY) {
                 Platform.runLater(() -> {
                     if (matchController != null) {
-                        matchController.applyBallState(x, y, speedX, speedY, rotation);
+                        matchController.applyBallState(x, y, speedX, speedY);
                     }
-                });
-            }
-
-            // 新增：处理落地事件
-            @Override
-            public void onGroundHit(int side) {
-                Platform.runLater(() -> {
-                    if (matchController != null) {
-                        matchController.onBallGroundHit(side);
-                    }
-                });
-            }
-
-            // 新增：处理触网事件
-            @Override
-            public void onNetCrash() {
-                Platform.runLater(() -> {
-                    NetAnimation net = (NetAnimation) getObject("net");
-                    if (net != null) {
-                        net.playCrashAnimation();
-                    }
-                    SoundPlay.playSound("net_crash.mp3", 0.4);
                 });
             }
 
@@ -170,7 +148,8 @@ public class RoomGameplay extends Room {
         GameObject stickmanRight = addObject(new StickMan(-1, GameProperties.characterType2));
         stickmanRight.setPosition(700, GameProperties.floorY - GameProperties.playerHeight - 11);
         stickmanRight.setName("stickman_right");
-        if (GameProperties.matchMode == 1) ((StickMan)stickmanRight).isAIControlled = true;
+        if (GameProperties.matchMode == 1)
+            ((StickMan)stickmanRight).isAIControlled = true;
 
         GameObject stickmanLeft = addObject(new StickMan(1, GameProperties.characterType1));
         stickmanLeft.setPosition(200, GameProperties.floorY - GameProperties.playerHeight - 11);
