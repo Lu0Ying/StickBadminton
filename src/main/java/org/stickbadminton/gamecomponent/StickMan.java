@@ -333,10 +333,17 @@ public class StickMan extends GameObject {
                                     if (hitAngle > 180 && hitAngle < 200 && getCenterY() > GameProperties.floorY - GameProperties.netHeight - 60)
                                         hitAngle = 200;
                                 }
-                                if (isHeavyShot)
-                                    badminton.heavyHit(hitAngle);
-                                else
-                                    badminton.lightHit(hitAngle);
+                                String type = isHeavyShot ? "HEAVY" : "LIGHT";
+                                if (MatchController.getNetClient() != null) {
+                                    // 网络: 发送请求
+                                    String hitMsg = String.format("HIT_REQUEST:%s:%.2f:%.2f:%.2f", type, hitAngle, badminton.getCenterX(), badminton.getCenterY());
+                                    MatchController.getNetClient().sendLine(hitMsg);
+                                } {
+                                    if (isHeavyShot)
+                                        badminton.heavyHit(hitAngle);
+                                    else
+                                        badminton.lightHit(hitAngle);
+                                }
                                 hasShotted = true;
                                 isReadyingServe = false;
                             }
@@ -381,10 +388,17 @@ public class StickMan extends GameObject {
                                         else if (hitAngle > 250)
                                             hitAngle = 250;
                                     }
-                                    if (isHeavyShot)
-                                        badminton.heavyHit(hitAngle);
-                                    else
-                                        badminton.lightHit(hitAngle);
+                                    String type = isHeavyShot ? "HEAVY" : "LIGHT";
+                                    if (MatchController.getNetClient() != null) {
+                                        // 网络: 发送请求
+                                        String hitMsg = String.format("HIT_REQUEST:%s:%.2f:%.2f:%.2f", type, hitAngle, badminton.getCenterX(), badminton.getCenterY());
+                                        MatchController.getNetClient().sendLine(hitMsg);
+                                    } {
+                                        if (isHeavyShot)
+                                            badminton.heavyHit(hitAngle);
+                                        else
+                                            badminton.lightHit(hitAngle);
+                                    }
                                     hasShotted = true;
                                     isReadyingServe = false;
                                 }

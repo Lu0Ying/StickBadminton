@@ -122,4 +122,5 @@ public class RoomStickmanSelect extends Room{
     public int getTeam2(){
         return team2;
     }
+
 }
