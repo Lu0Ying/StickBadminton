@@ -1,5 +1,9 @@
 # 火柴人打羽毛球项目仓库
 
+<p align="center">
+  <img src="logo/logo.png" width="200" alt="StickBadminton Logo"/>
+</p>
+
 组长：叶子衿
 
 组员：吴韶峰 苑博祥 廖煜杰 翁子翔
@@ -43,10 +47,11 @@
 
 5. **技术支撑层**：保障项目开发与运行，采用以下技术栈
 
-  - 编程语言：Java 24（核心逻辑开发）
+  - 编程语言：Java 21（核心逻辑开发，jlink 定制运行时）
   - 游戏引擎：FXGL（实体组件系统、碰撞检测、动画管理）
   - UI框架：JavaFX 17+（界面绘制、事件处理、属性绑定）
-  - 构建工具：Maven（依赖管理与项目打包）
+  - 构建工具：Maven Wrapper（mvnw，依赖管理与项目打包）
+  - 发布封装：jlink + jpackage（生成免装 JRE 的 Windows 安装包与便携版）
   - 开发工具：IntelliJ IDEA（JavaFX开发支持）
   - 版本控制：Git + GitHub（代码托管与团队协作）
 
@@ -100,3 +105,10 @@
   - 核心职责：创建和管理游戏用户界面，提供视觉反馈和交互元素。
   - 子模块：比分显示子模块（实时显示当前比分）、菜单界面子模块（提供开始和结束界面）。
   - 依赖模块：JavaFX控件系统、场景控制模块。
+
+#### 四、获取与运行
+
+* 无需配置 Java 环境，前往 [Release v1.0](https://github.com/Lu0Ying/StickBadminton/releases/tag/v1.0) 下载：
+  * `StickBadminton-1.0.exe`：Windows 安装包（内置定制运行时，安装即玩）
+  * `StickBadminton-1.0-portable-win.zip`：便携版，解压后直接运行
+* 本地开发：导入 IDE 后运行主类 `org.stickbadminton.Launcher`，或使用 `mvnw` 构建打包

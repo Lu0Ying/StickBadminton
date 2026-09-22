@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <clipPath id="disc"><circle cx="256" cy="256" r="242"/></clipPath>
+    <radialGradient id="boom">
+      <stop offset="0" stop-color="#FFF3B0" stop-opacity="0.95"/>
+      <stop offset="0.55" stop-color="#FFD54D" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#FFD54D" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="orb">
+      <stop offset="0" stop-color="#FFD54D" stop-opacity="0.9"/>
+      <stop offset="0.6" stop-color="#FFB020" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#FF8A3C" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- 底：游戏灰墙 -->
+  <circle cx="256" cy="256" r="242" fill="#a8a8a6"/>
+
+  <g clip-path="url(#disc)">
+    <!-- 墙面噪点 -->
+    <g fill="#8f8f8d" opacity="0.55">
+      <circle cx="100" cy="150" r="3.5"/><circle cx="330" cy="120" r="3"/>
+      <circle cx="440" cy="210" r="3"/><circle cx="70" cy="280" r="2.5"/>
+      <circle cx="290" cy="70" r="2.5"/><circle cx="200" cy="180" r="2"/>
+    </g>
+
+    <!-- 木地板 -->
+    <rect x="0" y="390" width="512" height="122" fill="#d8a95e"/>
+    <rect x="0" y="390" width="512" height="7" fill="#b98a3e"/>
+    <g stroke="#c1913f" stroke-width="3">
+      <line x1="0" y1="426" x2="512" y2="426"/>
+      <line x1="0" y1="462" x2="512" y2="462"/>
+      <line x1="160" y1="390" x2="156" y2="426"/>
+      <line x1="370" y1="390" x2="374" y2="426"/>
+      <line x1="100" y1="426" x2="96" y2="462"/>
+      <line x1="290" y1="426" x2="294" y2="462"/>
+      <line x1="440" y1="426" x2="444" y2="462"/>
+    </g>
+
+    <!-- 人物脚下投影 -->
+    <ellipse cx="172" cy="424" rx="58" ry="8" fill="#1a1a1a" opacity="0.13"/>
+
+    <!-- 右侧羽毛球网 -->
+    <g>
+      <rect x="336" y="322" width="8" height="70" rx="3" fill="#4a90d9"/>
+      <rect x="448" y="322" width="8" height="70" rx="3" fill="#4a90d9"/>
+      <rect x="331" y="316" width="130" height="8" rx="3" fill="#ffffff" stroke="#3a3a3a" stroke-width="2"/>
+      <g stroke="#ffffff" stroke-width="3" stroke-opacity="0.95">
+        <line x1="352" y1="324" x2="352" y2="390"/>
+        <line x1="372" y1="324" x2="372" y2="390"/>
+        <line x1="392" y1="324" x2="392" y2="390"/>
+        <line x1="412" y1="324" x2="412" y2="390"/>
+        <line x1="432" y1="324" x2="432" y2="390"/>
+      </g>
+      <g stroke="#ffffff" stroke-width="2.5" stroke-opacity="0.95">
+        <line x1="338" y1="344" x2="454" y2="344"/>
+        <line x1="338" y1="366" x2="454" y2="366"/>
+      </g>
+    </g>
+
+
+    <!-- 羽毛球炸开的火光 -->
+    <g transform="translate(370 134)">
+      <circle r="38" fill="url(#boom)"/>
+      <circle r="8" fill="#FFF3B0"/>
+      <g>
+        <circle cx="-34" cy="-26" r="12" fill="url(#orb)"/>
+        <circle cx="20" cy="-38" r="14" fill="url(#orb)"/>
+        <circle cx="-46" cy="6" r="10" fill="url(#orb)"/>
+        <circle cx="38" cy="-14" r="9" fill="url(#orb)"/>
+        <circle cx="-24" cy="34" r="8" fill="url(#orb)"/>
+        <circle cx="10" cy="44" r="7" fill="url(#orb)"/>
+        <circle cx="-52" cy="-44" r="7" fill="url(#orb)"/>
+        <circle cx="44" cy="22" r="6" fill="url(#orb)"/>
+      </g>
+      <g fill="#FFE082">
+        <circle cx="-20" cy="-52" r="2.5" opacity="0.9"/>
+        <circle cx="52" cy="-30" r="2" opacity="0.8"/>
+        <circle cx="-58" cy="-18" r="2" opacity="0.7"/>
+      </g>
+    </g>
+
+    <!-- 羽毛球：右上，球头朝右下、羽瓣朝左上 -->
+    <g transform="translate(-26 22) rotate(-45 402 116)">
+      <circle cx="402" cy="138" r="12" fill="#e8722a" stroke="#b5541c" stroke-width="3"/>
+      <g fill="#f7f7f0">
+        <path d="M395 128 Q387 110 382 102 Q389 98 394 104 L399 124 Z"/>
+        <path d="M400 126 Q399 106 398 96 Q406 95 410 101 L405 126 Z"/>
+        <path d="M406 128 Q412 112 416 104 Q423 107 422 114 L410 130 Z"/>
+      </g>
+    </g>
+
+
+    <!-- 火柴人：缩小版，黑线白头红帽，挥拍姿势 -->
+    <g stroke="#1a1a1a" stroke-width="11" stroke-linecap="round" fill="none">
+      <!-- 头：白底黑边 -->
+      <circle cx="172" cy="272" r="30" fill="#ffffff" stroke="#1a1a1a" stroke-width="7"/>
+      <!-- 躯干 -->
+      <path d="M174 302 Q168 336 165 366"/>
+      <!-- 持拍臂 -->
+      <path d="M172 310 Q196 292 216 268"/>
+      <!-- 左臂后摆 -->
+      <path d="M170 314 Q156 330 148 344"/>
+      <!-- 前腿弓步 -->
+      <path d="M165 366 Q150 392 132 414"/>
+      <!-- 后腿支撑 -->
+      <path d="M165 366 Q188 392 208 412"/>
+    </g>
+    <!-- 球拍：棕柄 + 灰面黑框 -->
+    <g>
+      <path d="M216 268 L 232 250" stroke="#7a4a21" stroke-width="12" stroke-linecap="round"/>
+      <g transform="rotate(26 254 222)">
+        <ellipse cx="254" cy="222" rx="30" ry="40" fill="#9e9e9e" stroke="#3a3a3a" stroke-width="8"/>
+        <g stroke="#ffffff" stroke-width="3.5" stroke-opacity="0.9" stroke-linecap="round">
+          <line x1="238" y1="196" x2="236" y2="248"/>
+          <line x1="254" y1="186" x2="254" y2="258"/>
+          <line x1="270" y1="196" x2="272" y2="248"/>
+          <line x1="228" y1="212" x2="280" y2="212"/>
+          <line x1="224" y1="228" x2="284" y2="228"/>
+          <line x1="228" y1="242" x2="280" y2="242"/>
+        </g>
+      </g>
+    </g>
+  </g>
+
+  <!-- 图标描边 -->
+  <circle cx="256" cy="256" r="242" fill="none" stroke="#5a5a58" stroke-width="15"/>
+</svg>
