@@ -3,9 +3,6 @@ package org.stickbadminton;
 import javafx.scene.media.Media;
 import javafx.scene.media.MediaPlayer;
 
-import java.io.File;
-import java.net.MalformedURLException;
-import java.nio.file.Paths;
 import java.util.HashMap;
 
 public class SoundPlay {
@@ -28,42 +25,38 @@ public class SoundPlay {
     }
 
     private static void loadSound(String sourceUrl) {
-        // 加载某个资源到音频池
-        try{
-            String path=getAbsolutePath(sourceUrl);
-            Media media=new Media(new File(path).toURI().toURL().toString());
+        // 加载某个资源到音频池，从 classpath 读取，打包后同样有效
+        Media media = loadMedia(sourceUrl);
+        if (media != null) {
             soundCache.put(sourceUrl, media);
-        }catch(MalformedURLException e) {
-            System.err.println("无效音频路径:"+e.getMessage());
         }
     }
 
-    // 播放音频相关的函数
-    public static String getAbsolutePath(String relativePath) {
-       //如果为绝对路径，返回
-        if(Paths.get(relativePath).isAbsolute()) {
-            return relativePath;
+    // 统一从 classpath 读取音频资源，缺失时打印错误并返回 null，避免游戏崩溃
+    private static Media loadMedia(String sourceUrl) {
+        var url = SoundPlay.class.getResource("/sounds/" + sourceUrl);
+        if (url == null) {
+            System.err.println("音频资源缺失:" + sourceUrl);
+            return null;
         }
-        String basePath=Paths.get("src","main","resources","sounds").toString();
-        return Paths.get(basePath,relativePath).toString();
+        return new Media(url.toExternalForm());
     }
+
     // 设置背景音乐
     public static void setBackgroundMusic(String sourceUrl) {
-       try{
-           if (backgroundPlayer != null) {
-               backgroundPlayer.stop();
-               backgroundPlayer.dispose(); // 释放资源
-           }
-           Media media=new Media(new File(getAbsolutePath(sourceUrl)).toURI().toURL().toString());
-           backgroundPlayer=new MediaPlayer(media);
+        if (backgroundPlayer != null) {
+            backgroundPlayer.stop();
+            backgroundPlayer.dispose(); // 释放资源
+        }
+        Media media = loadMedia(sourceUrl);
+        if (media == null) {
+            return;
+        }
+        backgroundPlayer=new MediaPlayer(media);
 
-           //设置循环播放和音量
-           backgroundPlayer.setCycleCount(MediaPlayer.INDEFINITE);
-           backgroundPlayer.setVolume(backgroundVolume);
-       }catch (MalformedURLException e) {
-            System.err.println("无效的音频文件路径:"+e.getMessage());
-       }
-
+        //设置循环播放和音量
+        backgroundPlayer.setCycleCount(MediaPlayer.INDEFINITE);
+        backgroundPlayer.setVolume(backgroundVolume);
     }
     public static void playBackgroundMusic() {
         // 播放背景音乐
@@ -92,20 +85,19 @@ public class SoundPlay {
     public static void playSound(String sourceUrl, double volume) {
         // 播放指定的音效，以给定的音量
         // volume 范围：0为静音，1为原音量
-        try {
-            Media media = soundCache.get(sourceUrl);
-            if(media==null){
-                // 如果音效没有预加载，则动态加载
-                media = new Media(new File(getAbsolutePath(sourceUrl)).toURI().toURL().toString());
-                soundCache.put(sourceUrl, media);
+        Media media = soundCache.get(sourceUrl);
+        if(media==null){
+            // 如果音效没有预加载，则动态加载
+            media = loadMedia(sourceUrl);
+            if (media == null) {
+                return;
             }
-            MediaPlayer soundPlayer = new MediaPlayer(media);
-            soundPlayer.setVolume(Math.max(0,Math.min(1,volume)));
-            soundPlayer.play();
-            soundPlayer.setOnEndOfMedia(() -> soundPlayer.dispose());
-        }catch (MalformedURLException e){
-            System.err.println("无效的音频文件路径:"+e.getMessage());
+            soundCache.put(sourceUrl, media);
         }
+        MediaPlayer soundPlayer = new MediaPlayer(media);
+        soundPlayer.setVolume(Math.max(0,Math.min(1,volume)));
+        soundPlayer.play();
+        soundPlayer.setOnEndOfMedia(() -> soundPlayer.dispose());
     }
 
     //手动移除不需要的音效
