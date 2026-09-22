@@ -1,8 +1,6 @@
 # 火柴人打羽毛球项目仓库
 
-<p align="center">
-  <img src="logo/logo.png" width="200" alt="StickBadminton Logo"/>
-</p>
+![StickBadminton Logo](logo/logo.png)
 
 组长：叶子衿
 
