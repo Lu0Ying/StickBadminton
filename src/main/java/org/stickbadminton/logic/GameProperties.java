@@ -65,6 +65,16 @@ public class GameProperties {
     public static final double idleEnergyRecover = 20.0;
     // 体力为 0 时的移动速度 (插值用)
     public static final double moveSpeed0 = 100.0;
+    // 满速移动所需的体力阈值（移速插值上界，StickMan 移动与 AI 决策预判共用同一公式）
+    public static final double fullSpeedEnergy = 40.0;
+    // 难度达到该等级（含 G 键满级）时，AI 启用完整体力管理
+    public static final int energyManageDifficulty = 3;
+    // 低体力站桩回血阈值：低于此值 AI 放大就位死区、站着回血（站立 20/s 远高于移动 3/s）
+    public static final double lowEnergyIdleThreshold = 60.0;
+    // 起跳后需保留的体力余量，保证跳完至少还能轻击
+    public static final double jumpEnergyReserve = 15.0;
+    // 5级 AI 属性倍率：决策以4级为基础，移速与击打力度 ×1.1
+    public static final double level5StatBoost = 1.1;
 
 
     // 以下为变量

@@ -121,17 +121,20 @@ public class Badminton extends GameObject {
             }
             // 释放检测双端同构执行（客户端按键来自服务器注入，固定初速双端一致）。
             // 发球方是 AI（单人模式右半场常驻 AI，或 G 键把 p1 切成 AI）时自动释放，
-            // 替代原先的 matchMode==1 特判：单人行为不变，联机 AI 发球也走同一路径
-            if (isServeSideControlledByAI()) {
+            // 替代原先的 matchMode==1 特判：单人行为不变，联机 AI 发球走同一路径。
+            // 5级AI发球力度 ×1.1（人类与G键满级恒为1.0，联机双端同值）
+            StickMan serverStickman = getServerStickman();
+            double servePower = serverStickman != null ? serverStickman.getStatMultiplier() : 1.0;
+            if (serverStickman != null && serverStickman.isAIControlled) {
                 isFrozen = false;
-                speedX = 250 * sideServe;
-                speedY = 300;
+                speedX = 250 * sideServe * servePower;
+                speedY = 300 * servePower;
             }
             else if (((sideServe == StickMan.sideRight) && (KeyInput.isKeyHolding(KeyCode.Q) || KeyInput.isKeyHolding(KeyCode.E)))
                     || ((sideServe == StickMan.sideLeft) && (KeyInput.isKeyHolding(KeyCode.U) || KeyInput.isKeyHolding(KeyCode.O)))) {
                 isFrozen = false;
-                speedX = 250 * sideServe;
-                speedY = 300;
+                speedX = 250 * sideServe * servePower;
+                speedY = 300 * servePower;
             }
             return;
         }
@@ -209,6 +212,14 @@ public class Badminton extends GameObject {
     }
 
     public void lightHit(double angle) {
+        lightHit(angle, 1.0);
+    }
+
+    /**
+     * @param powerMul 力度倍率：5级AI ×1.1，人类与其它难度为 1.0。
+     *                 联机 HIT 回放走1参重载、随后被权威初速覆盖，不影响双端同步
+     */
+    public void lightHit(double angle, double powerMul) {
         // angle: 击打角度
         // 被击打（力度小)
         SoundPlay.playSound("shot_light.mp3", 0.4);
@@ -228,6 +239,7 @@ public class Badminton extends GameObject {
             speed = 900;
         else
             speed = 700;
+        speed *= powerMul;
         speedY = speed * StrictMath.sin(StrictMath.toRadians(angle));
         speedX = speed * StrictMath.cos(StrictMath.toRadians(angle));
         emitter.setNumParticles(4);
@@ -236,6 +248,13 @@ public class Badminton extends GameObject {
     }
 
     public void heavyHit(double angle) {
+        heavyHit(angle, 1.0);
+    }
+
+    /**
+     * @param powerMul 力度倍率：5级AI ×1.1，人类与其它难度为 1.0
+     */
+    public void heavyHit(double angle, double powerMul) {
         // angle: 击打角度
         // 被击打（力度大）
         SoundPlay.playSound("shot_heavy.mp3", 1.0);
@@ -255,6 +274,7 @@ public class Badminton extends GameObject {
             speed = 1300;
         else
             speed = 1100;
+        speed *= powerMul;
         speedY = speed * StrictMath.sin(StrictMath.toRadians(angle));
         speedX = speed * StrictMath.cos(StrictMath.toRadians(angle));
 
@@ -264,15 +284,14 @@ public class Badminton extends GameObject {
     }
 
     /**
-     * 当前发球方是否由 AI 控制。
+     * 当前发球者（sideServe 决定左右半场），可能为 null。
      * sideServe==sideRight 的发球者是左半场 stickman_left（p1），
      * sideServe==sideLeft 的发球者是右半场 stickman_right；
-     * 双端按同一状态判断，自动释放时机一致。
+     * 双端按同一状态判断，自动释放时机与发球力度一致。
      */
-    private boolean isServeSideControlledByAI() {
-        StickMan server = (StickMan) inRoom.getObject(
+    private StickMan getServerStickman() {
+        return (StickMan) inRoom.getObject(
                 sideServe == StickMan.sideRight ? "stickman_left" : "stickman_right");
-        return server != null && server.isAIControlled;
     }
 
     //播放触网动画，在触网判断中被调用

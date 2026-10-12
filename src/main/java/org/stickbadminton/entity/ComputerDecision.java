@@ -63,15 +63,25 @@ public class ComputerDecision {
     // G 键调试：p1 满级 AI。决策全部在构造器内完成，必须构造前定级，
     // 事后改 difficultyLevel 来不及（shouldReact 等随机门槛已在构造中执行过）
     private boolean maxLevel = false;
+    // 体力管理（难度 ≥3 或 G 键满级启用）：低体力收敛跳跃/重击、站桩回血、按实际移速预判；
+    // 1-2级不启用，保持原有的“乱”行为
+    private boolean smartEnergy = false;
+    private double energy = 100.0;
+    // StickMan 传入的实际移速（体力插值 × 属性倍率），仅体力管理路径参与预判
+    private double effectiveMoveSpeed;
 
     public ComputerDecision() {}
 
     public ComputerDecision(boolean maxLevel, int side,
                             double hitCenterX, double hitCenterY, boolean isShotCooldown, boolean isJumpCooldown,
                             double badmintonX, double badmintonY, double badmintonSpeedX, double badmintonSpeedY,
-                            double opponentX, double opponentY)
+                            double opponentX, double opponentY,
+                            double energyRemain, double effectiveMoveSpeed)
     {
         this.maxLevel = maxLevel;
+        this.energy = energyRemain;
+        this.effectiveMoveSpeed = effectiveMoveSpeed;
+        this.smartEnergy = maxLevel || GameProperties.difficultyLevel >= GameProperties.energyManageDifficulty;
         // 初始化基本信息
         this.badmintonSpeedX = badmintonSpeedX;
         this.badmintonSpeedY = badmintonSpeedY;
@@ -95,13 +105,13 @@ public class ComputerDecision {
         else if (GameProperties.difficultyLevel == 1)
             this.difficultyLevel = 0.5;
         else if (GameProperties.difficultyLevel == 2)
-            this.difficultyLevel = 0.7;
+            this.difficultyLevel = 0.8; // 2级由0.7调至0.8；仍不启用体力管理，保持“乱”的行为
         else if (GameProperties.difficultyLevel == 3)
             this.difficultyLevel = 0.8;
         else if (GameProperties.difficultyLevel == 4)
             this.difficultyLevel = 0.9;
         else
-            this.difficultyLevel = 1.0;
+            this.difficultyLevel = 0.9; // 5级：决策以4级为基础，属性另乘1.1（StickMan.getStatMultiplier）
         if(random.nextDouble()>difficultyLevel*0.1)
         {
             this.racketRadius = GameProperties.racketRadius*difficultyLevel;
@@ -137,6 +147,12 @@ public class ComputerDecision {
         prevBallVX = badmintonSpeedX;
     }
 
+    // 决策层预判用的移速：体力管理按实际移速（低体力跑得慢，预判要同步变慢，
+    // 否则 AI 会误判“跑得到”而漏球）；1-2 级保持固定满速，保留原有的预判误差（“乱”的一部分）
+    private double decisionMoveSpeed() {
+        return smartEnergy ? effectiveMoveSpeed : GameProperties.moveSpeed;
+    }
+
     // 无球时的基础站位
     private void offBallPositioning(int side) {
         // 左侧玩家可移动区间中心大约在 260（[91, 429] 中点）
@@ -145,7 +161,10 @@ public class ComputerDecision {
         final double anchorRight = 640.0;
 
         double target = (side == 1) ? anchorLeft : anchorRight;
-        if (Math.abs(computerX - target) <= 2.0) {
+        // 体力管理：低体力时放大就位死区，站在锚点附近不动，
+        // 利用站立回血 20/s 快速恢复（移动回血仅 3/s），避免来回踱步浪费体力
+        double deadzone = (smartEnergy && energy < GameProperties.lowEnergyIdleThreshold) ? 30.0 : 2.0;
+        if (Math.abs(computerX - target) <= deadzone) {
             isMoveLeft = isMoveRight = false;
             return;
         }
@@ -359,7 +378,7 @@ public class ComputerDecision {
     private void adjustPosition() {
         double idealX = predictedLandingX;
         double distance = idealX - computerX;
-        double maxMoveDistance = GameProperties.moveSpeed * GameProperties.frameTime;
+        double maxMoveDistance = decisionMoveSpeed() * GameProperties.frameTime;
 
         if(difficultyLevel == 1) {
             distance *= 1.0;
@@ -462,7 +481,7 @@ public class ComputerDecision {
         double idealHitX = preLanding(targetY);
 
         double distance = idealHitX - computerX;
-        double maxMoveDistance = GameProperties.moveSpeed * GameProperties.frameTime;
+        double maxMoveDistance = decisionMoveSpeed() * GameProperties.frameTime;
 
         // 低难度也留一定精度
         if (random.nextDouble() > difficultyLevel) {
@@ -501,7 +520,7 @@ public class ComputerDecision {
             double idealHitY = computerY - GameProperties.hitAreaCenterHeight / 1.5;
             InterceptPrediction pred = predictAtY(idealHitY);
             if (pred.t > 0 && pred.t <= 1.0) {
-                double reach = GameProperties.moveSpeed * pred.t + hitAreaRadius + racketRadius + 8.0;
+                double reach = decisionMoveSpeed() * pred.t + hitAreaRadius + racketRadius + 8.0;
                 if (Math.abs(pred.x - computerX) <= reach) {
                     isJump = true;
                 }
@@ -537,6 +556,9 @@ public class ComputerDecision {
         boolean basicWindow = timeToNet > 0.22 && timeToNet < 0.9;
         if (!basicWindow) return false;
         if (isLikelyRecentWallBounce()) return false;
+        // 体力管理：起跳要花 25 体力，起跳后至少保留 15 余量确保还能出球，
+        // 体力不足先不起跳，避免连跳把体力掏空后跑不动也打不出
+        if (smartEnergy && energy < GameProperties.jumpEnergy + GameProperties.jumpEnergyReserve) return false;
         if (maxLevel) return true; // 满级恒起跳：跳过随机概率，双端一致
 
         // 难度概率（低难度也给较高概率，以免错过球）
@@ -622,6 +644,12 @@ public class ComputerDecision {
 
     // 重击
     public void superShot() {
+        // 体力管理：跳杀 = 跳25 + 重击35 = 60 体力，体力不足则降级为普通击球；
+        // 否则起跳后重击会被 StickMan 按“体力>35”规则静默降级成轻击，白跳一次还亏体力
+        if (smartEnergy && energy <= GameProperties.jumpEnergy + GameProperties.heavyShotEnergy) {
+            middleShot();
+            return;
+        }
         isHeavyhit = true;
         isLighthit = false;
         isJump = true;
@@ -641,8 +669,11 @@ public class ComputerDecision {
     // 中场球
     public void middleShot() {
         double distance = computerX - GameProperties.netPosition;
+        // 体力管理：体力已不够一次重击就直接轻击（重击门槛是体力>35，边缘值会被静默降级，
+        // 主动降级可让意图与实际动作一致）；满级路径按体力判断也是确定性的，双端不分叉
+        boolean energyLight = smartEnergy && energy <= GameProperties.heavyShotEnergy;
         // 满级恒重击：30% 轻击随机会令双端 energyRemain 分叉 → moveSpeed 分叉
-        if (!maxLevel && new Random().nextDouble() < 0.3 && distance > 200) {
+        if (energyLight || (!maxLevel && new Random().nextDouble() < 0.3 && distance > 200)) {
             isLighthit = true; isHeavyhit = false;
         } else {
             isHeavyhit = true; isLighthit = false;

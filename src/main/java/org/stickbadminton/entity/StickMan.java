@@ -40,6 +40,29 @@ public class StickMan extends GameObject {
     public boolean isReadyingServe = false;
     public double energyRemain = 100.0; // 满格体力 = 100
 
+    /**
+     * 本角色属性倍率：5级 AI（非 G 键满级）移速与击打力度 ×1.1；
+     * 人类与其它难度恒为 1.0——联机 G 键满级路径不叠倍率，保证双端一致。
+     */
+    public double getStatMultiplier() {
+        if (!isAIControlled || aiMaxLevel || GameProperties.difficultyLevel != 5)
+            return 1.0;
+        return GameProperties.level5StatBoost;
+    }
+
+    /**
+     * 当前实际移速：体力不足 fullSpeedEnergy 时线性衰减，5级AI 再乘属性倍率。
+     * AI 决策层（走位预判/跳跃可达性）必须用同一公式，否则低体力时会误判“跑得到”。
+     */
+    public double getEffectiveMoveSpeed() {
+        double baseMoveSpeed = GameProperties.moveSpeed * getStatMultiplier();
+        if (GameProperties.infiniteEnergyMode)
+            return baseMoveSpeed;
+        return energyRemain > GameProperties.fullSpeedEnergy ? baseMoveSpeed
+                : (GameProperties.moveSpeed0 + (baseMoveSpeed - GameProperties.moveSpeed0)
+                        * energyRemain / GameProperties.fullSpeedEnergy);
+    }
+
     public StickMan(int side, int characterType) {
         super("stickman1", Sprite.loadImage("/images/stickman/stickman_head1.png")); //head
         this.side = side;
@@ -181,17 +204,16 @@ public class StickMan extends GameObject {
         }
         ComputerDecision decision;
         if (isAIControlled && badminton != null && opponentObj != null) {
-            // aiMaxLevel 作为构造参数传入：决策在构造器内完成，事后改字段已来不及
+            // aiMaxLevel 作为构造参数传入：决策在构造器内完成，事后改字段已来不及；
+            // 体力与实际移速一并传入，供体力管理决策（跳跃预算/重击预算/预判）使用
             decision = new ComputerDecision(aiMaxLevel, side, getCenterX(), getCenterY() + GameProperties.playerHeight - GameProperties.hitAreaCenterHeight,
-                    isShotting, isJumping, badminton.getCenterX(), badminton.getCenterY(), badminton.speedX, badminton.speedY, opponentObj.getCenterX(), opponentObj.getCenterY());
+                    isShotting, isJumping, badminton.getCenterX(), badminton.getCenterY(), badminton.speedX, badminton.speedY, opponentObj.getCenterX(), opponentObj.getCenterY(),
+                    energyRemain, getEffectiveMoveSpeed());
         }
         else decision = new ComputerDecision();
 
-        // 水平移动相关
-        double moveSpeed = energyRemain > 40 ? GameProperties.moveSpeed
-                : (GameProperties.moveSpeed0 + (GameProperties.moveSpeed - GameProperties.moveSpeed0) * energyRemain / 40.0);
-        if (GameProperties.infiniteEnergyMode)
-            moveSpeed = GameProperties.moveSpeed;
+        // 水平移动相关：与 AI 决策层共用同一移速公式（体力插值 + 5级属性倍率）
+        double moveSpeed = getEffectiveMoveSpeed();
         if (isAIControlled) {
             if (decision.isMoveRight == true) {
                 if (getCenterY() + GameProperties.playerHeight >= GameProperties.floorY)
@@ -348,9 +370,9 @@ public class StickMan extends GameObject {
                                     // 先执行击球算出权威初速，再随消息上报，
                                     // 客户端直接采用该初速，避免重算公式/档位不一致导致轨迹分叉
                                     if (isHeavyShot)
-                                        badminton.heavyHit(hitAngle);
+                                        badminton.heavyHit(hitAngle, getStatMultiplier());
                                     else
-                                        badminton.lightHit(hitAngle);
+                                        badminton.lightHit(hitAngle, getStatMultiplier());
                                     if (MatchController.getNetClient() != null) {
                                         String type = isHeavyShot ? "HEAVY" : "LIGHT";
                                         String hitMsg = String.format("HIT_REQUEST:%s:%.2f:%.2f:%.2f:%.2f:%.2f",
@@ -409,9 +431,9 @@ public class StickMan extends GameObject {
                                     if (localAuthority) {
                                         // 先击球算出权威初速再上报，客户端直接采用避免重算分叉
                                         if (isHeavyShot)
-                                            badminton.heavyHit(hitAngle);
+                                            badminton.heavyHit(hitAngle, getStatMultiplier());
                                         else
-                                            badminton.lightHit(hitAngle);
+                                            badminton.lightHit(hitAngle, getStatMultiplier());
                                         if (MatchController.getNetClient() != null) {
                                             String type = isHeavyShot ? "HEAVY" : "LIGHT";
                                             String hitMsg = String.format("HIT_REQUEST:%s:%.2f:%.2f:%.2f:%.2f:%.2f",
