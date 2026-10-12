@@ -20,6 +20,7 @@
             <artifactId>javafx-controls</artifactId>
             <version>21.0.6</version>
         </dependency>
+        <!-- FXGL 的 module-info requires javafx.fxml，必须保留此依赖以满足模块解析 -->
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-fxml</artifactId>
@@ -105,7 +106,7 @@
                         <!-- Default configuration for running with: mvn clean javafx:run -->
                         <id>default-cli</id>
                         <configuration>
-                            <mainClass>org.example.stickbadminton/org.stickbadminton.HelloApplication
+                            <mainClass>org.example.stickbadminton/org.stickbadminton.Launcher
                             </mainClass>
                             <launcher>app</launcher>
                             <jlinkZipName>app</jlinkZipName>
