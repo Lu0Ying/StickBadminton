@@ -1,4 +1,8 @@
-package org.stickbadminton.gamecomponent;
+package org.stickbadminton.room;
+import org.stickbadminton.logic.GameProperties;
+import org.stickbadminton.room.RoomNetJoin;
+import org.stickbadminton.room.RoomStickmanSelect;
+import org.stickbadminton.ui.UIImageButton;
 
 import javafx.scene.control.Button;
 import javafx.scene.image.Image;

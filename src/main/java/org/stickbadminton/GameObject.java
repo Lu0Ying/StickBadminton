@@ -7,7 +7,7 @@ import com.almasb.fxgl.texture.AnimatedTexture;
 import javafx.geometry.Point2D;
 import javafx.scene.image.Image;
 import javafx.util.Duration;
-import org.stickbadminton.gamecomponent.GameProperties;
+import org.stickbadminton.logic.GameProperties;
 
 public class GameObject {
 

@@ -1,4 +1,5 @@
-package org.stickbadminton.gamecomponent;
+package org.stickbadminton.ui;
+import org.stickbadminton.logic.GameProperties;
 
 import com.almasb.fxgl.particle.ParticleComponent;
 import com.almasb.fxgl.particle.ParticleEmitter;
@@ -12,7 +13,7 @@ import org.stickbadminton.*;
 public class InfiniteEnergySettingDisplay extends GameObject {
     private GameObject offDisplay;
     // this : onDisplay
-    InfiniteEnergySettingDisplay() {
+    public InfiniteEnergySettingDisplay() {
         super("infinite_energy_on", new Image("infinite_energy_on.png"));
         offDisplay = new GameObject("infinite_energy_off", new Image("infinite_energy_off.png"));
         this.setOpacity(0.0);

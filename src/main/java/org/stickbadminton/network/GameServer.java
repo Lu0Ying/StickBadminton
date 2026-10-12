@@ -627,7 +627,7 @@
 //        System.out.println("[Server] Started. Press Ctrl+C to stop.");
 //    }
 //}
-package org.stickbadminton.gamecomponent.network;
+package org.stickbadminton.network;
 
 import java.io.*;
 import java.net.ServerSocket;
@@ -637,7 +637,7 @@ import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.CountDownLatch;
-import org.stickbadminton.gamecomponent.GameProperties;
+import org.stickbadminton.logic.GameProperties;
 /**
  * 权威 GameServer：
  * - 负责分配 p1/p2/watchers

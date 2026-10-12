@@ -1,4 +1,4 @@
-package org.stickbadminton.gamecomponent;
+package org.stickbadminton.fx;
 import com.almasb.fxgl.dsl.FXGL;
 import com.almasb.fxgl.particle.ParticleComponent;
 import com.almasb.fxgl.particle.ParticleEmitter;

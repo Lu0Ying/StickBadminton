@@ -1,4 +1,4 @@
-package org.stickbadminton.gamecomponent;
+package org.stickbadminton.logic;
 
 public class GameProperties {
     // 每帧的时间，即 fps 帧率的倒数

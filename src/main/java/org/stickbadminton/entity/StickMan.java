@@ -1,4 +1,8 @@
-package org.stickbadminton.gamecomponent;
+package org.stickbadminton.entity;
+import org.stickbadminton.entity.Badminton;
+import org.stickbadminton.entity.ComputerDecision;
+import org.stickbadminton.logic.GameProperties;
+import org.stickbadminton.logic.MatchController;
 
 import javafx.geometry.Point2D;
 import javafx.scene.image.Image;

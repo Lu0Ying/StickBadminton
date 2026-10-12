@@ -12,5 +12,10 @@ module org.example.stickbadminton {
     requires java.net.http;
 
     exports org.stickbadminton;
-    exports org.stickbadminton.gamecomponent;
+    exports org.stickbadminton.entity;
+    exports org.stickbadminton.room;
+    exports org.stickbadminton.ui;
+    exports org.stickbadminton.fx;
+    exports org.stickbadminton.logic;
+    exports org.stickbadminton.network;
 }

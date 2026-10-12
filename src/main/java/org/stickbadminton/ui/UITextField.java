@@ -1,4 +1,4 @@
-package org.stickbadminton.gamecomponent;
+package org.stickbadminton.ui;
 
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;

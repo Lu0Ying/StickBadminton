@@ -11,7 +11,7 @@ import javafx.animation.SequentialTransition;
 import javafx.scene.Scene;
 import javafx.scene.shape.Rectangle;
 import javafx.util.Duration;
-import org.stickbadminton.gamecomponent.GameProperties;
+import org.stickbadminton.logic.GameProperties;
 
 import java.awt.*;
 

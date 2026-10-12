@@ -1,4 +1,10 @@
-package org.stickbadminton.gamecomponent;
+package org.stickbadminton.room;
+import org.stickbadminton.logic.GameProperties;
+import org.stickbadminton.room.RoomGameplay;
+import org.stickbadminton.ui.HintAIDifficulty;
+import org.stickbadminton.ui.InfiniteEnergySettingDisplay;
+import org.stickbadminton.ui.UIImageButton;
+import org.stickbadminton.ui.UIStickmanPlayer;
 
 import javafx.scene.image.Image;
 import org.stickbadminton.GameObject;

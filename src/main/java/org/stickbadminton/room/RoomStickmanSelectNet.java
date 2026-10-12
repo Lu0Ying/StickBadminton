@@ -1,4 +1,9 @@
-package org.stickbadminton.gamecomponent;
+package org.stickbadminton.room;
+import org.stickbadminton.logic.GameProperties;
+import org.stickbadminton.room.RoomGameplay;
+import org.stickbadminton.ui.HintAIDifficulty;
+import org.stickbadminton.ui.UIImageButton;
+import org.stickbadminton.ui.UIStickmanPlayer;
 
 import javafx.application.Platform;
 import javafx.scene.image.Image;
@@ -7,7 +12,7 @@ import org.stickbadminton.Room;
 import org.stickbadminton.SoundPlay;
 import org.stickbadminton.SwitchRoomEffect;
 import org.stickbadminton.UIObject;
-import org.stickbadminton.gamecomponent.network.NetworkClient;
+import org.stickbadminton.network.NetworkClient;
 
 public class RoomStickmanSelectNet extends Room {
 

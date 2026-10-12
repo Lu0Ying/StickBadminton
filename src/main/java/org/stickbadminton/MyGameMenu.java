@@ -20,13 +20,9 @@ import com.almasb.fxgl.particle.ParticleEmitter;
 import com.almasb.fxgl.particle.ParticleComponent;
 
 import javafx.geometry.Pos;
-import javafx.scene.control.Button;
-import javafx.scene.layout.VBox;
-import javafx.scene.paint.Color;
-import javafx.scene.text.Text;
 import javafx.scene.layout.Pane;
 import javafx.scene.Node;
-import org.stickbadminton.gamecomponent.RoomTitle;
+import org.stickbadminton.room.RoomTitle;
 
 public class MyGameMenu extends FXGLMenu {
 

@@ -7,8 +7,8 @@ import com.almasb.fxgl.app.scene.FXGLMenu;
 import com.almasb.fxgl.app.scene.MenuType;
 import com.almasb.fxgl.app.scene.SceneFactory;
 import javafx.scene.input.KeyCode;
-import org.stickbadminton.gamecomponent.RoomGameplay;
-import org.stickbadminton.gamecomponent.RoomTitle;
+import org.stickbadminton.room.RoomGameplay;
+import org.stickbadminton.room.RoomTitle;
 
 public class GameApp extends GameApplication {
 

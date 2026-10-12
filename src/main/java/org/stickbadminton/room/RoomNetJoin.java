@@ -1,4 +1,9 @@
-package org.stickbadminton.gamecomponent;
+package org.stickbadminton.room;
+import org.stickbadminton.room.RoomStickmanSelectNet;
+import org.stickbadminton.room.RoomTitle;
+import org.stickbadminton.ui.UIImageButton;
+import org.stickbadminton.ui.UITextField;
+import org.stickbadminton.ui.UITextLabel;
 
 import javafx.application.Platform;
 import javafx.beans.value.ChangeListener;
@@ -13,7 +18,7 @@ import org.stickbadminton.GameObject;
 import org.stickbadminton.Room;
 import org.stickbadminton.SoundPlay;
 import org.stickbadminton.SwitchRoomEffect;
-import org.stickbadminton.gamecomponent.network.GameServer;
+import org.stickbadminton.network.GameServer;
 
 import java.io.IOException;
 import java.net.ServerSocket;

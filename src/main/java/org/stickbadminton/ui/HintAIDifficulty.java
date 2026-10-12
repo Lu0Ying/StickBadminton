@@ -1,4 +1,5 @@
-package org.stickbadminton.gamecomponent;
+package org.stickbadminton.ui;
+import org.stickbadminton.logic.GameProperties;
 
 import javafx.scene.image.Image;
 import org.stickbadminton.GameObject;

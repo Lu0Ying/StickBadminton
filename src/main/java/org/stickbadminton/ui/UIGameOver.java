@@ -1,4 +1,7 @@
-package org.stickbadminton.gamecomponent;
+package org.stickbadminton.ui;
+import org.stickbadminton.logic.GameProperties;
+import org.stickbadminton.room.RoomGameplay;
+import org.stickbadminton.room.RoomTitle;
 
 import com.almasb.fxgl.dsl.FXGL;
 import javafx.scene.control.Button;

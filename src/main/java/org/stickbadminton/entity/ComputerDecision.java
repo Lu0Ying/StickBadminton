@@ -1,4 +1,5 @@
-package org.stickbadminton.gamecomponent;
+package org.stickbadminton.entity;
+import org.stickbadminton.logic.GameProperties;
 import java.util.Random;
 
 public class ComputerDecision {

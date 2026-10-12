@@ -1,10 +1,15 @@
-package org.stickbadminton.gamecomponent;
+package org.stickbadminton.logic;
+import org.stickbadminton.entity.Badminton;
+import org.stickbadminton.entity.StickMan;
+import org.stickbadminton.logic.GameProperties;
+import org.stickbadminton.ui.UIDigitView;
+import org.stickbadminton.ui.UIGameOver;
 
 import javafx.scene.image.Image;
 import org.stickbadminton.GameObject;
 import org.stickbadminton.SoundPlay;
 import org.stickbadminton.UIObject;
-import org.stickbadminton.gamecomponent.network.NetworkClient;
+import org.stickbadminton.network.NetworkClient;
 
 
 public class MatchController extends GameObject{

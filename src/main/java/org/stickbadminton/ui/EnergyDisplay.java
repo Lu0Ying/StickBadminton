@@ -1,4 +1,5 @@
-package org.stickbadminton.gamecomponent;
+package org.stickbadminton.ui;
+import org.stickbadminton.entity.StickMan;
 
 import com.almasb.fxgl.particle.ParticleComponent;
 import com.almasb.fxgl.particle.ParticleEmitter;

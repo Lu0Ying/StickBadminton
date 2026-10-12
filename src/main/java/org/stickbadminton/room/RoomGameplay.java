@@ -1,4 +1,12 @@
-package org.stickbadminton.gamecomponent;
+package org.stickbadminton.room;
+import org.stickbadminton.entity.Badminton;
+import org.stickbadminton.entity.StickMan;
+import org.stickbadminton.fx.NetAnimation;
+import org.stickbadminton.logic.GameProperties;
+import org.stickbadminton.logic.MatchController;
+import org.stickbadminton.ui.EnergyDisplay;
+import org.stickbadminton.ui.HintKeyboard;
+import org.stickbadminton.ui.UIDigitView;
 
 import com.almasb.fxgl.dsl.FXGL;
 import javafx.application.Platform;
@@ -9,7 +17,7 @@ import org.stickbadminton.KeyInput;
 import org.stickbadminton.Room;
 import org.stickbadminton.SoundPlay;
 import org.stickbadminton.UIObject;
-import org.stickbadminton.gamecomponent.network.NetworkClient;
+import org.stickbadminton.network.NetworkClient;
 
 public class RoomGameplay extends Room {
 

@@ -1,4 +1,10 @@
-package org.stickbadminton.gamecomponent;
+package org.stickbadminton.entity;
+import org.stickbadminton.entity.StickMan;
+import org.stickbadminton.fx.HittingFX;
+import org.stickbadminton.fx.NetAnimation;
+import org.stickbadminton.fx.ParticleFX;
+import org.stickbadminton.logic.GameProperties;
+import org.stickbadminton.logic.MatchController;
 
 import com.almasb.fxgl.particle.ParticleComponent;
 import com.almasb.fxgl.particle.ParticleEmitter;
@@ -13,10 +19,10 @@ public class Badminton extends GameObject {
     public boolean isNetworkControlled = false; // 是否由网络同步控制
     private double sendTimer = 0;  // 控制发送频率
 
-    // 新增: 客户端预测用（上一个接收速度/时间）
-    double lastSpeedX = 0;
-    double lastSpeedY = 0;
-    double predictTimer = 0;
+    // 新增: 客户端预测用（上一个接收速度/时间），供 MatchController 跨包重置预测
+    public double lastSpeedX = 0;
+    public double lastSpeedY = 0;
+    public double predictTimer = 0;
 
     public static int sideServe = 0; // 当前发球人
     public static double airResistance = 0;  //空气阻力加速度

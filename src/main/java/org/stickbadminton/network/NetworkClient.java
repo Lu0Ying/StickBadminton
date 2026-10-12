@@ -695,7 +695,7 @@
 //        }
 //    }
 //}
-package org.stickbadminton.gamecomponent.network;
+package org.stickbadminton.network;
 
 import com.almasb.fxgl.dsl.FXGL;
 import javafx.application.Platform;
@@ -705,7 +705,7 @@ import javafx.scene.input.KeyEvent;
 import javafx.event.Event;
 import org.stickbadminton.KeyInput;
 import org.stickbadminton.Room;
-import org.stickbadminton.gamecomponent.Badminton;
+import org.stickbadminton.entity.Badminton;
 
 import java.io.BufferedReader;
 import java.io.IOException;

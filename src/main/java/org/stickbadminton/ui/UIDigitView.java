@@ -1,5 +1,5 @@
 // UIDigitView.java
-package org.stickbadminton.gamecomponent;
+package org.stickbadminton.ui;
 
 import javafx.scene.Node;
 import javafx.scene.image.Image;

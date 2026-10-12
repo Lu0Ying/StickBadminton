@@ -1,7 +1,9 @@
-package org.stickbadminton.gamecomponent;
+package org.stickbadminton.entity;
+import org.stickbadminton.entity.Badminton;
+import org.stickbadminton.fx.ParticleFX;
 
 import javafx.scene.image.Image;
-import org.stickbadminton.gamecomponent.network.NetworkClient;
+import org.stickbadminton.network.NetworkClient;
 
 public class BadmintonNet extends Badminton {
 
