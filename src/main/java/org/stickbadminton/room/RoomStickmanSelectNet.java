@@ -108,8 +108,8 @@ public class RoomStickmanSelectNet extends Room {
             onUndoButtonClick();
         });
 
-        // 返回按钮：退出联机选人房，endSession 会断开连接并复位网络状态
-        UIImageButton backButton = new UIImageButton("images/buttons/button_back.png");
+        // 返回按钮：复用 undo 素材（button_back 缺 _hover 图会被 UIImageButton 判为资源缺失）
+        UIImageButton backButton = new UIImageButton("images/buttons/button_undo.png");
         addUiObject(backButton, 30, 480);
         backButton.setOnAction(e -> {
             SoundPlay.playSound("button_select.mp3", 100);
