@@ -75,6 +75,11 @@ public class GameProperties {
     public static final double jumpEnergyReserve = 15.0;
     // 5级 AI 属性倍率：决策以4级为基础，移速与击打力度 ×1.1
     public static final double level5StatBoost = 1.1;
+    // 高难度AI跳杀的最低球高(肩上像素)：球低于此高度改站立重扣——
+    // 球本就在站立触及圈(105px)内，起跳白花25体力还要等0.67s冷却
+    public static final double smashJumpHeight = 60.0;
+    // 站立重扣的卡位击球点(肩上像素)：按球落到该高度的横向位置提前就位
+    public static final double smashStandContactHeight = 40.0;
 
 
     // 以下为变量

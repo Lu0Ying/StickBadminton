@@ -407,9 +407,14 @@ public class ComputerDecision {
                         getDistance() < (hitAreaRadius + racketRadius) &&
                         Math.abs(badmintonSpeedY) < 500;
 
-        if (canSmash) {
-            moveHorizontal(200);
-            superShot();
+        if (canSmash && (!smartEnergy || badmintonSpeedY >= 0)) {
+            if (smartEnergy) {
+                preciseSmash();
+            } else {
+                // 1-2级保持原有“一律跳杀”行为不变
+                moveHorizontal(200);
+                superShot();
+            }
             return;
         }
 
@@ -444,32 +449,68 @@ public class ComputerDecision {
         }
     }
 
-    // 预判水平落点
+    // 高难度扣杀智能：按球高与体力在“跳杀”和“站立重扣”间选择，不再一律起跳——
+    // canSmash 已保证球在站立触及圈内，多数情况下起跳只是白花体力与跳跃冷却
+    private void preciseSmash() {
+        double heightAbove = computerY - badmintonY; // 球高出肩部的像素
+        // 跳杀总价 = 跳25 + 重击35 = 60：体力不足或球不够高就改站立重扣，
+        // 避免起跳后重击被体力门槛降级成轻击而白跳
+        boolean jumpAffordable = energy > GameProperties.jumpEnergy + GameProperties.heavyShotEnergy
+                && heightAbove >= GameProperties.smashJumpHeight;
+        if (jumpAffordable) {
+            // 起跳够得到更高击球点，按原逻辑高位卡位
+            moveHorizontal(200);
+            superShot(true);
+        } else {
+            // 站立重扣：按球落到肩上40px处的横向位置提前就位，只耗35体力、无跳跃冷却
+            moveHorizontal(GameProperties.smashStandContactHeight);
+            superShot(false);
+        }
+    }
+
+    // 预判球飞到目标高度 targetY 时的水平位置（y 轴向下）
+    // 旧版循环条件方向写反：球在目标上方(下坠场景)时一次都不模拟，拿到的是当前球X；
+    // 球在目标下方时又空转 300 步模拟“永远到不了”的轨迹，返回随速度漂移的假落点，
+    // AI 跟着假目标反向跑——这正是移动方向偶尔变反的根因
     public double preLanding(double targetY) {
-        double y0 = badmintonY;
         double vy = badmintonSpeedY;
         double vx = badmintonSpeedX;
+        double x = badmintonX;
+        double y = badmintonY;
+
+        // 球已在目标高度或更低且不再上升 → 永远不会再穿过目标，直接返回当前 X
+        if (y >= targetY && vy >= 0) return x;
 
         double g = GameProperties.badmintonGravity;
         double dt = GameProperties.frameTime;
-
-        double x = badmintonX;
-        double y = y0;
-
         int steps = 0, maxSteps = 300;
+        double prevY = y;
 
-        while (y > targetY && steps < maxSteps) {
+        while (steps < maxSteps) {
+            // 与 Badminton.onUpdate 逐步物理一致：阻力与重力按步施加，不乘 dt
             double speed = Math.sqrt(vx * vx + vy * vy);
-            double air = (speed == 0) ? 0 : 0.00001 * (speed * speed);
-            double ax = (speed == 0) ? 0 : -2.7 * air * (vx / speed);
-            double ay = (speed == 0) ? g : g - 0.5 * air * (vy / speed);
+            if (speed == 0) {
+                vy += g;
+            } else {
+                double air = 0.00001 * (speed * speed);
+                vx -= 2.7 * air * (vx / speed);
+                vy += g - 0.5 * air * (vy / speed);
+            }
 
-            vx += ax * dt;
-            vy += ay * dt;
+            // 与球一致的空气墙反弹(0.6 恢复系数)：不模拟反弹会让预测点飞到墙外，AI 追着墙外目标反跑
+            double nextX = x + vx * dt;
+            if (nextX <= GameProperties.playFieldLeft || nextX >= GameProperties.playFieldRight) {
+                double leftSq = (x - GameProperties.playFieldLeft) * (x - GameProperties.playFieldLeft);
+                double rightSq = (GameProperties.playFieldRight - x) * (GameProperties.playFieldRight - x);
+                x = leftSq < rightSq ? GameProperties.playFieldLeft : GameProperties.playFieldRight;
+                vx = -vx * 0.6;
+            }
             x += vx * dt;
             y += vy * dt;
 
-            if (y <= targetY) break;
+            // 路径穿过目标高度即返回（同时兼容目标在球上方/下方两种场景）
+            if ((prevY - targetY) * (y - targetY) <= 0) break;
+            prevY = y;
             steps++;
         }
         return x;
@@ -556,6 +597,9 @@ public class ComputerDecision {
         boolean basicWindow = timeToNet > 0.22 && timeToNet < 0.9;
         if (!basicWindow) return false;
         if (isLikelyRecentWallBounce()) return false;
+        // 高难度：球在站立触及圈(肩上105px)内时不起跳——站立就能打到，
+        // 起跳白花25体力还打断横移，只对超出站立触及范围的高球起跳
+        if (smartEnergy && badmintonY >= computerY - (GameProperties.hitAreaRadius + GameProperties.racketRadius)) return false;
         // 体力管理：起跳要花 25 体力，起跳后至少保留 15 余量确保还能出球，
         // 体力不足先不起跳，避免连跳把体力掏空后跑不动也打不出
         if (smartEnergy && energy < GameProperties.jumpEnergy + GameProperties.jumpEnergyReserve) return false;
@@ -642,17 +686,24 @@ public class ComputerDecision {
         InterceptPrediction(double x, double t, double vy) { this.x = x; this.t = t; this.vy = vy; }
     }
 
-    // 重击
+    // 重击（默认随挥起跳，兼容原有调用）
     public void superShot() {
-        // 体力管理：跳杀 = 跳25 + 重击35 = 60 体力，体力不足则降级为普通击球；
-        // 否则起跳后重击会被 StickMan 按“体力>35”规则静默降级成轻击，白跳一次还亏体力
-        if (smartEnergy && energy <= GameProperties.jumpEnergy + GameProperties.heavyShotEnergy) {
+        superShot(true);
+    }
+
+    // 重击；jump 为 false 时是站立重扣：省 25 体力、无跳跃冷却，衔接下一拍更快
+    public void superShot(boolean jump) {
+        // 体力管理：跳杀 = 跳25 + 重击35 = 60，站立重扣 = 35。体力不足则降级为普通击球；
+        // 否则出招会被 StickMan 按“体力>35”规则静默降级成轻击，白跳一次还亏体力
+        double cost = jump ? GameProperties.jumpEnergy + GameProperties.heavyShotEnergy
+                : GameProperties.heavyShotEnergy;
+        if (smartEnergy && energy <= cost) {
             middleShot();
             return;
         }
         isHeavyhit = true;
         isLighthit = false;
-        isJump = true;
+        isJump = jump;
 
         boolean isRightSide = computerX > GameProperties.netPosition;
         double opponentDistance = Math.abs(opponentX - computerX);
