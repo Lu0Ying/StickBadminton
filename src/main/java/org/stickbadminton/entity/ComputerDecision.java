@@ -107,11 +107,11 @@ public class ComputerDecision {
         else if (GameProperties.difficultyLevel == 2)
             this.difficultyLevel = 0.8; // 2级由0.7调至0.8；仍不启用体力管理，保持“乱”的行为
         else if (GameProperties.difficultyLevel == 3)
-            this.difficultyLevel = 0.8;
-        else if (GameProperties.difficultyLevel == 4)
             this.difficultyLevel = 0.9;
+        else if (GameProperties.difficultyLevel == 4)
+            this.difficultyLevel = 1.0;
         else
-            this.difficultyLevel = 0.9; // 5级：决策以4级为基础，属性另乘1.1（StickMan.getStatMultiplier）
+            this.difficultyLevel = 1.0; // 5级：决策与4级同为1.0，属性另乘1.1（StickMan.getStatMultiplier）
         if(random.nextDouble()>difficultyLevel*0.1)
         {
             this.racketRadius = GameProperties.racketRadius*difficultyLevel;
