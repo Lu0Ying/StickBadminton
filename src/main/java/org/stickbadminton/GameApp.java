@@ -6,6 +6,8 @@ import com.almasb.fxgl.app.GameSettings;
 import com.almasb.fxgl.app.scene.FXGLMenu;
 import com.almasb.fxgl.app.scene.MenuType;
 import com.almasb.fxgl.app.scene.SceneFactory;
+import com.almasb.fxgl.dsl.FXGL;
+import javafx.application.Platform;
 import javafx.scene.input.KeyCode;
 import org.stickbadminton.room.RoomGameplay;
 import org.stickbadminton.room.RoomTitle;
@@ -34,6 +36,9 @@ public class GameApp extends GameApplication {
 
     @Override
     protected void initGame() {
+        // 运行时窗口/任务栏图标：jpackage --icon 只设 exe 文件图标，运行中的窗口要单独设置。
+        // initGame 在 FXGL 后台线程执行，Stage 图标必须回到 FX 应用线程修改
+        Platform.runLater(() -> FXGL.getPrimaryStage().getIcons().add(Sprite.loadImage("/images/logo.png")));
         SoundPlay.initSoundPool();
         RoomTitle roomTitle = new RoomTitle();
         roomTitle.enter();
