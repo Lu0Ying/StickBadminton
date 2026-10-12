@@ -50,6 +50,16 @@ public class MatchController extends GameObject{
         return netClient;
     }
 
+    // 会话结束：断开连接并复位网络静态状态（幂等），回主菜单等出口统一调用
+    public static void endSession() {
+        if (netClient != null) {
+            netClient.disconnect();
+            netClient = null;
+        }
+        isHost = false;
+        org.stickbadminton.KeyInput.disableNetworkMode();
+    }
+
     public MatchController() {
         super("controller", Sprite.loadImage("/images/stickman/stickman_head1.png"));
         setVisible(false);

@@ -15,9 +15,12 @@ import org.stickbadminton.Room;
 import javafx.scene.image.ImageView;
 import org.stickbadminton.SoundPlay;
 import org.stickbadminton.SwitchRoomEffect;
+import org.stickbadminton.logic.MatchController;
 
 public class RoomTitle extends Room{
     public RoomTitle() {
+        // 回主菜单即视为联机会话结束，统一断网并复位网络静态状态
+        MatchController.endSession();
         SoundPlay.setBackgroundMusic("title_bgm.mp3");
         SoundPlay.playBackgroundMusic();
 

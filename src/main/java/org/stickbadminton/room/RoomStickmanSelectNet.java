@@ -14,6 +14,7 @@ import org.stickbadminton.SoundPlay;
 import org.stickbadminton.SwitchRoomEffect;
 import org.stickbadminton.UIObject;
 import org.stickbadminton.network.NetworkClient;
+import org.stickbadminton.logic.MatchController;
 
 public class RoomStickmanSelectNet extends Room {
 
@@ -105,6 +106,15 @@ public class RoomStickmanSelectNet extends Room {
         undoButton.setOnAction(e -> {
             SoundPlay.playSound("button_select.mp3", 100);
             onUndoButtonClick();
+        });
+
+        // 返回按钮：退出联机选人房，endSession 会断开连接并复位网络状态
+        UIImageButton backButton = new UIImageButton("images/buttons/button_back.png");
+        addUiObject(backButton, 30, 480);
+        backButton.setOnAction(e -> {
+            SoundPlay.playSound("button_select.mp3", 100);
+            MatchController.endSession();
+            new SwitchRoomEffect(self, new RoomTitle());
         });
 
         // 角色选择按钮（示例）

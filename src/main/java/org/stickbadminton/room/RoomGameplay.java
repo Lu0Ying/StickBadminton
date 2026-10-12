@@ -17,6 +17,7 @@ import org.stickbadminton.GameObject;
 import org.stickbadminton.KeyInput;
 import org.stickbadminton.Room;
 import org.stickbadminton.SoundPlay;
+import org.stickbadminton.SwitchRoomEffect;
 import org.stickbadminton.UIObject;
 import org.stickbadminton.network.NetworkClient;
 
@@ -27,6 +28,8 @@ public class RoomGameplay extends Room {
 
     private MatchController matchController; // 引用 MatchController
     private boolean isHost = false; // 是否为主机（p1 是主机）
+    // 对手离开只处理一次，防止重复触发房间切换
+    private volatile boolean opponentLeftHandled = false;
 
     public RoomGameplay() {
         buildScene();
@@ -148,7 +151,10 @@ public class RoomGameplay extends Room {
 
             @Override
             public void onPlayerLeft(String id) {
-                // 可选处理玩家离开
+                // 对手断线后对局无法继续：防重（PLAYER_LEFT 可能多条）后回主菜单
+                if (opponentLeftHandled) return;
+                opponentLeftHandled = true;
+                Platform.runLater(() -> new SwitchRoomEffect(RoomGameplay.this, new RoomTitle()));
             }
 
             @Override

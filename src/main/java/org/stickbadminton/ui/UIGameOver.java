@@ -1,5 +1,6 @@
 package org.stickbadminton.ui;
 import org.stickbadminton.logic.GameProperties;
+import org.stickbadminton.logic.MatchController;
 import org.stickbadminton.room.RoomGameplay;
 import org.stickbadminton.room.RoomTitle;
 
@@ -53,6 +54,11 @@ public class UIGameOver extends UIObject {
     }
 
     private void onRestart() {
+        // 联机对局不可原房间重开（网络会话已绑定旧房间），改走主菜单重新匹配
+        if (MatchController.getNetClient() != null) {
+            onMainMenu();
+            return;
+        }
         // 重新开始当前房间
         if (getParentRoom() != null) {
             Room currentRoom = getParentRoom();
