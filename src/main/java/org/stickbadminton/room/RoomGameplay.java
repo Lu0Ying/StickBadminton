@@ -96,7 +96,7 @@ public class RoomGameplay extends Room {
         netClient.addConnectionListener(new NetworkClient.ConnectionListener() {
             @Override
             public void onBallState(double x, double y, double speedX, double speedY) {
-                // 主机球状态（50ms 周期）：应用插值同步；通知已在 FX 线程
+                // 主机发球准备期心跳（50ms）：lerp 平滑跟随；自由飞行不发，靠确定性回放
                 if (matchController != null) {
                     matchController.applyBallState(x, y, speedX, speedY);
                 }
@@ -123,7 +123,7 @@ public class RoomGameplay extends Room {
                 if (isHost || matchController == null) return;
                 Badminton ball = (Badminton) getObject("badminton");
                 if (ball == null) return;
-                // 瞬移到击球点触发表现，随后由 BALL 快照持续校正
+                // 定位到击球点并重放击球公式，随后按固定逻辑帧与主机同轨回放
                 ball.setPositionWithCenter(x, y);
                 if ("LIGHT".equals(type)) {
                     ball.lightHit(angle);

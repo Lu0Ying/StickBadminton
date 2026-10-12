@@ -16,14 +16,9 @@ import org.stickbadminton.*;
 
 public class Badminton extends GameObject {
 
-    public boolean isNetworkControlled = false; // 是否由网络同步控制
-    private double sendTimer = 0;  // 控制发送频率
+    public boolean isNetworkControlled = false; // 联机客户端模式：手里位置靠 BALL 同步、自由飞行走确定性同轨模拟
+    private double sendTimer = 0;  // 发球准备期同步心跳计时
     private boolean ballSendLogged = false; // 一次性诊断：主机首条发送日志
-
-    // 新增: 客户端预测用（上一个接收速度/时间），供 MatchController 跨包重置预测
-    public double lastSpeedX = 0;
-    public double lastSpeedY = 0;
-    public double predictTimer = 0;
 
     public static int sideServe = 0; // 当前发球人
     public static double airResistance = 0;  //空气阻力加速度
@@ -62,17 +57,17 @@ public class Badminton extends GameObject {
     @Override
     public void onUpdate() {
 
-        //方向修正
+        //方向修正（StrictMath 保证双端逐位一致）
         // 始终运行渲染逻辑（旋转、粒子）
-        if (!isTouchedGround || Math.pow(speedY, 2) > 50) {
+        if (!isTouchedGround || StrictMath.pow(speedY, 2) > 50) {
             double targetRotation;
-            double p = (Math.sqrt(Math.pow(speedX, 2) + Math.pow(speedY, 2))) / 800;
+            double p = (StrictMath.sqrt(StrictMath.pow(speedX, 2) + StrictMath.pow(speedY, 2))) / 800;
             if (speedX == 0)
                 targetRotation = speedY > 0 ? 180 : 0;
             else if (speedX > 0)
-                targetRotation = 90 + Math.toDegrees(Math.atan(speedY / speedX));
+                targetRotation = 90 + StrictMath.toDegrees(StrictMath.atan(speedY / speedX));
             else
-                targetRotation = -90 + Math.toDegrees(Math.atan(speedY / speedX));
+                targetRotation = -90 + StrictMath.toDegrees(StrictMath.atan(speedY / speedX));
             if (isHitted) {
                 rotation = targetRotation;
                 isHitted = false;
@@ -81,18 +76,23 @@ public class Badminton extends GameObject {
         }
 
 
-        // 主机定时广播球状态（50ms 周期，与客户端预测窗口/插值系数匹配）
+        // 主机在发球准备期广播球位置（跟随球员无法双端确定性还原）；
+        // 自由飞行不发——客机用同一套固定逻辑帧物理同轨回放，靠 HIT/SCORE/resetBall 事件对齐
         if (MatchController.isHost() && MatchController.getNetClient() != null) {
-            sendTimer += GameProperties.frameTime;
-            if (sendTimer >= 0.05) {
-                String ballState = String.format("BALL:%.2f:%.2f:%.2f:%.2f", getCenterX(), getCenterY(), speedX, speedY);
-                MatchController.getNetClient().sendLine(ballState);
-                sendTimer = 0;
-                // 一次性诊断：确认主机在发球状态
-                if (!ballSendLogged) {
-                    ballSendLogged = true;
-                    System.out.println("[Ball] host first send: " + ballState);
+            if (isFrozen) {
+                sendTimer += GameProperties.frameTime;
+                if (sendTimer >= 0.05) {
+                    String ballState = String.format("BALL:%.2f:%.2f:%.2f:%.2f", getCenterX(), getCenterY(), speedX, speedY);
+                    MatchController.getNetClient().sendLine(ballState);
+                    sendTimer = 0;
+                    // 一次性诊断：确认主机在发球状态
+                    if (!ballSendLogged) {
+                        ballSendLogged = true;
+                        System.out.println("[Ball] host first send: " + ballState);
+                    }
                 }
+            } else {
+                sendTimer = 0;
             }
         }
 
@@ -103,33 +103,20 @@ public class Badminton extends GameObject {
             TouchedTime++;
         }
 
-        if (isNetworkControlled) {
-            // 客户端: 短暂预测物理（模拟弧线，避免匀速）
-            predictTimer += GameProperties.frameTime;
-            if (predictTimer < 0.05) {  // 只预测50ms，避免分叉
-                airResistance = 0.00001 * (Math.pow(lastSpeedX, 2) + Math.pow(lastSpeedY, 2));
-                speedY += GameProperties.badmintonGravity * GameProperties.frameTime;
-                double totalSpeed = Math.sqrt(Math.pow(speedX, 2) + Math.pow(speedY, 2));
-                if (totalSpeed > 0) {
-                    speedX -= airResistance * speedX / totalSpeed * GameProperties.frameTime;
-                    speedY -= airResistance * speedY / totalSpeed * GameProperties.frameTime;
-                }
-                x += speedX * GameProperties.frameTime;
-                y += speedY * GameProperties.frameTime;
-            }
-            return;
-        }
-
         if (isFrozen) {
             speedY = 0;
-            if (sideServe == StickMan.sideLeft) { // 右侧火柴人
-                StickMan stickmanRight = (StickMan) inRoom.getObject("stickman_right");
-                setPositionWithCenter(stickmanRight.getX(), stickmanRight.getY() + 30);
+            // 主机/单机：球跟随发球者位置；客户端不跟随（本地球员与主机不同步，位置由 BALL 心跳驱动）
+            if (!isNetworkControlled) {
+                if (sideServe == StickMan.sideLeft) { // 右侧火柴人
+                    StickMan stickmanRight = (StickMan) inRoom.getObject("stickman_right");
+                    setPositionWithCenter(stickmanRight.getX(), stickmanRight.getY() + 30);
+                }
+                if (sideServe == StickMan.sideRight) { // 左侧火柴人
+                    StickMan stickManLeft = (StickMan) inRoom.getObject("stickman_left");
+                    setPositionWithCenter(stickManLeft.getX() + 21, stickManLeft.getY() + 30);
+                }
             }
-            if (sideServe == StickMan.sideRight) { // 左侧火柴人
-                StickMan stickManLeft = (StickMan) inRoom.getObject("stickman_left");
-                setPositionWithCenter(stickManLeft.getX() + 21, stickManLeft.getY() + 30);
-            }
+            // 释放检测双端同构执行（客户端按键来自服务器注入，固定初速双端一致）
             if (sideServe == StickMan.sideLeft && GameProperties.matchMode == 1) {
                 isFrozen = false;
                 speedX = 250 * sideServe;
@@ -141,9 +128,9 @@ public class Badminton extends GameObject {
                 speedX = 250 * sideServe;
                 speedY = 300;
             }
-            // 发球准备期间球跟随球员的位置由 50ms 定时广播同步，不再每帧发送
             return;
         }
+        // 释放后双端进入同一套固定步长（1/60）物理回放：状态序列一致则轨迹同轨
         // 注意球的贴图会随着运动方向而进行旋转
         // 在空中运动状态
         // 操作 speedX, speedY 等
@@ -171,15 +158,15 @@ public class Badminton extends GameObject {
             if (speedY == 0 && speedX == 0)
                 speedY += GameProperties.badmintonGravity;
             else {
-                airResistance = 0.00001 * (Math.pow(speedX, 2) + Math.pow(speedY, 2));  //空气阻力计算公式
-                speedY += GameProperties.badmintonGravity - 0.5 * airResistance * (speedY / Math.sqrt(Math.pow(speedX, 2) + Math.pow(speedY, 2)));
-                speedX -= 2.7 * airResistance * (speedX / Math.sqrt(Math.pow(speedX, 2) + Math.pow(speedY, 2)));
+                airResistance = 0.00001 * (StrictMath.pow(speedX, 2) + StrictMath.pow(speedY, 2));  //空气阻力计算公式
+                speedY += GameProperties.badmintonGravity - 0.5 * airResistance * (speedY / StrictMath.sqrt(StrictMath.pow(speedX, 2) + StrictMath.pow(speedY, 2)));
+                speedX -= 2.7 * airResistance * (speedX / StrictMath.sqrt(StrictMath.pow(speedX, 2) + StrictMath.pow(speedY, 2)));
             }
         }
         //触墙判断
         if (x + speedX * GameProperties.frameTime <= GameProperties.playFieldLeft || x + speedX * GameProperties.frameTime >= GameProperties.playFieldRight) {
             TouchedTime = 0;
-            x = Math.pow(x - GameProperties.playFieldLeft, 2) < Math.pow(x - GameProperties.playFieldRight, 2) ? GameProperties.playFieldLeft : GameProperties.playFieldRight;
+            x = StrictMath.pow(x - GameProperties.playFieldLeft, 2) < StrictMath.pow(x - GameProperties.playFieldRight, 2) ? GameProperties.playFieldLeft : GameProperties.playFieldRight;
             speedX = -speedX * 0.6;
         }
         //触网判断
@@ -193,23 +180,16 @@ public class Badminton extends GameObject {
                 speedY = speedY * 0.1;
                 speedX = speedX * 0.8;
             } else {
-                if (speedX > 0) {
-                    x = GameProperties.netPosition - 23;
-                } else {
-                    x = GameProperties.netPosition - 3;
+                    if (speedX > 0) {
+                        x = GameProperties.netPosition - 23;
+                    } else {
+                        x = GameProperties.netPosition - 3;
+                    }
+                    speedY = speedY * 0.4;
+                    speedX = -speedX * 0.4;
                 }
-                speedY = speedY * 0.4;
-                speedX = -speedX * 0.4;
-            }
         }
-
-        //拖尾粒子发射
-        if(TouchedTime>10)
-            ParticleFX.updataFire(emitter, speedX, speedY);
-        else {
-            ParticleFX.closeParticle(emitter);
-            TouchedTime++;
-        }
+        // 拖尾粒子与 TouchedTime 递增统一在 onUpdate 开头的渲染块处理，避免一帧双跳
     }
 
     public void lightHit(double angle) {
@@ -232,15 +212,11 @@ public class Badminton extends GameObject {
             speed = 900;
         else
             speed = 700;
-        speedY = speed * Math.sin(Math.toRadians(angle));
-        speedX = speed * Math.cos(Math.toRadians(angle));
+        speedY = speed * StrictMath.sin(StrictMath.toRadians(angle));
+        speedX = speed * StrictMath.cos(StrictMath.toRadians(angle));
         emitter.setNumParticles(4);
         onHit();
-        if (MatchController.isHost() && MatchController.getNetClient() != null) {
-            // 主机: 击球后立即广播状态，减少等待下一周期造成的视觉跳变
-            String ballState = String.format("BALL:%.2f:%.2f:%.2f:%.2f", getCenterX(), getCenterY(), speedX, speedY);
-            MatchController.getNetClient().sendLine(ballState);
-        }
+        // 击球状态同步由 HIT 事件承担（带击球点，客户端 setPosition 后重放同一公式）
     }
 
     public void heavyHit(double angle) {
@@ -263,17 +239,12 @@ public class Badminton extends GameObject {
             speed = 1300;
         else
             speed = 1100;
-        speedY = speed * Math.sin(Math.toRadians(angle));
-        speedX = speed * Math.cos(Math.toRadians(angle));
+        speedY = speed * StrictMath.sin(StrictMath.toRadians(angle));
+        speedX = speed * StrictMath.cos(StrictMath.toRadians(angle));
 
         emitter.setNumParticles(4);
         onHit();
-
-        if (MatchController.isHost() && MatchController.getNetClient() != null) {
-            // 主机: 击球后立即广播状态，减少等待下一周期造成的视觉跳变
-            String ballState = String.format("BALL:%.2f:%.2f:%.2f:%.2f", getCenterX(), getCenterY(), speedX, speedY);
-            MatchController.getNetClient().sendLine(ballState);
-        }
+        // 击球状态同步由 HIT 事件承担（带击球点，客户端 setPosition 后重放同一公式）
     }
 
     //播放触网动画，在触网判断中被调用
@@ -292,9 +263,9 @@ public class Badminton extends GameObject {
         hf.setX(getCenterX() - hf.getCenterX());
         hf.setY(getCenterY() - hf.getCenterY());
         if (speedX > 0)
-            FXRotation = Math.toDegrees(Math.atan(speedY / speedX)) + 90;
+            FXRotation = StrictMath.toDegrees(StrictMath.atan(speedY / speedX)) + 90;
         else
-            FXRotation = Math.toDegrees(Math.atan(speedY / speedX)) - 90;
+            FXRotation = StrictMath.toDegrees(StrictMath.atan(speedY / speedX)) - 90;
         inRoom.addObject(hf);
         hf.setRotation(FXRotation);
     }
@@ -303,7 +274,9 @@ public class Badminton extends GameObject {
     public void onHitGround() {
         if (isShotable) {
             isShotable = false;
-            if (inRoom != null) {
+            // 仅主机/单机做落地裁决计分：客户端等主机 SCORE 事件驱动，避免双端裁决分叉
+            boolean localAuthority = MatchController.getNetClient() == null || MatchController.isHost();
+            if (localAuthority && inRoom != null) {
                 ((MatchController) inRoom.getObject("controller")).onBallGroundHit(getCenterX() > 450 ? 1 : -1);
             }
         }

@@ -106,16 +106,35 @@ public class GameObject {
 
 class ObjectControl extends Component {
     private GameObject target;
+
+    // 固定逻辑帧累加器：逻辑步长恒为 GameProperties.frameTime(1/60)，
+    // 与渲染帧率解耦——掉帧补步、高刷屏不加速，双端状态序列由步数决定而与本机帧率无关
+    private double tickAccumulator = 0;
+
+    // 单渲染帧最多补的逻辑步数：防止断点/窗口拖动等长暂停后螺旋追帧
+    private static final int MAX_STEPS_PER_FRAME = 5;
+
     public ObjectControl(GameObject target) {
         this.target = target;
     }
 
     @Override
     public void onUpdate(double tpf) {
-        target.onUpdate();
-        target.x += target.speedX * GameProperties.frameTime;
-        target.y += target.speedY * GameProperties.frameTime;
-        target.rotation += target.speedRotation * GameProperties.frameTime;
+        tickAccumulator += tpf;
+        int steps = 0;
+        while (tickAccumulator >= GameProperties.frameTime && steps < MAX_STEPS_PER_FRAME) {
+            target.onUpdate();
+            target.x += target.speedX * GameProperties.frameTime;
+            target.y += target.speedY * GameProperties.frameTime;
+            target.rotation += target.speedRotation * GameProperties.frameTime;
+            tickAccumulator -= GameProperties.frameTime;
+            steps++;
+        }
+        // 超额时间过多说明经历长暂停：丢弃余量，避免恢复后持续补帧
+        if (tickAccumulator > GameProperties.frameTime * MAX_STEPS_PER_FRAME) {
+            tickAccumulator = 0;
+        }
+        // 渲染同步：每渲染帧把逻辑位置写给 entity（120Hz 下视觉每两帧更新一次，可接受）
         target.entity.setX(target.x);
         target.entity.setY(target.y);
         target.entity.setRotation(target.rotation);

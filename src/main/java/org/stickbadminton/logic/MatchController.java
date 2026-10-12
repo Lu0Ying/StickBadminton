@@ -92,11 +92,6 @@ public class MatchController extends GameObject{
         ball.speedX = ball.speedX + (speedX - ball.speedX) * lerpFactor;
         ball.speedY = ball.speedY + (speedY - ball.speedY) * lerpFactor;
 
-        // 重置预测计时，以下一帧重新起算
-        ball.lastSpeedX = speedX;
-        ball.lastSpeedY = speedY;
-        ball.predictTimer = 0;
-
         ball.isNetworkControlled = true;
     }
 

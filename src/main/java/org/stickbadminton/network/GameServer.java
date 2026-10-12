@@ -374,10 +374,10 @@ public class GameServer {
                                 boolean valid = hitX >= GameProperties.playFieldLeft
                                         && hitX <= GameProperties.playFieldRight;
                                 if (valid) {
-                                    // 广播 HIT:
+                                    // 广播 HIT:（携带击球点，客户端据此定位后同轨回放）
+                                    // 不再补广播 lastBallState：确定性回放下它可能是发球期旧值，
+                                    // 会把客户端刚对齐的球反向拽回
                                     broadcast(String.format("HIT:%s:%.2f:%.2f:%.2f", type, angle, hitX, hitY));
-                                    // 立即广播最新 BALL: (如果有 lastBallState)
-                                    if (lastBallState != null) broadcast(lastBallState);
                                 } else {
                                     System.out.println("[Server] Invalid HIT_REQUEST from " + id + ": " + line);
                                 }
