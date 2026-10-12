@@ -49,10 +49,9 @@ public class ComputerDecision {
     private static final double SMASH_CONTACT_OFFSET  = 6.0;     // 接触时的本方侧偏移，避免贴身打空
     private static final double SMASH_HIT_MARGIN      = 12.0;    // 击球圈放宽值
 
-    // 扣杀过网几何参数：按简化直线斜率判断扣杀能否压过网顶（y 轴向下）
-    private static final double SMASH_NET_MARGIN = 15.0;  // 过网边距(px)，扣杀弹道离网顶至少留这么多
-    private static final double SMASH_DROP_TAN = 0.8;     // 最大允许下压斜率(约39°)，保守防砸网
-    private static final double SMASH_JUMP_LIFT = 120.0;  // 跳杀击球点抬升量(≈jumpSpeedY²/(2*jumpGravity*dt))
+    // 扣杀决策过网仿真的安全边距(px)：接触发生在决策后约0.1s，球仍在下落，
+    // 把过网余量放宽兜住这段下落（真正出球时 StickMan 还有接触层安全网兜底）
+    private static final double SMASH_LAG_MARGIN = 45.0;
 
     // 跨帧记忆：用于判定“刚刚墙反弹”
     private static double prevBallX = Double.NaN;
@@ -458,36 +457,36 @@ public class ComputerDecision {
         }
     }
 
-    // 高难度扣杀智能：按体力与“过网几何”在跳杀/站立重扣/放弃扣杀间选择——
-    // 站立扣杀窗口(肩上20~120px)常低于网顶(445)，不判几何会直接砸网或砸己方半场
-    // 返回 true = 已执行扣杀；false = 压不过网，调用方落穿到常规挑/抽分支
+    // 高难度扣杀智能：先按挥拍切线预期出球角做物理过网仿真，再按体力选择跳杀/站立重扣——
+    // 实际出球角由挥拍扫掠相位决定（=球相对肩部极角的切线方向），决策层只能按当前几何预期，
+    // 接触延迟的下落由 SMASH_LAG_MARGIN 放宽兜住，StickMan 接触层安全网再兜一道
+    // 返回 true = 已执行扣杀；false = 预期压不过网，调用方落穿到常规挑/抽分支
     private boolean preciseSmash() {
         double heightAbove = computerY - badmintonY; // 球高出肩部的像素
-        double netTopY = GameProperties.floorBallY - GameProperties.netHeight; // 网顶 y
-        double distToNet = Math.abs(badmintonX - GameProperties.netPosition);
-        // 球按最大下压斜率飞到网前的下坠量为 tan*distToNet，须不超过“网顶余量”才不砸网
-        double allowDrop = (netTopY - badmintonY) - SMASH_NET_MARGIN;
-        // 跳杀把击球点抬高约 120px，等价于多出同等下坠空间
-        boolean jumpClear = allowDrop + SMASH_JUMP_LIFT >= SMASH_DROP_TAN * distToNet;
-        boolean standClear = allowDrop >= SMASH_DROP_TAN * distToNet;
-
-        // 跳杀总价 = 跳25 + 重击35 = 60：体力不足或球不够高就降级看站立重扣，
-        // 避免起跳后重击被体力门槛降级成轻击而白跳
-        boolean jumpAffordable = energy > GameProperties.jumpEnergy + GameProperties.heavyShotEnergy
-                && heightAbove >= GameProperties.smashJumpHeight;
-        if (jumpAffordable && jumpClear) {
+        // 球相对肩部的极角（y 轴向下）：右半场出球角=极角-90，左半场=极角+90（挥拍切线）
+        double alpha = StrictMath.toDegrees(StrictMath.atan2(badmintonY - computerY, badmintonX - computerX));
+        if (alpha < 0) alpha += 360;
+        boolean isRightSide = computerX > GameProperties.netPosition;
+        double expectedAngle = isRightSide ? alpha - 90 : alpha + 90;
+        if (expectedAngle < 0) expectedAngle += 360;
+        else if (expectedAngle >= 360) expectedAngle -= 360;
+        // 出球角不在扣球半圈（≥180° 是高球）→ 不算扣杀，交回常规分支
+        if (expectedAngle >= 180) return false;
+        // 步进真实物理仿真查是否过触网碰撞线：2500 是 angle<180 的 heavyHit 固定档
+        if (!Badminton.launchClearsNet(badmintonX, badmintonY, expectedAngle, 2500.0, SMASH_LAG_MARGIN))
+            return false;
+        // 跳杀总价 = 跳25 + 重击35 = 60：体力不足或球不够高就改站立重扣，避免起跳后白跳
+        if (energy > GameProperties.jumpEnergy + GameProperties.heavyShotEnergy
+                && heightAbove >= GameProperties.smashJumpHeight) {
             // 起跳够得到更高击球点，按原逻辑高位卡位
             moveHorizontal(200);
             superShot(true);
-            return true;
-        }
-        if (standClear) {
+        } else {
             // 站立重扣：按球落到肩上40px处的横向位置提前就位，只耗35体力、无跳跃冷却
             moveHorizontal(GameProperties.smashStandContactHeight);
             superShot(false);
-            return true;
         }
-        return false; // 跳/站都压不过网，放弃扣杀改常规出球
+        return true;
     }
 
     // 预判球飞到目标高度 targetY 时的水平位置（y 轴向下）

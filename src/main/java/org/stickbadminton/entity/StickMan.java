@@ -63,6 +63,27 @@ public class StickMan extends GameObject {
                         * energyRemain / GameProperties.fullSpeedEnergy);
     }
 
+    /**
+     * AI 出球过网安全网：出球角由挥拍扫掠相位决定（=球相对肩部极角的切线方向），
+     * 决策层无法精确预知，低球/贴网球常算出“砸网”的下压角。
+     * 在击球瞬间按接触点步进物理仿真，会撞网就把出球角每次向“正上方”一侧调 5°
+     * （右半场+5、左半场-5，绕360°均朝270°收敛），最多试24次；
+     * 本就能过网的出球一次仿真即通过、零干预。仅 AI 生效，人类玩家保留原物理手感。
+     */
+    private double adjustAINetSafeAngle(double hitAngle, double fromX, double fromY) {
+        double stepDeg = (side == sideRight) ? -5.0 : 5.0;
+        for (int k = 0; k <= 24; k++) {
+            double candidate = hitAngle + stepDeg * k;
+            while (candidate < 0) candidate += 360;
+            while (candidate >= 360) candidate -= 360;
+            // 接触点已在挥拍圆弧上，边距12只留轻微相位/步进误差
+            if (Badminton.launchClearsNet(fromX, fromY, candidate,
+                    Badminton.hitSpeedFor(isHeavyShot, candidate, fromX, getStatMultiplier()), 12.0))
+                return candidate;
+        }
+        return hitAngle; // 24次仍无解（极罕见），维持原角度
+    }
+
     public StickMan(int side, int characterType) {
         super("stickman1", Sprite.loadImage("/images/stickman/stickman_head1.png")); //head
         this.side = side;
@@ -363,6 +384,9 @@ public class StickMan extends GameObject {
                                     if (hitAngle > 180 && hitAngle < 200 && getCenterY() > GameProperties.floorY - GameProperties.netHeight - 60)
                                         hitAngle = 200;
                                 }
+                                // AI 过网兜底：挥拍相位算出的下压角若会砸网，向安全方向微调（人类不干预）
+                                if (isAIControlled)
+                                    hitAngle = adjustAINetSafeAngle(hitAngle, badminton.getCenterX(), badminton.getCenterY());
                                 // 击球判定唯一权威是主机/单机；联机客户端只更新本地动画标志，
                                 // 球的表现由服务器广播的 HIT 回显触发，避免双份音效/特效与判定分叉
                                 boolean localAuthority = MatchController.getNetClient() == null || MatchController.isHost();
@@ -425,6 +449,9 @@ public class StickMan extends GameObject {
                                         else if (hitAngle > 250)
                                             hitAngle = 250;
                                     }
+                                    // AI 过网兜底：贴地捞球的挑球角若升不到碰撞线之上，向安全方向微调
+                                    if (isAIControlled)
+                                        hitAngle = adjustAINetSafeAngle(hitAngle, badminton.getCenterX(), badminton.getCenterY());
                                     // 击球判定唯一权威是主机/单机；联机客户端只更新本地动画标志，
                                     // 球的表现由服务器广播的 HIT 回显触发
                                     boolean localAuthority = MatchController.getNetClient() == null || MatchController.isHost();

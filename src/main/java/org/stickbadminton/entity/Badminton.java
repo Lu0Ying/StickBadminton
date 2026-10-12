@@ -228,18 +228,8 @@ public class Badminton extends GameObject {
         while (angle > 360)
             angle -= 360;
         isHitted = true;
-        double speed;
-        if (angle < 180) // 扣球
-            speed = 1200;
-        else if (getCenterX() >= GameProperties.netPosition - GameProperties.powerDistance
-                && getCenterX() <= GameProperties.netPosition + GameProperties.powerDistance) // 近场
-            speed = 500;
-        else if (getCenterX() <= GameProperties.netPosition - GameProperties.powerDistance * 2
-                || getCenterX() >= GameProperties.netPosition + GameProperties.powerDistance * 2) // 远场
-            speed = 900;
-        else
-            speed = 700;
-        speed *= powerMul;
+        // 档位表抽成静态方法，供 AI 出球过网仿真复用同一公式（逐字一致，双端确定性不变）
+        double speed = hitSpeedFor(false, angle, getCenterX(), powerMul);
         speedY = speed * StrictMath.sin(StrictMath.toRadians(angle));
         speedX = speed * StrictMath.cos(StrictMath.toRadians(angle));
         emitter.setNumParticles(4);
@@ -263,24 +253,72 @@ public class Badminton extends GameObject {
         while (angle > 360)
             angle -= 360;
         isHitted = true;
-        double speed;
-        if (angle < 180) // 扣球
-            speed = 2500;
-        else if (getCenterX() >= GameProperties.netPosition - GameProperties.powerDistance
-                && getCenterX() <= GameProperties.netPosition + GameProperties.powerDistance) // 近场
-            speed = 900;
-        else if (getCenterX() <= GameProperties.netPosition - GameProperties.powerDistance * 2
-                || getCenterX() >= GameProperties.netPosition + GameProperties.powerDistance * 2) // 远场
-            speed = 1300;
-        else
-            speed = 1100;
-        speed *= powerMul;
+        double speed = hitSpeedFor(true, angle, getCenterX(), powerMul);
         speedY = speed * StrictMath.sin(StrictMath.toRadians(angle));
         speedX = speed * StrictMath.cos(StrictMath.toRadians(angle));
 
         emitter.setNumParticles(4);
         onHit();
         // 击球状态同步由 HIT 事件承担（带击球点，客户端 setPosition 后重放同一公式）
+    }
+
+    /**
+     * 击球初速档位：角度 180° 内为“扣球”固定档，其余按击球点到网距离分近/中/远三档。
+     * lightHit/heavyHit 与 AI 过网仿真共用同一公式，避免两处抄表走样。
+     */
+    public static double hitSpeedFor(boolean heavy, double angle, double ballCenterX, double powerMul) {
+        while (angle < 0)
+            angle += 360;
+        while (angle > 360)
+            angle -= 360;
+        double speed;
+        if (angle < 180) // 扣球
+            speed = heavy ? 2500 : 1200;
+        else if (ballCenterX >= GameProperties.netPosition - GameProperties.powerDistance
+                && ballCenterX <= GameProperties.netPosition + GameProperties.powerDistance) // 近场
+            speed = heavy ? 900 : 500;
+        else if (ballCenterX <= GameProperties.netPosition - GameProperties.powerDistance * 2
+                || ballCenterX >= GameProperties.netPosition + GameProperties.powerDistance * 2) // 远场
+            speed = heavy ? 1300 : 900;
+        else
+            speed = heavy ? 1100 : 700;
+        return speed * powerMul;
+    }
+
+    /**
+     * 仿真一次出球能否过网：按 onUpdate 同款物理（重力+阻力按帧施加）步进，
+     * 判定口径与触网逻辑一致——穿越网柱区间 [netPosition-18, netPosition-8] 时
+     * y ≥ floorBallY-netHeight+20 即撞网；过网前先落地也算失败。
+     * safeMargin 为要求的过网余量（决策层预判要放宽，兜住接触前的球体下落）。
+     * 返回 true = 能过网（或仿真窗内球到不了网，如直上直下）。
+     */
+    public static boolean launchClearsNet(double startX, double startY, double angleDeg, double speed, double safeMargin) {
+        double vx = speed * StrictMath.cos(StrictMath.toRadians(angleDeg));
+        double vy = speed * StrictMath.sin(StrictMath.toRadians(angleDeg));
+        double x = startX, y = startY;
+        double dt = GameProperties.frameTime;
+        double collideY = GameProperties.floorBallY - GameProperties.netHeight + 20; // 触网判定同款碰撞线
+        double nearEdge = GameProperties.netPosition - 8, farEdge = GameProperties.netPosition - 18;
+        for (int step = 0; step < 120; step++) {
+            // 与 Badminton.onUpdate 一致：Δv 按帧施加，不乘 frameTime
+            double sp = StrictMath.sqrt(vx * vx + vy * vy);
+            if (sp == 0) {
+                vy += GameProperties.badmintonGravity;
+            } else {
+                double air = 0.00001 * (sp * sp);
+                vx -= 2.7 * air * (vx / sp);
+                vy += GameProperties.badmintonGravity - 0.5 * air * (vy / sp);
+            }
+            double nextX = x + vx * dt;
+            double nextY = y + vy * dt;
+            if (nextY >= GameProperties.floorBallY)
+                return false; // 过网前先落地
+            if (Math.min(x, nextX) <= nearEdge && Math.max(x, nextX) >= farEdge)
+                return nextY < collideY - safeMargin; // 本步穿越网柱区间，看是否在碰撞线之上
+            x = nextX;
+            y = nextY;
+        }
+        return true; // 仿真窗内到不了网，不算撞网
     }
 
     /**
