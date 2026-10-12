@@ -1,14 +1,18 @@
 # 火柴人打羽毛球 StickBadminton
 
-![logo](logo/logo.png)
+<p align="center">
+  <img src="logo/logo.png" width="180" alt="StickBadminton Logo">
+</p>
 
-基于 JavaFX 与 FXGL 编写的 2D 羽毛球对战游戏，灵感来自 Flash 时期的火柴人羽毛球小游戏。支持单人对战 AI、本地双人、局域网联机三种模式。
+<p align="center">基于 JavaFX 与 FXGL 编写的 2D 羽毛球对战游戏，灵感来自 Flash 时期的火柴人羽毛球小游戏。支持单人对战 AI、本地双人、局域网联机三种模式。</p>
 
-![Java 21](https://img.shields.io/badge/Java-21-orange)
-![FXGL 17.3](https://img.shields.io/badge/FXGL-17.3-blue)
-![JavaFX 21](https://img.shields.io/badge/JavaFX-21-0073A6)
-![Platform](https://img.shields.io/badge/platform-Windows-lightgrey)
-[![Release](https://img.shields.io/badge/release-v1.0-brightgreen)](https://github.com/Lu0Ying/StickBadminton/releases/tag/v1.0)
+<p align="center">
+  <img src="https://img.shields.io/badge/Java-21-orange" alt="Java 21">
+  <img src="https://img.shields.io/badge/FXGL-17.3-blue" alt="FXGL 17.3">
+  <img src="https://img.shields.io/badge/JavaFX-21-0073A6" alt="JavaFX 21">
+  <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform">
+  <a href="https://github.com/Lu0Ying/StickBadminton/releases/tag/v1.0"><img src="https://img.shields.io/badge/release-v1.0-brightgreen" alt="Release v1.0"></a>
+</p>
 
 ## 特性
 
