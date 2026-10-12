@@ -60,14 +60,26 @@ public class MatchController extends GameObject{
         org.stickbadminton.KeyInput.disableNetworkMode();
     }
 
+    // 一次性诊断日志：客户端首条球状态应用
+    private boolean ballRecvLogged = false;
+
     public MatchController() {
         super("controller", Sprite.loadImage("/images/stickman/stickman_head1.png"));
         setVisible(false);
     }
 
     public void applyBallState(double x, double y, double speedX, double speedY) {
+        // 忽略自己上报的回环（服务器广播含发送者）：否则主机的球被标记为网络控制，
+        // onUpdate 提前 return，本地落地/触网检测与发球跟随全部中断，球飞出屏幕
+        if (isHost) return;
+
         Badminton ball = (Badminton) inRoom.getObject("badminton");
         if (ball == null) return;
+
+        if (!ballRecvLogged) {
+            ballRecvLogged = true;
+            System.out.println("[Ball] client first apply: " + x + "," + y);
+        }
 
         double dx = x - ball.getCenterX();
         double dy = y - ball.getCenterY();

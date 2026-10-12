@@ -18,6 +18,7 @@ public class Badminton extends GameObject {
 
     public boolean isNetworkControlled = false; // 是否由网络同步控制
     private double sendTimer = 0;  // 控制发送频率
+    private boolean ballSendLogged = false; // 一次性诊断：主机首条发送日志
 
     // 新增: 客户端预测用（上一个接收速度/时间），供 MatchController 跨包重置预测
     public double lastSpeedX = 0;
@@ -87,6 +88,11 @@ public class Badminton extends GameObject {
                 String ballState = String.format("BALL:%.2f:%.2f:%.2f:%.2f", getCenterX(), getCenterY(), speedX, speedY);
                 MatchController.getNetClient().sendLine(ballState);
                 sendTimer = 0;
+                // 一次性诊断：确认主机在发球状态
+                if (!ballSendLogged) {
+                    ballSendLogged = true;
+                    System.out.println("[Ball] host first send: " + ballState);
+                }
             }
         }
 
