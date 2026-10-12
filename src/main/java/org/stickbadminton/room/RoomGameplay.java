@@ -1,4 +1,5 @@
 package org.stickbadminton.room;
+import org.stickbadminton.Sprite;
 import org.stickbadminton.entity.Badminton;
 import org.stickbadminton.entity.StickMan;
 import org.stickbadminton.fx.NetAnimation;
@@ -129,7 +130,7 @@ public class RoomGameplay extends Room {
 
     private void buildScene() {
         SoundPlay.stopBackgroundMusic();
-        addObject(new GameObject("background", new Image("ingame_background.png")));
+        addObject(new GameObject("background", Sprite.loadImage("/images/scenes/ingame_background.png")));
         matchController = new MatchController();
         // 设置是否为主机，用于决定是否广播
         matchController.setHost(isHost);

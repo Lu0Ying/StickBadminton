@@ -1,4 +1,5 @@
 package org.stickbadminton.room;
+import org.stickbadminton.Sprite;
 import org.stickbadminton.logic.GameProperties;
 import org.stickbadminton.room.RoomNetJoin;
 import org.stickbadminton.room.RoomStickmanSelect;
@@ -20,9 +21,9 @@ public class RoomTitle extends Room{
         SoundPlay.setBackgroundMusic("title_bgm.mp3");
         SoundPlay.playBackgroundMusic();
 
-        addObject(new GameObject("title_background", new Image("title_background.png")));
+        addObject(new GameObject("title_background", Sprite.loadImage("/images/scenes/title_background.png")));
 
-        UIImageButton button_start = new UIImageButton("button_titlestart.png");
+        UIImageButton button_start = new UIImageButton("images/buttons/button_titlestart.png");
         button_start.setOnAction(e -> {
             SoundPlay.playSound("button_select.mp3", 100);
             GameProperties.matchMode = 1;
@@ -31,7 +32,7 @@ public class RoomTitle extends Room{
         });
         addUiObject(button_start, 650, 350);
 
-        UIImageButton button_players = new UIImageButton("button_2player.png");
+        UIImageButton button_players = new UIImageButton("images/buttons/button_2player.png");
         button_players.setOnAction(e -> {
             SoundPlay.playSound("button_select.mp3", 100);
             GameProperties.matchMode = 2;
@@ -40,7 +41,7 @@ public class RoomTitle extends Room{
         });
         addUiObject(button_players, 650, 420);
 
-        UIImageButton button_netplay = new UIImageButton("button_netplay.png");
+        UIImageButton button_netplay = new UIImageButton("images/buttons/button_netplay.png");
         button_netplay.setOnAction(e -> {
             SoundPlay.playSound("button_select.mp3", 100);
             GameProperties.matchMode = 2;

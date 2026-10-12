@@ -1,4 +1,5 @@
 package org.stickbadminton.fx;
+import org.stickbadminton.Sprite;
 import org.stickbadminton.logic.GameProperties;
 
 import javafx.scene.image.Image;
@@ -30,10 +31,10 @@ public class NetAnimation extends GameObject {
     //构造函数 - 初始化网和动画
     public NetAnimation() {
         // 调用父类构造函数，创建基础网对象
-        super("net", new Image("net_static.png"));
+        super("net", Sprite.loadImage("/images/game/net_static.png"));
 
         // 初始化静态网对象
-        netStatic = new GameObject("net_static", new Image("net_static.png"));
+        netStatic = new GameObject("net_static", Sprite.loadImage("/images/game/net_static.png"));
 
         // 应用缩放
         netStatic.getEntity().setScaleX(scaleFactor);
@@ -57,7 +58,7 @@ public class NetAnimation extends GameObject {
     private void setupNetAnimation() {
         try {
             // 加载6帧动画图片资源
-            Image animationImage = new Image("net_crash_animation.png");
+            Image animationImage = Sprite.loadImage("/images/game/net_crash_animation.png");
             // 动画帧数
             int frameCount = 6;
             // 计算每帧宽度
@@ -84,7 +85,7 @@ public class NetAnimation extends GameObject {
             // 动画加载失败时的错误处理
             System.err.println("无法加载触网动画: " + e.getMessage());
             // 使用静态网作为后备方案
-            netAnimation = new GameObject("net_animation_fallback", new Image("net_static.png"));
+            netAnimation = new GameObject("net_animation_fallback", Sprite.loadImage("/images/game/net_static.png"));
             // 应用缩放
             netAnimation.getEntity().setScaleX(scaleFactor);
             netAnimation.getEntity().setScaleY(scaleFactor);

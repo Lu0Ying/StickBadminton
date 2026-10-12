@@ -1,4 +1,5 @@
 package org.stickbadminton.room;
+import org.stickbadminton.Sprite;
 import org.stickbadminton.logic.GameProperties;
 import org.stickbadminton.room.RoomGameplay;
 import org.stickbadminton.ui.HintAIDifficulty;
@@ -61,16 +62,16 @@ public class RoomStickmanSelectNet extends Room {
         this.serverPort = (port >= 1 && port <= 65535) ? port : 8888;
         this.desiredId = desiredId;
 
-        addObject(new GameObject("background", new Image("stickmanselect_background.png")));
+        addObject(new GameObject("background", Sprite.loadImage("/images/scenes/stickmanselect_background.png")));
 
         // Ready / Waiting 指示
-        buttonWaiting1 = new UIImageButton("button_waiting.png");
+        buttonWaiting1 = new UIImageButton("images/buttons/button_waiting.png");
         addUiObject(buttonWaiting1, 720, 170);
-        buttonWaiting2 = new UIImageButton("button_waiting.png");
+        buttonWaiting2 = new UIImageButton("images/buttons/button_waiting.png");
         addUiObject(buttonWaiting2, 720, 170);
-        buttonReady1 = new UIImageButton("button_ready.png");
+        buttonReady1 = new UIImageButton("images/buttons/button_ready.png");
         addUiObject(buttonReady1, 130, 170);
-        buttonReady2 = new UIImageButton("button_ready.png");
+        buttonReady2 = new UIImageButton("images/buttons/button_ready.png");
         addUiObject(buttonReady2, 130, 170);
 
         // 初始 waiting
@@ -88,7 +89,7 @@ public class RoomStickmanSelectNet extends Room {
         updateNetReadyUi();
 
         // 开始按钮：满足条件会由服务端自动 START
-        UIImageButton startButton = new UIImageButton("button_start.png");
+        UIImageButton startButton = new UIImageButton("images/buttons/button_start.png");
         addUiObject(startButton, 380, 480);
         startButton.setOnAction(e -> {
             SoundPlay.playSound("button_select.mp3", 100);
@@ -99,7 +100,7 @@ public class RoomStickmanSelectNet extends Room {
         });
 
         // 撤销按钮
-        UIImageButton undoButton = new UIImageButton("button_undo.png");
+        UIImageButton undoButton = new UIImageButton("images/buttons/button_undo.png");
         addUiObject(undoButton, 400, 350);
         undoButton.setOnAction(e -> {
             SoundPlay.playSound("button_select.mp3", 100);
@@ -114,8 +115,8 @@ public class RoomStickmanSelectNet extends Room {
         addCharacterButton(5, 470, 220);
 
         // 模式提示
-        addObject(new GameObject("modeHint", new Image(
-                GameProperties.matchMode == 1 ? "stickmanselect_mode1hint.png" : "stickmanselect_mode2hint.png"
+        addObject(new GameObject("modeHint", Sprite.loadImage(
+                GameProperties.matchMode == 1 ? "/images/hud/stickmanselect_mode1hint.png" : "/images/hud/stickmanselect_mode2hint.png"
         ))).setOpacity(0.2);
 
         if (GameProperties.matchMode == 1) {
@@ -199,7 +200,7 @@ public class RoomStickmanSelectNet extends Room {
     }
 
     private void addCharacterButton(int characterId, int x, int y) {
-        UIImageButton button = new UIImageButton("selectbutton_" + characterId + ".png");
+        UIImageButton button = new UIImageButton("images/buttons/selectbutton_" + characterId + ".png");
         button.setOnAction(e -> {
             SoundPlay.playSound("button_select.mp3", 100);
             onCharacterSelect(characterId);

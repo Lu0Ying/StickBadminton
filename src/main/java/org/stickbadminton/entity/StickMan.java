@@ -1,4 +1,5 @@
 package org.stickbadminton.entity;
+import org.stickbadminton.Sprite;
 import org.stickbadminton.entity.Badminton;
 import org.stickbadminton.entity.ComputerDecision;
 import org.stickbadminton.logic.GameProperties;
@@ -38,24 +39,24 @@ public class StickMan extends GameObject {
     public double energyRemain = 100.0; // 满格体力 = 100
 
     public StickMan(int side, int characterType) {
-        super("stickman1", new Image("stickman_head1.png")); //head
+        super("stickman1", Sprite.loadImage("/images/stickman/stickman_head1.png")); //head
         this.side = side;
 
         setCenterPosition(10, 10);
 
-        bodyIdle = new GameObject("bodyIdle", new Image("stickman_body_idle.png"));
+        bodyIdle = new GameObject("bodyIdle", Sprite.loadImage("/images/stickman/stickman_body_idle.png"));
         bodyIdle.getEntity().setScaleOrigin(new Point2D(12, 0));
-        bodyMoving = new GameObject("bodyMoving", new Image("stickman_body_moving.png"), 32, Duration.seconds(0.15));
+        bodyMoving = new GameObject("bodyMoving", Sprite.loadImage("/images/stickman/stickman_body_moving.png"), 32, Duration.seconds(0.15));
         bodyMoving.getEntity().setScaleOrigin(new Point2D(16, 0));
 
-        rightHand = new GameObject("right_hand", new Image("stickman_righthand.png"));
+        rightHand = new GameObject("right_hand", Sprite.loadImage("/images/stickman/stickman_righthand.png"));
         rightHand.setCenterPosition(1, 1);
 
-        leftHandIdle = new GameObject("left_hand", new Image("stickman_lefthand_idle.png"));
+        leftHandIdle = new GameObject("left_hand", Sprite.loadImage("/images/stickman/stickman_lefthand_idle.png"));
         leftHandIdle.setCenterPosition(1, 1);
 
         this.characterType = characterType;
-        decoration = new GameObject("decoration", new Image("stickman_decoration" + characterType + ".png"));
+        decoration = new GameObject("decoration", Sprite.loadImage("/images/stickman/stickman_decoration" + characterType + ".png"));
         decoration.getEntity().setScaleOrigin(new Point2D(52, 0));
     }
 

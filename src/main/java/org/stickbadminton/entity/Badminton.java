@@ -35,7 +35,7 @@ public class Badminton extends GameObject {
     ParticleComponent particleComponent = new ParticleComponent(emitter);
 
     public Badminton() {
-        super("badminton", new Image("badminton.png"));
+        super("badminton", Sprite.loadImage("/images/game/badminton.png"));
         speedY = -100;
         setCenterPosition(10.5, 3);
         setRotation(180);
@@ -46,7 +46,7 @@ public class Badminton extends GameObject {
     }
 
     public Badminton(int _sideServe) {
-        super("badminton", new Image("badminton.png"));
+        super("badminton", Sprite.loadImage("/images/game/badminton.png"));
         speedY = -100;
         setCenterPosition(10.5, 3);
         setRotation(180);

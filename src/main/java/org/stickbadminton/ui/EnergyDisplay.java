@@ -17,8 +17,8 @@ public class EnergyDisplay extends GameObject{
     private double displayedEnergy = 100.0;
     private int side;
     public EnergyDisplay(int side) {
-        super("energydisplay_" + side, new Image("energydisplay_fill.png"));
-        border = new GameObject("energydisplay_" + side + "_border", new Image("energydisplay_border.png"));
+        super("energydisplay_" + side, Sprite.loadImage("/images/hud/energydisplay_fill.png"));
+        border = new GameObject("energydisplay_" + side + "_border", Sprite.loadImage("/images/hud/energydisplay_border.png"));
         this.side = side;
         if (side == 1) {
             setCenterPosition(0, 0);

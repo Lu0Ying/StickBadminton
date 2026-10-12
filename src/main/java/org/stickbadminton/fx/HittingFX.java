@@ -1,4 +1,5 @@
 package org.stickbadminton.fx;
+import org.stickbadminton.Sprite;
 import org.stickbadminton.logic.GameProperties;
 
 import javafx.scene.image.Image;
@@ -8,7 +9,7 @@ import org.stickbadminton.GameObject;
 public class HittingFX extends GameObject {
     private double liveTimer;
     public HittingFX() {
-        super("hittingFX",new Image("hit_FX.png"), 387, Duration.seconds(0.5));
+        super("hittingFX",Sprite.loadImage("/images/game/hit_FX.png"), 387, Duration.seconds(0.5));
         entity.setScaleX(0.3);
         entity.setScaleY(0.3);
         setCenterPosition(193.5, 115);

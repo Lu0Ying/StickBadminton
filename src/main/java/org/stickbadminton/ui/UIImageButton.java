@@ -8,6 +8,7 @@ import javafx.scene.control.Button;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.Background;
+import org.stickbadminton.Sprite;
 import org.stickbadminton.UIObject;
 
 public class UIImageButton extends UIObject {
@@ -19,11 +20,11 @@ public class UIImageButton extends UIObject {
 
     public UIImageButton(String sourceUrl) {
         button = new Button(sourceUrl);
-        // 常态与悬停图片
-        Image imgNormal = new Image(sourceUrl);
+        // 常态与悬停图片（Sprite.loadImage 统一做 classpath URL 解析）
+        Image imgNormal = Sprite.loadImage("/" + sourceUrl);
         StringBuffer sb = new StringBuffer(sourceUrl);
         sb.insert(sb.length() - 4, "_hover");
-        Image imgHover = new Image(sb.toString());
+        Image imgHover = Sprite.loadImage("/" + sb.toString());
 
         ImageView iv = new ImageView(imgNormal);
         iv.setPreserveRatio(true);

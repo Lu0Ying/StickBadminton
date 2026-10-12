@@ -1,4 +1,5 @@
 package org.stickbadminton.room;
+import org.stickbadminton.Sprite;
 import org.stickbadminton.logic.GameProperties;
 import org.stickbadminton.room.RoomGameplay;
 import org.stickbadminton.ui.HintAIDifficulty;
@@ -29,8 +30,8 @@ public class RoomStickmanSelect extends Room{
 
 
 
-        addObject(new GameObject("background",new Image("stickmanselect_background.png")));
-        UIImageButton startButton=new UIImageButton("button_start.png");
+        addObject(new GameObject("background",Sprite.loadImage("/images/scenes/stickmanselect_background.png")));
+        UIImageButton startButton=new UIImageButton("images/buttons/button_start.png");
         addUiObject(startButton, 380, 480);
         startButton.setOnAction(e->{
             SoundPlay.playSound("button_select.mp3", 100);
@@ -39,14 +40,14 @@ public class RoomStickmanSelect extends Room{
                 new SwitchRoomEffect(this, roomGameplay);
             }
         });
-        UIImageButton undoButton=new UIImageButton("button_undo.png");
+        UIImageButton undoButton=new UIImageButton("images/buttons/button_undo.png");
         addUiObject(undoButton, 400, 350);
         undoButton.setOnAction(e-> {
             SoundPlay.playSound("button_select.mp3", 100);
             onUndoButtonClick();
         });
 
-        UIImageButton infiniteEnergyButton=new UIImageButton("button_rectanglerounded.png");
+        UIImageButton infiniteEnergyButton=new UIImageButton("images/buttons/button_rectanglerounded.png");
         addUiObject(infiniteEnergyButton, 384, 410);
         infiniteEnergyButton.setOnAction(e->{
             SoundPlay.playSound("button_select.mp3", 100);
@@ -60,8 +61,8 @@ public class RoomStickmanSelect extends Room{
         addCharacterButton(4,370,220);
         addCharacterButton(5,470,220);
 
-        addObject(new GameObject("modeHint", new Image(
-                GameProperties.matchMode == 1 ? "stickmanselect_mode1hint.png" : "stickmanselect_mode2hint.png"
+        addObject(new GameObject("modeHint", Sprite.loadImage(
+                GameProperties.matchMode == 1 ? "/images/hud/stickmanselect_mode1hint.png" : "/images/hud/stickmanselect_mode2hint.png"
         ))).setOpacity(0.2);
 
         if (GameProperties.matchMode == 1) {
@@ -80,7 +81,7 @@ public class RoomStickmanSelect extends Room{
 
     }
     private void addCharacterButton(int characterId, int x, int y) {
-        UIImageButton button = new UIImageButton("selectbutton_" + characterId + ".png");
+        UIImageButton button = new UIImageButton("images/buttons/selectbutton_" + characterId + ".png");
         button.setOnAction(e-> {
             SoundPlay.playSound("button_select.mp3", 100);
             onCharacterSelect(characterId);

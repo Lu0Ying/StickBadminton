@@ -1,4 +1,5 @@
 package org.stickbadminton.logic;
+import org.stickbadminton.Sprite;
 import org.stickbadminton.entity.Badminton;
 import org.stickbadminton.entity.StickMan;
 import org.stickbadminton.logic.GameProperties;
@@ -45,7 +46,7 @@ public class MatchController extends GameObject{
     }
 
     public MatchController() {
-        super("controller", new Image("stickman_head1.png"));
+        super("controller", Sprite.loadImage("/images/stickman/stickman_head1.png"));
         setVisible(false);
     }
 

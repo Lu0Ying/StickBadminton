@@ -33,7 +33,7 @@ public class UIDigitView extends UIObject {
         digitView = createDigitImageView(currentNumber);
     }
     private ImageView createDigitImageView(int number) {
-        String imagePath = "/digital_" + number + ".png";
+        String imagePath = "/images/hud/digital_" + number + ".png";
         try {
             Image digitImage = new Image(Objects.requireNonNull(getClass().getResource(imagePath)).toExternalForm());
             ImageView imageView = new ImageView(digitImage);
@@ -47,7 +47,7 @@ public class UIDigitView extends UIObject {
     }
 
     private void updateDigitImage(int number) {
-        String imagePath = "/digital_" + number + ".png";
+        String imagePath = "/images/hud/digital_" + number + ".png";
         try {
             Image digitImage = new Image(Objects.requireNonNull(getClass().getResource(imagePath)).toExternalForm());
             digitView.setImage(digitImage);

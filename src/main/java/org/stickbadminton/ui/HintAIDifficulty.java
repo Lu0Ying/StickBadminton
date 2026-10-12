@@ -1,4 +1,5 @@
 package org.stickbadminton.ui;
+import org.stickbadminton.Sprite;
 import org.stickbadminton.logic.GameProperties;
 
 import javafx.scene.image.Image;
@@ -9,7 +10,7 @@ public class HintAIDifficulty extends GameObject{
     private double openTimer = 0.0;
     private final double transitionTime = 0.1;
     public HintAIDifficulty() {
-        super("hintAIDifficulty", new Image("stickmanselect_difficultyhint.png"));
+        super("hintAIDifficulty", Sprite.loadImage("/images/hud/stickmanselect_difficultyhint.png"));
         setOpacity(0.0);
     }
     @Override

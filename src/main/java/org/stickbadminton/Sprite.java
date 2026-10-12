@@ -45,6 +45,21 @@ public class Sprite {
         this.texture = animatedTexture;
     }
 
+    /**
+     * 统一的图片资源加载入口：先由本模块的类把 classpath 路径解析成 URL，再交给 JavaFX。
+     * 不能直接 new Image("相对路径")——模块化运行时 JavaFX 通过 ClassLoader 跨模块
+     * 查资源会返回 null，必须在本模块内先完成 URL 解析（与 SoundPlay 的音频加载同理）。
+     *
+     * @param resourcePath 以 / 开头的 classpath 路径，如 "/images/game/badminton.png"
+     */
+    public static Image loadImage(String resourcePath) {
+        var url = Sprite.class.getResource(resourcePath);
+        if (url == null) {
+            throw new IllegalStateException("资源未找到: " + resourcePath);
+        }
+        return new Image(url.toExternalForm());
+    }
+
     public void activate() {
         parent.getViewComponent().clearChildren();
         parent.getViewComponent().addChild(texture);

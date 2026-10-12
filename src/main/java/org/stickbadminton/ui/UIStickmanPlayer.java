@@ -35,7 +35,7 @@ public class UIStickmanPlayer extends UIObject {
     //创建数字图片视图
     private ImageView createPlayerImageView(int number) {
         if(number != 0) {
-            String imagePath = "/stickman_player_" + number + ".png";
+            String imagePath = "/images/stickman/stickman_player_" + number + ".png";
             try {
                 Image playerImage = new Image(Objects.requireNonNull(getClass().getResource(imagePath)).toExternalForm());
                 ImageView imageView = new ImageView(playerImage);
@@ -57,7 +57,7 @@ public class UIStickmanPlayer extends UIObject {
             PlayerView.setVisible(false);
         } else {
             // 数字不为0时显示图片并更新图片内容
-            String imagePath = "/stickman_player_" + number + ".png";
+            String imagePath = "/images/stickman/stickman_player_" + number + ".png";
             try {
                 Image playerImage = new Image(Objects.requireNonNull(getClass().getResource(imagePath)).toExternalForm());
                 PlayerView.setImage(playerImage);

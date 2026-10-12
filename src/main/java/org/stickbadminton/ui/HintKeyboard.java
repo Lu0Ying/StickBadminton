@@ -3,11 +3,12 @@ import org.stickbadminton.logic.GameProperties;
 
 import javafx.scene.image.Image;
 import org.stickbadminton.GameObject;
+import org.stickbadminton.Sprite;
 
 public class HintKeyboard extends GameObject{
     private double liveTimer = 0;
     public HintKeyboard() {
-        super("hint", new Image(GameProperties.matchMode == 1 ? "ingame_hint_singleplayer.png" : "ingame_hint.png"));
+        super("hint", Sprite.loadImage(GameProperties.matchMode == 1 ? "/images/hud/ingame_hint_singleplayer.png" : "/images/hud/ingame_hint.png"));
     }
     @Override
     public void onUpdate() {

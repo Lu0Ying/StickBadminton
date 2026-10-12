@@ -14,8 +14,8 @@ public class InfiniteEnergySettingDisplay extends GameObject {
     private GameObject offDisplay;
     // this : onDisplay
     public InfiniteEnergySettingDisplay() {
-        super("infinite_energy_on", new Image("infinite_energy_on.png"));
-        offDisplay = new GameObject("infinite_energy_off", new Image("infinite_energy_off.png"));
+        super("infinite_energy_on", Sprite.loadImage("/images/hud/infinite_energy_on.png"));
+        offDisplay = new GameObject("infinite_energy_off", Sprite.loadImage("/images/hud/infinite_energy_off.png"));
         this.setOpacity(0.0);
         this.entity.setScaleX(0.7);
         this.entity.setScaleY(0.7);

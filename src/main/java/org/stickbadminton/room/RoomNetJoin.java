@@ -1,4 +1,5 @@
 package org.stickbadminton.room;
+import org.stickbadminton.Sprite;
 import org.stickbadminton.room.RoomStickmanSelectNet;
 import org.stickbadminton.room.RoomTitle;
 import org.stickbadminton.ui.UIImageButton;
@@ -61,10 +62,10 @@ public class RoomNetJoin extends Room {
 
     public RoomNetJoin() {
         // 背景
-        addObject(new GameObject("background", new Image("stickmanselect_background_clear.png"))).setOpacity(0.85);
+        addObject(new GameObject("background", Sprite.loadImage("/images/scenes/stickmanselect_background_clear.png"))).setOpacity(0.85);
 
         // 创建房间（默认请求 p1）
-        btnCreateHost = new UIImageButton("button_create.png");
+        btnCreateHost = new UIImageButton("images/buttons/button_create.png");
         addUiObject(btnCreateHost, 395, 180);
 
         btnCreateHost.setOnAction(e -> {
@@ -73,7 +74,7 @@ public class RoomNetJoin extends Room {
         });
 
         // 加入房间（进入加入模式）
-        btnJoin = new UIImageButton("button_join.png");
+        btnJoin = new UIImageButton("images/buttons/button_join.png");
         addUiObject(btnJoin, 415, 250);
         btnJoin.setOnAction(e -> {
             SoundPlay.playSound("button_select.mp3", 100);
@@ -81,7 +82,7 @@ public class RoomNetJoin extends Room {
         });
 
         // 返回主菜单
-        btnBackToMenu = new UIImageButton("button_undo.png");
+        btnBackToMenu = new UIImageButton("images/buttons/button_undo.png");
         addUiObject(btnBackToMenu, 400, 320);
         btnBackToMenu.setOnAction(e -> {
             SoundPlay.playSound("button_select.mp3", 100);
@@ -123,7 +124,7 @@ public class RoomNetJoin extends Room {
             return next.matches("\\d{0,5}") ? change : null;
         }));
 
-        btnJoinConfirm = new UIImageButton("button_start.png"); // “加入/开始”
+        btnJoinConfirm = new UIImageButton("images/buttons/button_start.png"); // “加入/开始”
         addUiObject(btnJoinConfirm, 380, 290);
         btnJoinConfirm.setVisible(false);
         btnJoinConfirm.setOnAction(e -> {
@@ -134,7 +135,7 @@ public class RoomNetJoin extends Room {
         ((TextField) ipField.getUINode()).setOnAction(ev -> onJoinConfirm());
         tfPort.setOnAction(ev -> onJoinConfirm());
 
-        btnBack = new UIImageButton("button_undo.png"); // “返回（退出加入模式）”
+        btnBack = new UIImageButton("images/buttons/button_undo.png"); // “返回（退出加入模式）”
         addUiObject(btnBack, 400, 350);
         btnBack.setVisible(false);
         btnBack.setOnAction(e -> {
