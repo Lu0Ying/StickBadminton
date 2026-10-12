@@ -338,12 +338,16 @@ public class StickMan extends GameObject {
                                     if (hitAngle > 180 && hitAngle < 200 && getCenterY() > GameProperties.floorY - GameProperties.netHeight - 60)
                                         hitAngle = 200;
                                 }
-                                String type = isHeavyShot ? "HEAVY" : "LIGHT";
-                                if (MatchController.getNetClient() != null) {
-                                    // 网络: 发送请求
-                                    String hitMsg = String.format("HIT_REQUEST:%s:%.2f:%.2f:%.2f", type, hitAngle, badminton.getCenterX(), badminton.getCenterY());
-                                    MatchController.getNetClient().sendLine(hitMsg);
-                                } {
+                                // 击球判定唯一权威是主机/单机；联机客户端只更新本地动画标志，
+                                // 球的表现由服务器广播的 HIT 回显触发，避免双份音效/特效与判定分叉
+                                boolean localAuthority = MatchController.getNetClient() == null || MatchController.isHost();
+                                if (localAuthority) {
+                                    if (MatchController.getNetClient() != null) {
+                                        // 联机主机: 上报击球请求，经服务器校验后广播 HIT 回显
+                                        String type = isHeavyShot ? "HEAVY" : "LIGHT";
+                                        String hitMsg = String.format("HIT_REQUEST:%s:%.2f:%.2f:%.2f", type, hitAngle, badminton.getCenterX(), badminton.getCenterY());
+                                        MatchController.getNetClient().sendLine(hitMsg);
+                                    }
                                     if (isHeavyShot)
                                         badminton.heavyHit(hitAngle);
                                     else
@@ -393,12 +397,15 @@ public class StickMan extends GameObject {
                                         else if (hitAngle > 250)
                                             hitAngle = 250;
                                     }
-                                    String type = isHeavyShot ? "HEAVY" : "LIGHT";
-                                    if (MatchController.getNetClient() != null) {
-                                        // 网络: 发送请求
-                                        String hitMsg = String.format("HIT_REQUEST:%s:%.2f:%.2f:%.2f", type, hitAngle, badminton.getCenterX(), badminton.getCenterY());
-                                        MatchController.getNetClient().sendLine(hitMsg);
-                                    } {
+                                    // 击球判定唯一权威是主机/单机；联机客户端只更新本地动画标志，
+                                    // 球的表现由服务器广播的 HIT 回显触发
+                                    boolean localAuthority = MatchController.getNetClient() == null || MatchController.isHost();
+                                    if (localAuthority) {
+                                        if (MatchController.getNetClient() != null) {
+                                            String type = isHeavyShot ? "HEAVY" : "LIGHT";
+                                            String hitMsg = String.format("HIT_REQUEST:%s:%.2f:%.2f:%.2f", type, hitAngle, badminton.getCenterX(), badminton.getCenterY());
+                                            MatchController.getNetClient().sendLine(hitMsg);
+                                        }
                                         if (isHeavyShot)
                                             badminton.heavyHit(hitAngle);
                                         else
