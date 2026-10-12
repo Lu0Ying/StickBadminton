@@ -26,6 +26,11 @@ public class MatchController extends GameObject{
     private static boolean isHost = false;
     private static NetworkClient netClient = null;
 
+    // 本球得分后的目标分：由 onBallGroundHit（本地）/applyRemoteScore（主机消息）计算，
+    // changeScore 时统一 set —— 双端 set 同一目标值，避免各自 +1 增量产生计数偏差
+    private int pendingLeft = 0;
+    private int pendingRight = 0;
+
 
     // 添加 setter 方法
     public void setHost(boolean Host) {
@@ -54,15 +59,18 @@ public class MatchController extends GameObject{
         Badminton ball = (Badminton) inRoom.getObject("badminton");
         if (ball == null) return;
 
-        double lerpFactor = 0.2;
+        double dx = x - ball.getCenterX();
+        double dy = y - ball.getCenterY();
+        // 距离过大（如重置后的新球、快照跳变）直接就位，防止长距离拖尾
+        double lerpFactor = (Math.abs(dx) > 300 || Math.abs(dy) > 300) ? 1.0 : 0.35;
         ball.setPositionWithCenter(
-                ball.getCenterX() + (x - ball.getCenterX()) * lerpFactor,
-                ball.getCenterY() + (y - ball.getCenterY()) * lerpFactor
+                ball.getCenterX() + dx * lerpFactor,
+                ball.getCenterY() + dy * lerpFactor
         );
         ball.speedX = ball.speedX + (speedX - ball.speedX) * lerpFactor;
         ball.speedY = ball.speedY + (speedY - ball.speedY) * lerpFactor;
 
-        // 新增: 重置预测
+        // 重置预测计时，以下一帧重新起算
         ball.lastSpeedX = speedX;
         ball.lastSpeedY = speedY;
         ball.predictTimer = 0;
@@ -79,58 +87,87 @@ public class MatchController extends GameObject{
         ballHitGroundTimer = 1.0;
         lastPointWinner = winner;
 
-        // 新增: 主机发送得分
-        if (isHost) {
-            UIObject scoreLeft = inRoom.getUiObject("score_left");
-            UIObject scoreRight = inRoom.getUiObject("score_right");
-            int leftScore = (scoreLeft instanceof UIDigitView) ? ((UIDigitView) scoreLeft).getCurrentNumber() : 0;
-            int rightScore = (scoreRight instanceof UIDigitView) ? ((UIDigitView) scoreRight).getCurrentNumber() : 0;
-            if (winner == -1) rightScore = (rightScore + 1) % 10;
-            else leftScore = (leftScore + 1) % 10;
-            netClient.sendLine(String.format("SCORE:%d:%d", leftScore, rightScore));
+        // 计算本球得分后的目标分
+        pendingLeft = readDigit("score_left");
+        pendingRight = readDigit("score_right");
+        if (winner == -1) pendingRight = (pendingRight + 1) % 10;
+        else pendingLeft = (pendingLeft + 1) % 10;
+
+        // 主机上报比分，客户端收到后启动同一套计分/重置流程
+        if (isHost && netClient != null) {
+            netClient.sendLine(String.format("SCORE:%d:%d", pendingLeft, pendingRight));
         }
     }
+
+    /**
+     * 联机客户端/旁观者：收到主机上报的比分，启动与本地完全相同的
+     * 计分 → 音效 → 球员回位 → 重置球 → 比赛结束流程，实现双端状态对齐。
+     */
+    public void applyRemoteScore(int left, int right) {
+        if (isHost) return; // 忽略自己上报的回显，避免双触发
+
+        int localLeft = readDigit("score_left");
+        int localRight = readDigit("score_right");
+        if (left == localLeft && right == localRight) return; // 相同快照（开局 0:0 等），直接吸收
+
+        pendingLeft = left;
+        pendingRight = right;
+        // 增量方即得分方；中途加入快照（比分跳变）时以领先方近似，仅影响结束显示与发球方
+        if (left > localLeft) lastPointWinner = 1;
+        else if (right > localRight) lastPointWinner = -1;
+        else lastPointWinner = (left >= right) ? 1 : -1;
+
+        // 已在得分流程中则只更新目标分，不重启计时（避免重复快照打断流程）
+        if (ballHitGroundTimer <= 0.0 && scoreChangeTimer <= 0.01) {
+            ballHitGroundTimer = 1.0;
+        }
+    }
+
+    /** 发球方快照对齐（主要服务中途加入/旁观者；正常流程由 lastPointWinner 推出） */
+    public void applyRemoteServe(int side) {
+        serveSide = (side >= 0) ? 1 : -1;
+    }
+
+    private int readDigit(String uiName) {
+        UIObject view = inRoom.getUiObject(uiName);
+        return (view instanceof UIDigitView) ? ((UIDigitView) view).getCurrentNumber() : 0;
+    }
+
     public void changeScore() {
         SoundPlay.playSound("add_score.mp3", 1.0);
-        if (lastPointWinner == -1) {
-            UIObject scoreRight = inRoom.getUiObject("score_right");
-            if (scoreRight instanceof UIDigitView) {
-                UIDigitView scoreView = (UIDigitView) scoreRight;
-                scoreView.setCurrentNumber((scoreView.getCurrentNumber() + 1) % 10);
-            }
-        } else {
-            UIObject scoreLeft = inRoom.getUiObject("score_left");
-            if (scoreLeft instanceof UIDigitView) {
-                UIDigitView scoreView = (UIDigitView) scoreLeft;
-                scoreView.setCurrentNumber((scoreView.getCurrentNumber() + 1) % 10);
-            }
+        // 统一 set 目标分（双端同值），而非各自 +1
+        UIObject scoreLeft = inRoom.getUiObject("score_left");
+        if (scoreLeft instanceof UIDigitView) {
+            ((UIDigitView) scoreLeft).setCurrentNumber(pendingLeft);
+        }
+        UIObject scoreRight = inRoom.getUiObject("score_right");
+        if (scoreRight instanceof UIDigitView) {
+            ((UIDigitView) scoreRight).setCurrentNumber(pendingRight);
         }
 
         //判断获胜
-        UIObject scoreLeft = inRoom.getUiObject("score_left");
-        UIObject scoreRight = inRoom.getUiObject("score_right");
-
-        if (scoreLeft instanceof UIDigitView && scoreRight instanceof UIDigitView) {
-            UIDigitView leftView = (UIDigitView) scoreLeft;
-            UIDigitView rightView = (UIDigitView) scoreRight;
-
-            if (leftView.getCurrentNumber() >= 9 || rightView.getCurrentNumber() >= 9) {
-                // 游戏结束，显示结果
-                matchEndTimer = 1.5;
-            }
+        if (pendingLeft >= 9 || pendingRight >= 9) {
+            // 游戏结束，显示结果
+            matchEndTimer = 1.5;
         }
     }
 
     public void resetBall() {
         if (inRoom.getObject("badminton") != null)
             inRoom.removeObject(inRoom.getObject("badminton"));
-        GameObject badminton = inRoom.addObject(new Badminton(serveSide));
+        Badminton badminton = (Badminton) inRoom.addObject(new Badminton(serveSide));
         badminton.setPosition(450 - 200 * serveSide, 700);
         badminton.speedX = 0;
         badminton.speedY = 0;
 
-        // 新增: 主机立即发送新状态
-        if (isHost&& netClient != null) {
+        // 联机客户端：新球立即标记网络控制，
+        // 否则开局 scoreChangeTimer=0.01 分支重建的球会退化成本地物理并脱离同步
+        if (netClient != null && !isHost) {
+            badminton.isNetworkControlled = true;
+        }
+
+        // 主机立即发送新状态
+        if (isHost && netClient != null) {
             String ballState = String.format("BALL:%.2f:%.2f:%.2f:%.2f", badminton.getCenterX(), badminton.getCenterY(), 0.0, 0.0);
             netClient.sendLine(ballState);
         }

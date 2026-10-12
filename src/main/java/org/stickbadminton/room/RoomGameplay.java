@@ -81,29 +81,57 @@ public class RoomGameplay extends Room {
 
         // ========== 关键：添加网络监听 ==========
         setupNetworkListeners();
+        // 进入对局后请求状态快照，补上连接时快照错过监听器挂载的窗口（中途加入/旁观者）
+        netClient.requestSnapshot();
 
         inputAttached = true;
         System.out.println("[RoomGameplay] attachScene ok");
     }
 
-    // ========== 新增：设置网络监听 ==========
+    // ========== 设置网络监听：比赛状态统一经 ConnectionListener 转发给 MatchController ==========
     private void setupNetworkListeners() {
-        netClient.setInRoom(this);
         netClient.addConnectionListener(new NetworkClient.ConnectionListener() {
             @Override
             public void onBallState(double x, double y, double speedX, double speedY) {
-                Platform.runLater(() -> {
-                    if (matchController != null) {
-                        matchController.applyBallState(x, y, speedX, speedY);
-                    }
-                });
+                // 主机球状态（50ms 周期）：应用插值同步；通知已在 FX 线程
+                if (matchController != null) {
+                    matchController.applyBallState(x, y, speedX, speedY);
+                }
+            }
+
+            @Override
+            public void onScore(int left, int right) {
+                // 比分状态驱动客户端走与主机相同的计分/重置/结束流程
+                if (matchController != null) {
+                    matchController.applyRemoteScore(left, right);
+                }
+            }
+
+            @Override
+            public void onServeSide(int side) {
+                if (matchController != null) {
+                    matchController.applyRemoteServe(side);
+                }
+            }
+
+            @Override
+            public void onHit(String type, double angle, double x, double y) {
+                // 击球表现回显：主机已本地执行，忽略回显避免音效/特效双份
+                if (isHost || matchController == null) return;
+                Badminton ball = (Badminton) getObject("badminton");
+                if (ball == null) return;
+                // 瞬移到击球点触发表现，随后由 BALL 快照持续校正
+                ball.setPositionWithCenter(x, y);
+                if ("LIGHT".equals(type)) {
+                    ball.lightHit(angle);
+                } else if ("HEAVY".equals(type)) {
+                    ball.heavyHit(angle);
+                }
             }
 
             @Override
             public void onAssigned(String id) {
-                // 可选：记录或日志
                 System.out.println("[RoomGameplay] Assigned ID: " + id);
-                // 如果需要根据 assignedId 更新 isHost，也可以在这里做
             }
 
             @Override
@@ -137,19 +165,10 @@ public class RoomGameplay extends Room {
         // 注入 netClient，用于发送
         matchController.setNetClient(netClient);
 
-        // 新增: 如果是客户端，初始化球为网络控制
-        if (!isHost) {
-            Badminton ball = (Badminton) getObject("badminton");  // 假设buildScene后球已创建
-            if (ball != null) ball.isNetworkControlled = true;
-        }
-
         addObject(matchController);
 
-        matchController.resetBall();  // 立即创建并重置球
-        if (!isHost) {
-            Badminton ball = (Badminton) getObject("badminton");
-            if (ball != null) ball.isNetworkControlled = true;
-        }
+        // 立即创建并重置球（联机客户端的新球由 resetBall 内部标记为网络控制）
+        matchController.resetBall();
 
         NetAnimation net = new NetAnimation();
         addObject(net, "net");
