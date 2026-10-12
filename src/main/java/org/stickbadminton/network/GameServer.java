@@ -365,19 +365,23 @@ public class GameServer {
                     // 主机代双方模拟，若按 sender 固定半场校验会拒绝主机代理 p2 的合法击球。
                     if (this == p1Holder && "IN_PROGRESS".equals(gameStatus)) {
                         String[] parts = line.split(":");
-                        if (parts.length == 5) {
+                        // HIT_REQUEST:<type>:<angle>:<x>:<y>:<speedX>:<speedY> —— 附带主机权威初速
+                        if (parts.length == 7) {
                             try {
                                 String type = parts[1];
                                 double angle = Double.parseDouble(parts[2]);
                                 double hitX = Double.parseDouble(parts[3]);
                                 double hitY = Double.parseDouble(parts[4]);
-                                boolean valid = hitX >= GameProperties.playFieldLeft
-                                        && hitX <= GameProperties.playFieldRight;
+                                double speedX = Double.parseDouble(parts[5]);
+                                double speedY = Double.parseDouble(parts[6]);
+                                // 按球中心语义放宽边界：getCenterX 含 10.5px 贴图偏移，
+                                // 贴右墙击球时 center 可达 840.5，用原 830 上限会把合法击球当非法丢弃
+                                boolean valid = hitX >= GameProperties.playFieldLeft - 11
+                                        && hitX <= GameProperties.playFieldRight + 11;
                                 if (valid) {
-                                    // 广播 HIT:（携带击球点，客户端据此定位后同轨回放）
-                                    // 不再补广播 lastBallState：确定性回放下它可能是发球期旧值，
-                                    // 会把客户端刚对齐的球反向拽回
-                                    broadcast(String.format("HIT:%s:%.2f:%.2f:%.2f", type, angle, hitX, hitY));
+                                    // 广播 HIT:（含击球点与主机算出的初速，客户端直接采用不再重算）
+                                    broadcast(String.format("HIT:%s:%.2f:%.2f:%.2f:%.2f:%.2f",
+                                            type, angle, hitX, hitY, speedX, speedY));
                                 } else {
                                     System.out.println("[Server] Invalid HIT_REQUEST from " + id + ": " + line);
                                 }

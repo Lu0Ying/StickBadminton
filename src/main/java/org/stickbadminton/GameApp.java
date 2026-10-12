@@ -20,7 +20,7 @@ public class GameApp extends GameApplication {
         settings.setScaleAffectedOnResize(true);
         settings.setPreserveResizeRatio(true);
         settings.setTitle("火柴人打羽毛球");
-        settings.setVersion("v0.1");
+        settings.setVersion("v1.0");
         settings.setTicksPerSecond(60);
         settings.setPauseMusicWhenMinimized(true);
         settings.setMenuKey(KeyCode.ESCAPE);

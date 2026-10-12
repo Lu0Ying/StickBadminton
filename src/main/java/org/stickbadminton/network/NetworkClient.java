@@ -211,15 +211,17 @@ public class NetworkClient {
 
         try {
             if (line.startsWith("HIT:")) {
-                // HIT:<LIGHT|HEAVY>:<angle>:<x>:<y> —— 击球表现回显，转发给游戏房间
+                // HIT:<LIGHT|HEAVY>:<angle>:<x>:<y>:<speedX>:<speedY> —— 击球事件，含主机权威初速
                 String[] parts = line.split(":");
-                if (parts.length == 5) {
+                if (parts.length == 7) {
                     try {
                         String type = parts[1];
                         double angle = Double.parseDouble(parts[2]);
                         double hitX = Double.parseDouble(parts[3]);
                         double hitY = Double.parseDouble(parts[4]);
-                        notifyHit(type, angle, hitX, hitY);
+                        double speedX = Double.parseDouble(parts[5]);
+                        double speedY = Double.parseDouble(parts[6]);
+                        notifyHit(type, angle, hitX, hitY, speedX, speedY);
                     } catch (NumberFormatException e) {
                         System.out.println("[Client] Invalid HIT format: " + line);
                     }
@@ -524,9 +526,11 @@ public class NetworkClient {
         }));
     }
 
-    private void notifyHit(String type, double angle, double x, double y) {
+    private void notifyHit(String type, double angle, double x, double y, double speedX, double speedY) {
         runOnFxThreadOrNow(() -> connectionListeners.forEach(l -> {
-            try { l.onHit(type, angle, x, y); } catch (Exception ignored) {}
+            // 不吞异常：重放失败时至少留日志，否则客户端零表现零线索
+            try { l.onHit(type, angle, x, y, speedX, speedY); }
+            catch (Exception e) { System.out.println("[Client] onHit listener error: " + e); }
         }));
     }
 
@@ -550,6 +554,6 @@ public class NetworkClient {
         /** 发球方 1(左)/-1(右) */
         default void onServeSide(int side) {}
         /** 击球表现回显（主机已本地执行，忽略回显；非主机端播放音效/特效） */
-        default void onHit(String type, double angle, double x, double y) {}
+        default void onHit(String type, double angle, double x, double y, double speedX, double speedY) {}
     }
 }

@@ -83,8 +83,9 @@ public class MatchController extends GameObject{
 
         double dx = x - ball.getCenterX();
         double dy = y - ball.getCenterY();
-        // 距离过大（如重置后的新球、快照跳变）直接就位，防止长距离拖尾
-        double lerpFactor = (Math.abs(dx) > 300 || Math.abs(dy) > 300) ? 1.0 : 0.35;
+        // 跳变（重置后的新球在屏幕外 y=700、快照复位）直接就位，避免客机看到球从底部飘入；
+        // 正常发球准备期心跳跟随距离 <30px，仍走平滑插值
+        double lerpFactor = (Math.abs(dx) > 60 || Math.abs(dy) > 60) ? 1.0 : 0.35;
         ball.setPositionWithCenter(
                 ball.getCenterX() + dx * lerpFactor,
                 ball.getCenterY() + dy * lerpFactor
@@ -224,6 +225,11 @@ public class MatchController extends GameObject{
                 ballHitGroundTimer = 0.0;
                 scoreChangeTimer = 2.0;
                 serveSide = lastPointWinner;
+                // 主机广播权威发球方：客机 applyRemoteServe 直接采纳，
+                // 不再依赖分数差推导，也纠正服务器快照里滞后的 serveSide
+                if (isHost && netClient != null) {
+                    netClient.sendLine("SERVE:" + serveSide);
+                }
             }
         }
         else if (scoreChangeTimer > 0.0) { // 记分牌改变后到重置玩家和球的位置等待时间

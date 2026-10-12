@@ -342,16 +342,19 @@ public class StickMan extends GameObject {
                                 // 球的表现由服务器广播的 HIT 回显触发，避免双份音效/特效与判定分叉
                                 boolean localAuthority = MatchController.getNetClient() == null || MatchController.isHost();
                                 if (localAuthority) {
-                                    if (MatchController.getNetClient() != null) {
-                                        // 联机主机: 上报击球请求，经服务器校验后广播 HIT 回显
-                                        String type = isHeavyShot ? "HEAVY" : "LIGHT";
-                                        String hitMsg = String.format("HIT_REQUEST:%s:%.2f:%.2f:%.2f", type, hitAngle, badminton.getCenterX(), badminton.getCenterY());
-                                        MatchController.getNetClient().sendLine(hitMsg);
-                                    }
+                                    // 先执行击球算出权威初速，再随消息上报，
+                                    // 客户端直接采用该初速，避免重算公式/档位不一致导致轨迹分叉
                                     if (isHeavyShot)
                                         badminton.heavyHit(hitAngle);
                                     else
                                         badminton.lightHit(hitAngle);
+                                    if (MatchController.getNetClient() != null) {
+                                        String type = isHeavyShot ? "HEAVY" : "LIGHT";
+                                        String hitMsg = String.format("HIT_REQUEST:%s:%.2f:%.2f:%.2f:%.2f:%.2f",
+                                                type, hitAngle, badminton.getCenterX(), badminton.getCenterY(),
+                                                badminton.speedX, badminton.speedY);
+                                        MatchController.getNetClient().sendLine(hitMsg);
+                                    }
                                 }
                                 hasShotted = true;
                                 isReadyingServe = false;
@@ -401,15 +404,18 @@ public class StickMan extends GameObject {
                                     // 球的表现由服务器广播的 HIT 回显触发
                                     boolean localAuthority = MatchController.getNetClient() == null || MatchController.isHost();
                                     if (localAuthority) {
-                                        if (MatchController.getNetClient() != null) {
-                                            String type = isHeavyShot ? "HEAVY" : "LIGHT";
-                                            String hitMsg = String.format("HIT_REQUEST:%s:%.2f:%.2f:%.2f", type, hitAngle, badminton.getCenterX(), badminton.getCenterY());
-                                            MatchController.getNetClient().sendLine(hitMsg);
-                                        }
+                                        // 先击球算出权威初速再上报，客户端直接采用避免重算分叉
                                         if (isHeavyShot)
                                             badminton.heavyHit(hitAngle);
                                         else
                                             badminton.lightHit(hitAngle);
+                                        if (MatchController.getNetClient() != null) {
+                                            String type = isHeavyShot ? "HEAVY" : "LIGHT";
+                                            String hitMsg = String.format("HIT_REQUEST:%s:%.2f:%.2f:%.2f:%.2f:%.2f",
+                                                    type, hitAngle, badminton.getCenterX(), badminton.getCenterY(),
+                                                    badminton.speedX, badminton.speedY);
+                                            MatchController.getNetClient().sendLine(hitMsg);
+                                        }
                                     }
                                     hasShotted = true;
                                     isReadyingServe = false;

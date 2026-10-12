@@ -27,6 +27,9 @@ public class Badminton extends GameObject {
     public boolean isHitted = false;
     public int TouchedTime = 11;  //触墙或者触网后经过的时间，小于10的时候关闭拖尾
     public boolean isShotable = true; // 是否能被打出
+    // 触网一次性闩锁：路径进入网柱区间时触发一次即上锁，离开区间才解锁——
+    // 防止球停在网柱区间内时每逻辑帧重复触发触网音效/动画
+    private boolean netHitLatch = true;
     ParticleEmitter emitter = ParticleFX.fire();
     ParticleComponent particleComponent = new ParticleComponent(emitter);
 
@@ -134,6 +137,9 @@ public class Badminton extends GameObject {
         // 注意球的贴图会随着运动方向而进行旋转
         // 在空中运动状态
         // 操作 speedX, speedY 等
+        // 本逻辑步的起点位置（x 的积分由 ObjectControl 在 onUpdate 返回后执行），
+        // 供触网判定做整段路径覆盖检测
+        double stepStartX = x;
         //落地判断
         double centerX = getCenterX();
         double centerY = getCenterY();
@@ -169,10 +175,18 @@ public class Badminton extends GameObject {
             x = StrictMath.pow(x - GameProperties.playFieldLeft, 2) < StrictMath.pow(x - GameProperties.playFieldRight, 2) ? GameProperties.playFieldLeft : GameProperties.playFieldRight;
             speedX = -speedX * 0.6;
         }
-        //触网判断
-        if (y + speedY * GameProperties.frameTime >= GameProperties.floorBallY - GameProperties.netHeight + 20
-                && (x + speedX * GameProperties.frameTime >= GameProperties.netPosition - 18 && x <= GameProperties.netPosition - 18
-                || x + speedX * GameProperties.frameTime <= GameProperties.netPosition - 8 && x >= GameProperties.netPosition - 8)) {
+        //触网判断：本步路径与网柱区间 [netPosition-18, netPosition-8] 重叠即判定触网——
+        // 与步相位无关，消除双端因状态相差一步导致一端触发、一端漏判的轨迹分叉
+        double stepEndX = x + speedX * GameProperties.frameTime;
+        double pathMin = Math.min(stepStartX, stepEndX);
+        double pathMax = Math.max(stepStartX, stepEndX);
+        boolean inNetColumn = pathMin <= GameProperties.netPosition - 8 && pathMax >= GameProperties.netPosition - 18;
+        if (!inNetColumn) {
+            netHitLatch = true; // 路径已离开网柱区间，解锁以允许下一次触网
+        }
+        if (inNetColumn && netHitLatch
+                && y + speedY * GameProperties.frameTime >= GameProperties.floorBallY - GameProperties.netHeight + 20) {
+            netHitLatch = false; // 同一次穿越只触发一次，防止球停在网柱区间内时逐帧重复触发
             TouchedTime = 0;
             onNetCrashed();   //调用播放触网动画方法
             if (y < GameProperties.floorBallY - GameProperties.netHeight + 25) {

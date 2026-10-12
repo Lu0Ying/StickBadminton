@@ -118,18 +118,25 @@ public class RoomGameplay extends Room {
             }
 
             @Override
-            public void onHit(String type, double angle, double x, double y) {
+            public void onHit(String type, double angle, double x, double y, double speedX, double speedY) {
                 // 击球表现回显：主机已本地执行，忽略回显避免音效/特效双份
                 if (isHost || matchController == null) return;
                 Badminton ball = (Badminton) getObject("badminton");
                 if (ball == null) return;
-                // 定位到击球点并重放击球公式，随后按固定逻辑帧与主机同轨回放
+                // HIT 到达即证明主机已把球打出：若本地球还停在发球准备态（释放时序差），
+                // 必须强制解冻，否则下一逻辑帧冻结分支会把重放的初速清零，球看起来打不出去
+                ball.isFrozen = false;
+                // 定位到击球点并触发表现，随后按固定逻辑帧与主机同轨回放
                 ball.setPositionWithCenter(x, y);
                 if ("LIGHT".equals(type)) {
                     ball.lightHit(angle);
                 } else if ("HEAVY".equals(type)) {
                     ball.heavyHit(angle);
                 }
+                // 采用主机算出的权威初速，覆盖 lightHit/heavyHit 的本地重算值，
+                // 消除 %.2f 截断或档位边界导致的双端初速不一致
+                ball.speedX = speedX;
+                ball.speedY = speedY;
             }
 
             @Override
