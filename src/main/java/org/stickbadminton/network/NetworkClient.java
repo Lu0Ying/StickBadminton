@@ -81,7 +81,10 @@ public class NetworkClient {
         if (running) return;
         running = true;
 
-        socket = new Socket(host, port);
+        // 带 5 秒连接超时：地址不可达时快速失败，
+        // 调用方在后台线程调用，避免同步 TCP 连接阻塞 FX 线程导致界面冻结
+        socket = new Socket();
+        socket.connect(new java.net.InetSocketAddress(host, port), 5000);
         socket.setTcpNoDelay(true);
         try {
             in = new BufferedReader(new InputStreamReader(socket.getInputStream(), "UTF-8"));

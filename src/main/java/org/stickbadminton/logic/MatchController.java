@@ -32,12 +32,12 @@ public class MatchController extends GameObject{
     private int pendingRight = 0;
 
 
-    // 添加 setter 方法
-    public void setHost(boolean Host) {
+    // 设置方法（static：会话状态全局唯一，选人房/对战房/退出路径统一经 endSession 收口）
+    public static void setHost(boolean Host) {
         isHost = Host;
     }
 
-    public void setNetClient(NetworkClient Client) {
+    public static void setNetClient(NetworkClient Client) {
         netClient = Client;
     }
 

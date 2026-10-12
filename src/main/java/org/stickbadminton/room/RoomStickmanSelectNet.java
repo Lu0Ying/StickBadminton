@@ -4,10 +4,12 @@ import org.stickbadminton.logic.GameProperties;
 import org.stickbadminton.room.RoomGameplay;
 import org.stickbadminton.ui.HintAIDifficulty;
 import org.stickbadminton.ui.UIImageButton;
+import org.stickbadminton.ui.UITextLabel;
 import org.stickbadminton.ui.UIStickmanPlayer;
 
 import javafx.application.Platform;
 import javafx.scene.image.Image;
+import javafx.scene.text.Font;
 import org.stickbadminton.GameObject;
 import org.stickbadminton.Room;
 import org.stickbadminton.SoundPlay;
@@ -41,6 +43,9 @@ public class RoomStickmanSelectNet extends Room {
     // 关键字段：网络客户端
     private NetworkClient netClient;
     private volatile String myId = null; // "p1" / "p2" / watcher*
+
+    // 连接失败提示（默认隐藏，连接线程失败时显示）
+    private UITextLabel connectErrorLabel;
 
     // 保存服务器地址与期望席位
     private final String serverHost;
@@ -140,18 +145,37 @@ public class RoomStickmanSelectNet extends Room {
         addUiObject(view1, 65, 320);
         addUiObject(view2, 840, 320);
 
+        // 连接失败提示（后台连接线程失败时显示）
+        connectErrorLabel = new UITextLabel("无法连接服务器，请检查地址与网络");
+        connectErrorLabel.getTextNode().setFont(Font.font("Arial", 22));
+        connectErrorLabel.getTextNode().setStyle("-fx-fill: #ff5555;");
+        addUiObject(connectErrorLabel, 240, 430);
+        connectErrorLabel.setVisible(false);
+
         // 初始化网络并监听服务端事件
         initNetStatusListener();
     }
 
     private void initNetStatusListener() {
+        // 先清理上一会话的残留连接：旧连接若仍占用服务器 p1/p2 席位，
+        // 本次会被降级分配到错误席位（主机选人显示在 p2 界面）或旁观者
+        MatchController.endSession();
+
         try {
-            netClient = new NetworkClient(serverHost, serverPort, desiredId);
-            netClient.addConnectionListener(new NetworkClient.ConnectionListener() {
+            final NetworkClient client = new NetworkClient(serverHost, serverPort, desiredId);
+            netClient = client;
+            client.addConnectionListener(new NetworkClient.ConnectionListener() {
                 @Override
                 public void onAssigned(String playerId) {
                     myId = playerId;
                     System.out.println("[SelectNet] I am assigned as " + myId);
+                    // 分到旁观者说明 p1/p2 席位被占（通常是残留连接未释放），给出可见提示便于排查
+                    if (playerId == null || playerId.startsWith("w")) {
+                        if (connectErrorLabel != null) {
+                            connectErrorLabel.getTextNode().setText("席位已满，当前为旁观者");
+                            connectErrorLabel.setVisible(true);
+                        }
+                    }
                 }
 
                 @Override
@@ -203,7 +227,21 @@ public class RoomStickmanSelectNet extends Room {
 
                 }
             });
-            netClient.connect();
+            // 纳入统一会话管理：返回按钮/回主菜单的 endSession 才能真正断开本连接
+            MatchController.setNetClient(client);
+            // 后台线程建立 TCP 连接：同步连接会阻塞 FX 线程，地址不可达时界面会一直冻结
+            Thread connectThread = new Thread(() -> {
+                try {
+                    client.connect();
+                } catch (Exception e) {
+                    System.out.println("[RoomStickmanSelectNet] connect failed: " + e.getMessage());
+                    Platform.runLater(() -> {
+                        if (connectErrorLabel != null) connectErrorLabel.setVisible(true);
+                    });
+                }
+            }, "NetConnect");
+            connectThread.setDaemon(true);
+            connectThread.start();
         } catch (Exception e) {
             System.out.println("[RoomStickmanSelectNet] net init error: " + e.getMessage());
         }

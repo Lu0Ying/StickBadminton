@@ -167,9 +167,9 @@ public class RoomGameplay extends Room {
         addObject(new GameObject("background", Sprite.loadImage("/images/scenes/ingame_background.png")));
         matchController = new MatchController();
         // 设置是否为主机，用于决定是否广播
-        matchController.setHost(isHost);
+        MatchController.setHost(isHost);
         // 注入 netClient，用于发送
-        matchController.setNetClient(netClient);
+        MatchController.setNetClient(netClient);
 
         addObject(matchController);
 

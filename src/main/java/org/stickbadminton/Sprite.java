@@ -53,12 +53,20 @@ public class Sprite {
      * @param resourcePath 以 / 开头的 classpath 路径，如 "/images/game/badminton.png"
      */
     public static Image loadImage(String resourcePath) {
-        var url = Sprite.class.getResource(resourcePath);
-        if (url == null) {
-            throw new IllegalStateException("资源未找到: " + resourcePath);
-        }
-        return new Image(url.toExternalForm());
+        // 缓存 Image：击球特效等高频创建点复用同一对象，
+        // 避免每次同步解码大尺寸 PNG（如 hit_FX.png 3096x115）阻塞渲染帧造成卡顿
+        return imageCache.computeIfAbsent(resourcePath, path -> {
+            var url = Sprite.class.getResource(path);
+            if (url == null) {
+                throw new IllegalStateException("资源未找到: " + path);
+            }
+            return new Image(url.toExternalForm());
+        });
     }
+
+    // 图片缓存：路径 -> 已解码 Image（Image 不可变，跨 Sprite 共享安全）
+    private static final java.util.Map<String, Image> imageCache =
+            new java.util.concurrent.ConcurrentHashMap<>();
 
     public void activate() {
         parent.getViewComponent().clearChildren();
