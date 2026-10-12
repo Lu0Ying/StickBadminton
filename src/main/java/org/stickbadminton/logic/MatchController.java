@@ -7,7 +7,9 @@ import org.stickbadminton.ui.UIDigitView;
 import org.stickbadminton.ui.UIGameOver;
 
 import javafx.scene.image.Image;
+import javafx.scene.input.KeyCode;
 import org.stickbadminton.GameObject;
+import org.stickbadminton.KeyInput;
 import org.stickbadminton.SoundPlay;
 import org.stickbadminton.UIObject;
 import org.stickbadminton.network.NetworkClient;
@@ -62,6 +64,22 @@ public class MatchController extends GameObject{
 
     // 一次性诊断日志：客户端首条球状态应用
     private boolean ballRecvLogged = false;
+
+    // G 键上一帧按住状态（边沿检测，按一次切换一次）
+    private boolean gPrevHeld = false;
+
+    /**
+     * 调试用：p1（左半场 stickman_left）在满级 AI 与玩家之间切换。
+     * 单人/双人/联机三个模块统一从这里进入——联机时 G 经服务器 P1 白名单广播，
+     * 双端注入后各自在本方法触发，状态保持一致。
+     */
+    private void toggleP1AI() {
+        GameObject p1Obj = inRoom.getObject("stickman_left");
+        if (!(p1Obj instanceof StickMan p1)) return;
+        p1.aiMaxLevel = !p1.aiMaxLevel;
+        p1.isAIControlled = p1.aiMaxLevel;
+        System.out.println("[Debug] p1 -> " + (p1.aiMaxLevel ? "AI(max)" : "player"));
+    }
 
     public MatchController() {
         super("controller", Sprite.loadImage("/images/stickman/stickman_head1.png"));
@@ -209,6 +227,14 @@ public class MatchController extends GameObject{
     }
     @Override
     public void onUpdate() {
+        // G 键边沿检测：把 p1（左半场）在满级 AI 与玩家间切换，按一次切换一次。
+        // 联机时 G 走服务器 P1 白名单广播、双端注入后各自触发，状态保持一致
+        boolean gHeld = KeyInput.isKeyHolding(KeyCode.G);
+        if (gHeld && !gPrevHeld) {
+            toggleP1AI();
+        }
+        gPrevHeld = gHeld;
+
         if (matchEndTimer > 0.0) {
             matchEndTimer -= GameProperties.frameTime;
             if (matchEndTimer <= 0.0) {

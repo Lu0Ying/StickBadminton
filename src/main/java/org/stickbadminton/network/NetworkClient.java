@@ -56,7 +56,8 @@ public class NetworkClient {
     private final Set<Scene> attachedScenes = Collections.newSetFromMap(new IdentityHashMap<>());
 
     // 本地键位白名单（仅用于客户端软约束；服务端仍会进行硬校验）
-    private static final EnumSet<KeyCode> P1_KEYS = EnumSet.of(KeyCode.Q, KeyCode.W, KeyCode.E, KeyCode.A, KeyCode.S, KeyCode.D);
+    // G 为调试键：主机按 G 将 p1 切换为满级 AI，需经服务器广播使双端同帧响应
+    private static final EnumSet<KeyCode> P1_KEYS = EnumSet.of(KeyCode.Q, KeyCode.W, KeyCode.E, KeyCode.A, KeyCode.S, KeyCode.D, KeyCode.G);
     private static final EnumSet<KeyCode> P2_KEYS = EnumSet.of(KeyCode.U, KeyCode.I, KeyCode.O, KeyCode.J, KeyCode.K, KeyCode.L);
 
     public NetworkClient(String host, int port) {

@@ -119,8 +119,10 @@ public class Badminton extends GameObject {
                     setPositionWithCenter(stickManLeft.getX() + 21, stickManLeft.getY() + 30);
                 }
             }
-            // 释放检测双端同构执行（客户端按键来自服务器注入，固定初速双端一致）
-            if (sideServe == StickMan.sideLeft && GameProperties.matchMode == 1) {
+            // 释放检测双端同构执行（客户端按键来自服务器注入，固定初速双端一致）。
+            // 发球方是 AI（单人模式右半场常驻 AI，或 G 键把 p1 切成 AI）时自动释放，
+            // 替代原先的 matchMode==1 特判：单人行为不变，联机 AI 发球也走同一路径
+            if (isServeSideControlledByAI()) {
                 isFrozen = false;
                 speedX = 250 * sideServe;
                 speedY = 300;
@@ -259,6 +261,18 @@ public class Badminton extends GameObject {
         emitter.setNumParticles(4);
         onHit();
         // 击球状态同步由 HIT 事件承担（带击球点，客户端 setPosition 后重放同一公式）
+    }
+
+    /**
+     * 当前发球方是否由 AI 控制。
+     * sideServe==sideRight 的发球者是左半场 stickman_left（p1），
+     * sideServe==sideLeft 的发球者是右半场 stickman_right；
+     * 双端按同一状态判断，自动释放时机一致。
+     */
+    private boolean isServeSideControlledByAI() {
+        StickMan server = (StickMan) inRoom.getObject(
+                sideServe == StickMan.sideRight ? "stickman_left" : "stickman_right");
+        return server != null && server.isAIControlled;
     }
 
     //播放触网动画，在触网判断中被调用

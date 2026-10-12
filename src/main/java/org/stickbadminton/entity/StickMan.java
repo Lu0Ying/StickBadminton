@@ -15,6 +15,8 @@ import org.stickbadminton.KeyInput;
 public class StickMan extends GameObject {
     public int characterType = 0; // 1 ~ 5
     public boolean isAIControlled = false;
+    // 调试用：G 键切换后 p1 以满级（难度 1.0）AI 出战，不受选人房难度影响
+    public boolean aiMaxLevel = false;
     private GameObject bodyIdle;
     private GameObject bodyMoving;
     private GameObject rightHand;
@@ -179,7 +181,8 @@ public class StickMan extends GameObject {
         }
         ComputerDecision decision;
         if (isAIControlled && badminton != null && opponentObj != null) {
-            decision = new ComputerDecision(side, getCenterX(), getCenterY() + GameProperties.playerHeight - GameProperties.hitAreaCenterHeight,
+            // aiMaxLevel 作为构造参数传入：决策在构造器内完成，事后改字段已来不及
+            decision = new ComputerDecision(aiMaxLevel, side, getCenterX(), getCenterY() + GameProperties.playerHeight - GameProperties.hitAreaCenterHeight,
                     isShotting, isJumping, badminton.getCenterX(), badminton.getCenterY(), badminton.speedX, badminton.speedY, opponentObj.getCenterX(), opponentObj.getCenterY());
         }
         else decision = new ComputerDecision();

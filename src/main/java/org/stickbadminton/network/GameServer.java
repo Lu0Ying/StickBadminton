@@ -43,7 +43,8 @@ public class GameServer {
     private final AtomicInteger watcherSeq = new AtomicInteger(1);
 
     // 硬校验白名单（与客户端软白名单一致）
-    private static final Set<String> P1_WHITELIST = Set.of("Q", "W", "E", "A", "S", "D");
+    // G 为调试键：主机按 G 将 p1 切换为满级 AI，随 KEY 广播使双端同帧响应
+    private static final Set<String> P1_WHITELIST = Set.of("Q", "W", "E", "A", "S", "D", "G");
     private static final Set<String> P2_WHITELIST = Set.of("U", "I", "O", "J", "K", "L");
 
     // 游戏状态机

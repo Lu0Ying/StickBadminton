@@ -60,14 +60,18 @@ public class ComputerDecision {
     private double predictedLandingY;
     private boolean isBallApproaching = false;
     private Random random = new Random();
+    // G 键调试：p1 满级 AI。决策全部在构造器内完成，必须构造前定级，
+    // 事后改 difficultyLevel 来不及（shouldReact 等随机门槛已在构造中执行过）
+    private boolean maxLevel = false;
 
     public ComputerDecision() {}
 
-    public ComputerDecision(int side,
+    public ComputerDecision(boolean maxLevel, int side,
                             double hitCenterX, double hitCenterY, boolean isShotCooldown, boolean isJumpCooldown,
                             double badmintonX, double badmintonY, double badmintonSpeedX, double badmintonSpeedY,
                             double opponentX, double opponentY)
     {
+        this.maxLevel = maxLevel;
         // 初始化基本信息
         this.badmintonSpeedX = badmintonSpeedX;
         this.badmintonSpeedY = badmintonSpeedY;
@@ -82,7 +86,13 @@ public class ComputerDecision {
 
         // 难度（如项目中有统一难度，可替换）
         // this.difficultyLevel = GameProperties.difficultyLevel;
-        if (GameProperties.difficultyLevel == 1)
+        if (maxLevel) {
+            // 满级覆盖：难度 1.0 + 满判定半径，不动全局 difficultyLevel（避免对手 AI 顺带满级）
+            this.difficultyLevel = 1.0;
+            this.racketRadius = GameProperties.racketRadius;
+            this.hitAreaRadius = GameProperties.hitAreaRadius;
+        }
+        else if (GameProperties.difficultyLevel == 1)
             this.difficultyLevel = 0.5;
         else if (GameProperties.difficultyLevel == 2)
             this.difficultyLevel = 0.7;
@@ -161,6 +171,7 @@ public class ComputerDecision {
     }
 
     private boolean shouldReact() {
+        if (maxLevel) return true; // 满级恒反应：消除随机门槛，保证双端决策同轨
         // 低难度也给到高反应，避免“等太久错过网前球”
         double reactionTime = REACTION_TIME_MIN;
         return random.nextDouble() > reactionTime;
@@ -526,6 +537,7 @@ public class ComputerDecision {
         boolean basicWindow = timeToNet > 0.22 && timeToNet < 0.9;
         if (!basicWindow) return false;
         if (isLikelyRecentWallBounce()) return false;
+        if (maxLevel) return true; // 满级恒起跳：跳过随机概率，双端一致
 
         // 难度概率（低难度也给较高概率，以免错过球）
         double p = Math.max(0.5, difficultyLevel);
@@ -629,7 +641,8 @@ public class ComputerDecision {
     // 中场球
     public void middleShot() {
         double distance = computerX - GameProperties.netPosition;
-        if (new Random().nextDouble() < 0.3 && distance > 200) {
+        // 满级恒重击：30% 轻击随机会令双端 energyRemain 分叉 → moveSpeed 分叉
+        if (!maxLevel && new Random().nextDouble() < 0.3 && distance > 200) {
             isLighthit = true; isHeavyhit = false;
         } else {
             isHeavyhit = true; isLighthit = false;
