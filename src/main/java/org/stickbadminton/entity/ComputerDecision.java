@@ -98,6 +98,10 @@ public class ComputerDecision {
     private static final double[] oppSampleLast = new double[]{Double.NaN, Double.NaN};
     private static final double[] oppSamplePrev = new double[]{Double.NaN, Double.NaN};
     private static final int[] oppSampleCd = new int[]{0, 0};
+    // 跳杀后的横移跟随窗口(帧)：起跳后约12帧(风存6+挥拍)内 AI 必须朝球当前位置收差，
+    // 不能走 adjustPosition 的落地点——有水平速度的球落点常在球的后方，
+    // 朝落点跑会让起跳位置太靠后(网前/场边)而挥空。按半场侧索引
+    private static final int[] jumpSmashFollow = new int[]{0, 0};
 
     // 预判与状态
     private double predictedLandingX;
@@ -254,6 +258,17 @@ public class ComputerDecision {
         //提前起跳扣杀：高位/网前下落球不等进圈、不退后场等球，先跳(风存后空中截击)。
         //放在网前拦截分支之前：球快落到前场时直接网前跳起拦截扣杀
         if (earlyJumpSmash(side, isShotCooldown)) return;
+
+        // 跳杀风存跟随：起跳后12帧内横移朝球当前x(而非落地点)，防止 AI 被 adjustPosition
+        // 带到球的后方——网前跳起位置太靠后、场边高球追不平都是这个原因
+        int sideIdx = (side == 1) ? 0 : 1;
+        if (jumpSmashFollow[sideIdx] > 0) {
+            jumpSmashFollow[sideIdx]--;
+            if (isJumpCooldown) {
+                moveFollowBallX();
+                return; // 风存期只跟球：不出招(风存状态机管挥拍)、不另跳
+            }
+        }
 
         //预测拦截
         if (handleFrontCourt(side, isShotCooldown)) return;
@@ -657,13 +672,32 @@ public class ComputerDecision {
             double prob = netDist <= SMASH_COURT_WINDOW ? EARLY_SMASH_PROB_MID : EARLY_SMASH_PROB_BACK;
             if (varianceRoll() >= prob) return false;
         }
-        moveHorizontal(200);
+        moveFollowBallX(); // 触发帧就朝球当前x走(不用preLanding落点：落点常在球后方)
+        jumpSmashFollow[(side == 1) ? 0 : 1] = 12; // 开风存跟随窗口，覆盖风存6帧+挥拍
         isShot = true;
         isHeavyhit = true;
         isLighthit = false;
         isJump = true;
         isSmashIntent = true;
         return true;
+    }
+
+    // 跳杀风存跟随专用：朝球当前位置横移，边界钳制与 moveHorizontal 同公式
+    private void moveFollowBallX() {
+        double distance = badmintonX - computerX;
+        double maxMoveDistance = decisionMoveSpeed() * GameProperties.frameTime;
+        double leftBoundary = GameProperties.playFieldLeft + GameProperties.playerWidth / 2;
+        double rightBoundary = GameProperties.playFieldRight - GameProperties.playerWidth / 2;
+        if (computerX < leftBoundary) {
+            isMoveRight = true; isMoveLeft = false;
+        } else if (computerX > rightBoundary) {
+            isMoveLeft = true; isMoveRight = false;
+        } else if (Math.abs(distance) > maxMoveDistance) {
+            if (distance > 0) { isMoveRight = true; isMoveLeft = false; }
+            else { isMoveLeft = true; isMoveRight = false; }
+        } else {
+            isMoveLeft = false; isMoveRight = false;
+        }
     }
 
     // 提前跳杀可达性：风存6帧+置位1帧后从第8帧起进入挥拍命中判定（前0.15s内），
@@ -688,7 +722,10 @@ public class ComputerDecision {
         // 球心贴图半宽：Badminton 左上角 x 撞墙时球心 = 墙 + 10.5（与 setCenterPosition 一致）
         final double ballHalf = 10.5;
         final double racketSq = GameProperties.racketRadius * GameProperties.racketRadius;
-        for (int f = 1; f <= 16; f++) {
+        // 出招帧确定的拍型：真实逻辑在挥拍置位帧按球位选上/下方击球(球低于肩上46px
+        // 且在本方半场 → 下方击球)，两套相位完全不同，必须跟着真实走
+        boolean useDown = false;
+        for (int f = 1; f <= 17; f++) {
             jumpVy += GameProperties.jumpGravity;
             shoulderY += jumpVy * GameProperties.frameTime;
             // 球：先重力+空气阻力(Δv)，再位移——与 Badminton.onUpdate 逐字一致
@@ -713,15 +750,32 @@ public class ComputerDecision {
             if (pivotX < minPivot) pivotX = minPivot;
             else if (pivotX > maxPivot) pivotX = maxPivot;
             if (f < 8) continue; // 前6帧风存+第7帧置位挥拍，第8帧起才进命中判定
+            if (f == 8) {
+                // 拍型在出招帧(第7帧)按当帧球位选定；推演用第8帧起始位置近似(±1帧)
+                useDown = (ballX - GameProperties.netPosition) * side <= 0
+                        && ballY > shoulderY - 46; // 真实条件: 球Y > getCenterY()-30 即肩上46px以下
+            }
             double deltaT = (f - 7) / 60.0;
-            if (deltaT >= GameProperties.shotAnimationTime) break; // 命中判定仅动画前0.15s
-            // 与 StickMan 上方击球逐字一致的拍头相位：起手180+45，0.15s内扫至300+45，
-            // side=-1(右半场)做 180-θ 镜像
-            double nowAngle = 180 + deltaT
-                    * ((180 + 45 + GameProperties.hitAreaAngleUp - 180) / GameProperties.shotAnimationTime) + 45;
-            if (side == -1) nowAngle = 180 - nowAngle;
+            double animTime = useDown ? GameProperties.shotAnimationTime2 : GameProperties.shotAnimationTime;
+            if (deltaT >= animTime) break; // 命中判定仅各自动画首段
+            double nowAngle;
+            if (!useDown) {
+                // StickMan 上方击球相位：起手180+45，0.15s内扫至300+45，side=-1镜像
+                nowAngle = 180 + deltaT
+                        * ((180 + 45 + GameProperties.hitAreaAngleUp - 180) / GameProperties.shotAnimationTime) + 45;
+                if (side == -1) nowAngle = 180 - nowAngle;
+            } else {
+                // StickMan 下方击球相位：targetAngle=180-145-hitAreaAngleDown，0.17s扫掠
+                double targetAngle = 180 - 145 - GameProperties.hitAreaAngleDown;
+                nowAngle = 180 + deltaT * ((targetAngle - 180) / GameProperties.shotAnimationTime2);
+                nowAngle += 45;
+                if (side == -1) nowAngle = 180 - nowAngle;
+            }
             while (nowAngle < 0) nowAngle += 360;
             while (nowAngle > 360) nowAngle -= 360;
+            // 下方击球还有相位区间门(区间外整个判定跳过，不算命中)
+            if (useDown && !((side == 1 && nowAngle < 110) || (side == -1 && nowAngle > 70)))
+                continue;
             double racketX = pivotX + StrictMath.cos(StrictMath.toRadians(nowAngle)) * GameProperties.hitAreaRadius;
             double racketY = shoulderY + StrictMath.sin(StrictMath.toRadians(nowAngle)) * GameProperties.hitAreaRadius;
             double hitDX = ballX - racketX, hitDY = ballY - racketY;
