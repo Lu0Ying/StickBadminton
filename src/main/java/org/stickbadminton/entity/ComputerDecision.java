@@ -27,6 +27,10 @@ public class ComputerDecision {
     public double defenceOpponentDistance = 100.0;
     public double superShotPoint;
     public double superShotAngleDeg = -1.0;
+    // 扣杀意图：superShot 路径置位（过网仿真通过后的爆发一拍）。
+    // 平抽(middleShot)/防守重击不算扣杀——接触层仅对扣杀做"朝上角镜像成下压角"
+    // 的爆发处理，避免普通重击也变成 2500 档陡下压
+    public boolean isSmashIntent = false;
     public double difficultyLevel;
 
     // 反应时间
@@ -448,8 +452,8 @@ public class ComputerDecision {
 
         // 前场跳扣：球在本方前半场(离网190px内)、位置高、水平速度慢（对方放网/搓球
         // 回过来的高挂球与高慢球）——这类球下坠慢、有充分起跳时间，是最该下压终结的
-        // 一拍。复用 preciseSmash 的过网仿真与跳/站决策：站立切线朝上的高慢球由
-        // needsJump 路径按抬肩后角度压成跳杀，压不过落穿到常规分支。
+        // 一拍。复用 preciseSmash 的过网仿真与跳/站决策：正上方高慢球由其内部的
+        // 接触几何重算压成跳杀，压不过落穿到常规分支。
         // 仅高难度启用(体力管理路径)，1-2级保持原有简单行为
         if (smartEnergy
                 && Math.abs(badmintonX - GameProperties.netPosition) < FRONT_COURT_WINDOW
@@ -457,6 +461,16 @@ public class ComputerDecision {
                 && Math.abs(badmintonSpeedX) < 150.0
                 && badmintonSpeedY < 200.0) {
             if (preciseSmash()) return;
+        }
+
+        // 概率扣杀：球不在专门扣杀窗口时也按 35% 概率先试爆发一拍——
+        // preciseSmash 内含切线角过网仿真+体力/可达门槛，不合适自动返回 false 落穿到
+        // 下方调动分支；varianceRoll 用球心坐标哈希，满级联机双端同拍不分叉
+        if (smartEnergy
+                && energy > GameProperties.jumpEnergy + GameProperties.heavyShotEnergy
+                && varianceRoll() < 0.35
+                && preciseSmash()) {
+            return;
         }
 
         // “对手/自己离网多远”一律用绝对值：旧式 netPosition-x 只在 AI 在右半场时为正，
@@ -498,6 +512,12 @@ public class ComputerDecision {
     // 80% 走局势偏好的稳妥拍，20% 反着来——多数正确、偶尔出其不意。
     // 偏好方(高远/平抽)本身已按对手站位与球速算出，故整体仍合理，只是不再单调
     private void variedShot(boolean preferHigh) {
+        // 体力不充沛(≤50，即再打两次重击就见底)时强制轻击高远：省下重击体力，
+        // 同时把对手压向底线、下一拍再放前场，用前后跑动消耗对手体力
+        if (smartEnergy && energy <= GameProperties.heavyShotEnergy + 15.0) {
+            highShot();
+            return;
+        }
         double roll = varianceRoll();
         boolean chooseHigh = (roll < 0.8) ? preferHigh : !preferHigh;
         if (chooseHigh) highShot(); else middleShot();
@@ -842,6 +862,7 @@ public class ComputerDecision {
         isHeavyhit = true;
         isLighthit = false;
         isJump = jump;
+        isSmashIntent = true; // 扣杀意图：接触层据此做下压角爆发处理
 
         boolean isRightSide = computerX > GameProperties.netPosition;
         double opponentDistance = Math.abs(opponentX - computerX);

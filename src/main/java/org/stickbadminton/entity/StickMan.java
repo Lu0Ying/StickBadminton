@@ -33,6 +33,9 @@ public class StickMan extends GameObject {
     public boolean isShotting = false;
     public boolean shotType = false; // false -> 上方击球, true -> 下方击球
     public boolean isHeavyShot = false;
+    // 本拍是否扣杀意图（ComputerDecision.superShot 路径）：接触层据此把起手相位
+    // 算出的朝上角镜像成下压角，进 hitSpeedFor 的 2500 扣球档；平抽/防守重击不置位
+    private boolean aiSmashIntent = false;
     public boolean hasShotted = false; // 自本次击球动画开始以来是否打过球
     public static final boolean shotTypeUp = false;
     public static final boolean shotTypeDown = true;
@@ -394,6 +397,13 @@ public class StickMan extends GameObject {
                                     if (hitAngle > 180 && hitAngle < 200 && getCenterY() > GameProperties.floorY - GameProperties.netHeight - 60)
                                         hitAngle = 200;
                                 }
+                                // AI 扣杀爆发：挥拍起手 0.06s 内球进圈，相位算出的是朝上角(>180)，
+                                // 会落进 900~1300 档——"扣杀"成了地面重击挑球。扣杀意图下把朝上角
+                                // 关于水平轴镜像(360-angle)成对称下压角：左右半场均得朝对方场地的
+                                // 下压方向，进 hitSpeedFor 的 2500 扣球档（全游戏最大速）。
+                                // 仅 AI 扣杀生效，人类手感与普通重击不动
+                                if (isAIControlled && aiSmashIntent && isHeavyShot && hitAngle > 180)
+                                    hitAngle = 360 - hitAngle;
                                 // AI 过网兜底：挥拍相位算出的下压角若会砸网，向安全方向微调（人类不干预）
                                 if (isAIControlled)
                                     hitAngle = adjustAINetSafeAngle(hitAngle, badminton.getCenterX(), badminton.getCenterY());
@@ -501,6 +511,7 @@ public class StickMan extends GameObject {
                     isShotting = true;
                     hasShotted = false;
                     isHeavyShot = decision.isHeavyhit;
+                    aiSmashIntent = decision.isSmashIntent; // 扣杀意图随出招一并落地
                     if (isHeavyShot) {
                         if (GameProperties.infiniteEnergyMode)
                             isHeavyShot = true;
