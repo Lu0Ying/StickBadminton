@@ -42,13 +42,20 @@ public class ComputerDecision {
     // 前半场窗口：本方半场(网到墙约380px)的一半。前场内的高球优先起跳扣杀，
     // 后场不再为站立本就够得到的高球起跳挑球
     private static final double FRONT_COURT_WINDOW = 190.0;
-    // 扣杀窗口：离网 ≤250px（中场+前场）才允许扣杀。后场扣杀虽是最大速，
-    // 但会诱导 AI 退到底线等球、放弃前中场压制——后场一律落穿成常规高远/平抽
+    // 中前场/后场分界：离网 ≤250px 为中前场(扣杀高概率区)，>250px 为后场(允许扣但低概率)，
+    // variedShot 也按该分界在后场偏向重击
     private static final double SMASH_COURT_WINDOW = 250.0;
     // 提前起跳扣杀：球至少高出肩点 90px 才值得提前跳（更低的球等进圈再决策还来得及）
     private static final double EARLY_SMASH_MIN_H = 90.0;
-    // 提前起跳的水平对齐容差：起跳时人要在球下方附近，跳起才截得到
-    private static final double EARLY_SMASH_ALIGN = 50.0;
+    // 网前拦截阈值：球快落到前场(离网190px内)时高度门槛放宽，AI 直接网前跳起拦截扣杀
+    private static final double EARLY_SMASH_MIN_H_NET = 30.0;
+    // 提前起跳的水平对齐容差：粗筛门槛，真实裁判是 earlySmashConnectable 的逐帧推演
+    // (含风存期横移收差)。放宽到150px：慢速球允许边跑边跳，不必先跑到后场等球再接
+    private static final double EARLY_SMASH_ALIGN = 150.0;
+    // 提前起跳概率：网前球必跳（拦截最优先）；中后场分层给概率——中前场高、后场低，
+    // 让慢速球优先获得起跳权重而不是退后场等待
+    private static final double EARLY_SMASH_PROB_MID = 0.75;
+    private static final double EARLY_SMASH_PROB_BACK = 0.40;
     // 起跳 0.1s(挥拍接触时刻)肩膀抬高的像素：v0=700、g=35/帧，6帧累计约60px，
     // 高慢球按抬高后的肩点重算切线出球角，判断能否压成扣杀
     private static final double JUMP_RAISE_PX = 60.0;
@@ -224,14 +231,15 @@ public class ComputerDecision {
         //杀球防守
         if (handleSmashDefense(side, isShotCooldown)) return;
 
+        //提前起跳扣杀：高位/网前下落球不等进圈、不退后场等球，先跳(风存后空中截击)。
+        //放在网前拦截分支之前：球快落到前场时直接网前跳起拦截扣杀
+        if (earlyJumpSmash(isShotCooldown)) return;
+
         //预测拦截
         if (handleFrontCourt(side, isShotCooldown)) return;
 
         //位置调整
         adjustPosition();
-
-        //提前起跳扣杀：高位下落球不等进圈，先跳(风存后空中截击)
-        if (earlyJumpSmash(isShotCooldown)) return;
 
         //常规击球
         if (!isShotCooldown && getDistance() < (hitAreaRadius + racketRadius)) {
@@ -473,12 +481,13 @@ public class ComputerDecision {
             if (preciseSmash()) return;
         }
 
-        // 概率扣杀：中前场(离网250px内)按 60% 概率先试跳杀——后场已在 preciseSmash 入口
-        // 禁扣；其内含切线角过网仿真+体力/跳跃冷却/可达门槛，不合适自动返回 false 落穿到
-        // 下方调动分支；varianceRoll 用球心坐标哈希，满级联机双端同拍不分叉
+        // 概率扣杀（圈内路径）：中前场 60%、后场 35%——后场球已在脸上，允许跳扣但权重低，
+        // 避免 AI 退守底线等最大速球；其内含切线角过网仿真+体力/跳跃冷却/可达门槛，
+        // 不合适自动返回 false 落穿到下方调动分支；varianceRoll 双端同拍不分叉
         if (smartEnergy
                 && energy > GameProperties.jumpEnergy + GameProperties.heavyShotEnergy
-                && varianceRoll() < 0.60
+                && varianceRoll() < (Math.abs(badmintonX - GameProperties.netPosition) > SMASH_COURT_WINDOW
+                        ? 0.35 : 0.60)
                 && preciseSmash()) {
             return;
         }
@@ -529,6 +538,12 @@ public class ComputerDecision {
             return;
         }
         double roll = varianceRoll();
+        // 后场偏向重击：深区发力压制对手底线，35% 轻击吊前场变节奏调动
+        if (Math.abs(computerX - GameProperties.netPosition) > SMASH_COURT_WINDOW) {
+            if (roll < 0.65) middleShot(); else highShot();
+            return;
+        }
+        // 体力充沛时随机切换轻重：80% 走局势偏好的稳妥拍，20% 反着来增加球路变化
         boolean chooseHigh = (roll < 0.8) ? preferHigh : !preferHigh;
         if (chooseHigh) highShot(); else middleShot();
     }
@@ -555,23 +570,30 @@ public class ComputerDecision {
         return angle;
     }
 
-    // 提前起跳扣杀：球还在高位(≥90px在肩上)下落时提前起跳，风存6帧后空中截击。
+    // 提前起跳扣杀：球还在高位(或网前拦截位)下落时提前起跳，风存6帧后空中截击。
     // 等球落进105px击球圈再决策时 vy 常已>400，起跳可达性推演(keepsContact)必拒，
-    // AI 只能站着轻挡——这就是"几乎不跳"的根因；先跳再扣的主路径。
+    // AI 只能站着轻挡或退后场等球——"先跳再击球"的主路径。
     // 仅高难度(smartEnergy)启用；体力门槛(>55)天然限频：两次跳杀即见底，靠站桩回血续航
     private boolean earlyJumpSmash(boolean isShotCooldown) {
         if (!smartEnergy || isShotCooldown || isJumpCooldown) return false;
         if (energy <= GameProperties.jumpEnergy + GameProperties.heavyShotEnergy) return false;
-        double heightAbove = computerY - badmintonY;
-        if (heightAbove < EARLY_SMASH_MIN_H) return false;   // 球不够高不值得提前跳
-        if (badmintonSpeedY <= 0) return false;              // 只接下落球，上升球交给常规分支
-        if (Math.abs(badmintonX - GameProperties.netPosition) > SMASH_COURT_WINDOW) return false; // 后场禁扣
-        if (Math.abs(computerX - badmintonX) > EARLY_SMASH_ALIGN) return false; // 人要已在球下方附近
+        double netDist = Math.abs(badmintonX - GameProperties.netPosition);
+        if (badmintonSpeedY <= 0) return false; // 只接下落球，上升球交给常规分支
+        // 高度门槛：网前拦截位放宽(球快落到前场也跳)，其余按高位球标准
+        double minHeight = netDist <= FRONT_COURT_WINDOW ? EARLY_SMASH_MIN_H_NET : EARLY_SMASH_MIN_H;
+        if (computerY - badmintonY < minHeight) return false;
+        if (Math.abs(computerX - badmintonX) > EARLY_SMASH_ALIGN) return false;
         double angle = tangentHitAngle();
-        if (angle >= 180) return false;                      // 切线朝上（球在肩后/正上方）不提前跳
+        if (angle >= 180) return false; // 切线朝上（球在肩后/正上方）不提前跳
         double lagMargin = Math.min(SMASH_LAG_MARGIN_CAP, Math.max(0.0, badmintonSpeedY * 0.1));
         if (!Badminton.launchClearsNet(badmintonX, badmintonY, angle, 2500.0, lagMargin)) return false;
-        if (!earlySmashConnectable()) return false;          // 风存+挥拍窗口内接不到球不白跳
+        if (!earlySmashConnectable()) return false; // 风存+挥拍窗口内接不到球不白跳
+        // 分层概率：网前拦截必跳；中场75%、后场40%——varianceRoll 用球心坐标哈希，
+        // 满级联机双端同拍不分叉
+        if (netDist > FRONT_COURT_WINDOW) {
+            double prob = netDist <= SMASH_COURT_WINDOW ? EARLY_SMASH_PROB_MID : EARLY_SMASH_PROB_BACK;
+            if (varianceRoll() >= prob) return false;
+        }
         moveHorizontal(200);
         isShot = true;
         isHeavyhit = true;
@@ -583,19 +605,24 @@ public class ComputerDecision {
 
     // 提前跳杀可达性：风存6帧后进入挥拍动画(第7~15帧，挥拍首段0.15s内才判命中)，
     // 逐帧推演肩点与球心距离——球心在肩点上方距≤hitArea+racket(挥拍弧扫到)、
-    // 或在肩点附近距≤racket(贴身兜底)即算截击成功
+    // 或在肩点附近距≤racket(贴身兜底)即算截击成功。
+    // AI 横移一并推演：起跳前后都在朝球收差，慢速球可边跑边跳
     private boolean earlySmashConnectable() {
         double shoulderY = computerY;
         double pivotX = computerX;
         double jumpVy = -GameProperties.jumpSpeedY;
         double ballX = badmintonX, ballY = badmintonY;
         double ballVx = badmintonSpeedX, ballVy = badmintonSpeedY;
+        double step = decisionMoveSpeed() * GameProperties.frameTime;
         for (int f = 1; f <= 15; f++) {
             jumpVy += GameProperties.jumpGravity;
             shoulderY += jumpVy * GameProperties.frameTime;
             ballVy += GameProperties.badmintonGravity;
             ballY += ballVy * GameProperties.frameTime;
             ballX += ballVx * GameProperties.frameTime;
+            double gap = ballX - pivotX;
+            if (Math.abs(gap) > step) pivotX += Math.signum(gap) * step;
+            else pivotX = ballX;
             if (f < 7) continue; // 风存期不挥拍
             double dx = ballX - pivotX, dy = ballY - shoulderY;
             double distSq = dx * dx + dy * dy;
@@ -610,12 +637,9 @@ public class ComputerDecision {
     // 高难度扣杀智能（圈内路径）：球已落进击球圈时按挥拍切线预期出球角做物理过网仿真，
     // 满足跳杀条件才起跳扣——接触延迟的下落由 SMASH_LAG_MARGIN 放宽兜住，
     // StickMan 接触层安全网再兜一道
-    // 返回 true = 已执行跳杀；false = 压不过网/后场/跳不了，调用方落穿到常规挑/抽分支
+    // 返回 true = 已执行跳杀；false = 压不过网/跳不了，调用方落穿到常规挑/抽分支
     // （扣杀必须先跳再击球，不再有站立重扣路径；高位球的主路径是 earlyJumpSmash 提前跳）
     private boolean preciseSmash() {
-        // 后场禁扣：球离网超过中前场窗口时不扣杀，落穿到常规高远/平抽——
-        // 扣杀不求全场最大速，中前场压制比后场爆发更重要（避免 AI 退守底线）
-        if (Math.abs(badmintonX - GameProperties.netPosition) > SMASH_COURT_WINDOW) return false;
         double heightAbove = computerY - badmintonY; // 球高出肩部的像素
         double expectedAngle = tangentHitAngle();
         boolean isRightSide = computerX > GameProperties.netPosition;
