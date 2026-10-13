@@ -455,34 +455,54 @@ public class ComputerDecision {
         // 左侧 AI（对手在右）恒为负 → 分支判断全部失真，永远只会出高球轻击
         double opponentNetDist = Math.abs(opponentX - GameProperties.netPosition);
         double computerNetDist = Math.abs(computerX - GameProperties.netPosition);
+        // 叶子统一走 variedShot：原局势偏好(高远/平抽)作稳妥拍，20% 反着来增加球路变化
         if (opponentDistance > 400 && opponentNetDist < defenceOpponentDistance) {
             if (ballSpeed > 800) {
                 moveHorizontal(hitAreaRadius / 1.414);
-                middleShot();
+                variedShot(false);
             } else {
                 moveHorizontal(-hitAreaRadius);
-                highShot();
+                variedShot(true);
             }
         } else if (opponentDistance > 200 && opponentNetDist < defenceOpponentDistance) {
             if (computerNetDist < highShotDistance) {
                 moveHorizontal(-hitAreaRadius);
-                highShot();
+                variedShot(true);
             } else {
                 moveHorizontal(GameProperties.hitAreaCenterHeight / 1.5);
-                middleShot();
+                variedShot(false);
             }
         } else {
             if (computerNetDist < 200 || opponentNetDist < defenceOpponentDistance) {
                 moveHorizontal(-hitAreaRadius);
-                highShot();
+                variedShot(true);
             } else if (ballSpeed > 600) {
                 moveHorizontal(GameProperties.hitAreaCenterHeight / 1.2);
-                middleShot();
+                variedShot(false);
             } else {
                 moveHorizontal(-GameProperties.hitAreaCenterHeight / 1.5);
-                highShot();
+                variedShot(true);
             }
         }
+    }
+
+    // 回球变拍：让相同球况不至于永远回同一拍，提升观赏性。
+    // 80% 走局势偏好的稳妥拍，20% 反着来——多数正确、偶尔出其不意。
+    // 偏好方(高远/平抽)本身已按对手站位与球速算出，故整体仍合理，只是不再单调
+    private void variedShot(boolean preferHigh) {
+        double roll = varianceRoll();
+        boolean chooseHigh = (roll < 0.8) ? preferHigh : !preferHigh;
+        if (chooseHigh) highShot(); else middleShot();
+    }
+
+    // [0,1) 伪随机源。满级(maxLevel)联机时必须双端同轨，不能用 Random——
+    // 改由球心坐标导出：双端球轨迹经固定步长物理回放逐位一致(StrictMath)，
+    // 同一帧 badmintonX/Y 相同 → 此值相同 → 双端选同一拍，不分叉。
+    // 非满级仅单人存在，直接用随机即可
+    private double varianceRoll() {
+        if (!maxLevel) return random.nextDouble();
+        double h = StrictMath.sin(badmintonX * 12.9898 + badmintonY * 78.233) * 43758.5453;
+        return h - StrictMath.floor(h);
     }
 
     // 高难度扣杀智能：先按挥拍切线预期出球角做物理过网仿真，再按体力选择跳杀/站立重扣——
@@ -684,9 +704,11 @@ public class ComputerDecision {
         boolean basicWindow = timeToNet > 0.22 && timeToNet < 0.9;
         if (!basicWindow) return false;
         if (isLikelyRecentWallBounce()) return false;
-        // 高难度：球在站立触及圈(肩上105px)内时不起跳——站立就能打到，
-        // 起跳白花25体力还打断横移，只对超出站立触及范围的高球起跳
-        if (smartEnergy && badmintonY >= computerY - (GameProperties.hitAreaRadius + GameProperties.racketRadius)) return false;
+        // 高难度：球低到“站立轻松够到”(肩上 hitAreaRadius 内)才不起跳——站立即打，
+        // 起跳白花25体力。原阈值是整个触及圈105px，把偏高球也排除了、跳跃过少；
+        // 下移到 hitAreaRadius(60px)，让 60~105px 的偏高球也能起跳截击(仍有下方
+        // 可达性终检 + 体力门槛兜底，不会起跳接空)
+        if (smartEnergy && badmintonY >= computerY - GameProperties.hitAreaRadius) return false;
         // 体力管理：起跳要花 25 体力，起跳后至少保留 15 余量确保还能出球，
         // 体力不足先不起跳，避免连跳把体力掏空后跑不动也打不出
         if (smartEnergy && energy < GameProperties.jumpEnergy + GameProperties.jumpEnergyReserve) return false;
@@ -694,7 +716,7 @@ public class ComputerDecision {
 
         // 难度概率（低难度也给较高概率，以免错过球）
         double p = Math.max(0.5, difficultyLevel);
-        return random.nextDouble() < (0.9 * p);
+        return random.nextDouble() < (0.95 * p);
     }
 
     // 强化“刚碰墙反弹”检测：结合速度符号翻转 + 临近墙体 + 冷却帧
