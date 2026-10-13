@@ -949,47 +949,6 @@ public class ComputerDecision {
         }
     }
 
-    // 跳跃截击把关：shouldJump 的时间窗+对齐40px 在墙边失效——墙边球心恒在 AI pivot 外
-    // 31px(球心可达840、AI 卡809)，高位时距肩轴>105 拍头扫不到，跳了纯属白跳还落地漏球。
-    // 判据：起跳后 0.5s 内球会进入挥拍命中区(距肩轴≤JUMP_REACH_PX 且在肩轴上方、本方半场)
-    // 才起跳；JUMP_REACH_PX 取 60拍杆+45拍面-10安全余量，比真实105圈收紧挡掉擦边白跳
-    private static final double JUMP_REACH_PX = 95.0;
-
-    private boolean jumpInterceptReachable() {
-        int side = computerX > GameProperties.netPosition ? -1 : 1; // AI 不越网，位置即半场
-        double shoulderY = computerY;
-        double jumpVy = -GameProperties.jumpSpeedY;
-        double ballX = badmintonX, ballY = badmintonY;
-        double ballVx = badmintonSpeedX, ballVy = badmintonSpeedY;
-        final double ballHalf = 10.5;
-        for (int f = 1; f <= 30; f++) {
-            jumpVy += GameProperties.jumpGravity;
-            shoulderY += jumpVy * GameProperties.frameTime;
-            double sp = StrictMath.sqrt(ballVx * ballVx + ballVy * ballVy);
-            double air = sp == 0 ? 0 : 0.00001 * sp * sp;
-            ballVx -= 2.7 * air * (ballVx / sp);
-            ballVy += GameProperties.badmintonGravity - 0.5 * air * (ballVy / sp);
-            ballY += ballVy * GameProperties.frameTime;
-            ballX += ballVx * GameProperties.frameTime;
-            // 球贴墙反弹（与 Badminton.onUpdate 一致）
-            if (ballX <= GameProperties.playFieldLeft + ballHalf) {
-                ballX = GameProperties.playFieldLeft + ballHalf;
-                ballVx = -ballVx * 0.6;
-            } else if (ballX >= GameProperties.playFieldRight + ballHalf) {
-                ballX = GameProperties.playFieldRight + ballHalf;
-                ballVx = -ballVx * 0.6;
-            }
-            if (ballY >= GameProperties.floorBallY) return false; // 落地前没进命中区就不跳
-            double dx = ballX - computerX, dy = ballY - shoulderY;
-            // 本方半场 + 肩轴上方（上方挥拍扫掠可及区）
-            if ((ballX - GameProperties.netPosition) * side <= 0
-                    && dy < 0 && dx * dx + dy * dy <= JUMP_REACH_PX * JUMP_REACH_PX) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     // 垂直跳跃
     public void moveVertical() {
         if (isJump || isJumpCooldown) return;
@@ -1010,7 +969,7 @@ public class ComputerDecision {
             InterceptPrediction pred = predictAtY(idealHitY);
             if (pred.t > 0 && pred.t <= 1.0) {
                 double reach = decisionMoveSpeed() * pred.t + hitAreaRadius + racketRadius + 8.0;
-                if (Math.abs(pred.x - computerX) <= reach && jumpInterceptReachable()) {
+                if (Math.abs(pred.x - computerX) <= reach) {
                     isJump = true;
                 }
             }
