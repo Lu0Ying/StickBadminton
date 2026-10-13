@@ -42,6 +42,9 @@ public class ComputerDecision {
     // 前半场窗口：本方半场(网到墙约380px)的一半。前场内的高球优先起跳扣杀，
     // 后场不再为站立本就够得到的高球起跳挑球
     private static final double FRONT_COURT_WINDOW = 190.0;
+    // 扣杀窗口：离网 ≤250px（中场+前场）才允许扣杀。后场扣杀虽是最大速，
+    // 但会诱导 AI 退到底线等球、放弃前中场压制——后场一律落穿成常规高远/平抽
+    private static final double SMASH_COURT_WINDOW = 250.0;
     // 起跳 0.1s(挥拍接触时刻)肩膀抬高的像素：v0=700、g=35/帧，6帧累计约60px，
     // 高慢球按抬高后的肩点重算切线出球角，判断能否压成扣杀
     private static final double JUMP_RAISE_PX = 60.0;
@@ -463,12 +466,12 @@ public class ComputerDecision {
             if (preciseSmash()) return;
         }
 
-        // 概率扣杀：球不在专门扣杀窗口时也按 35% 概率先试爆发一拍——
-        // preciseSmash 内含切线角过网仿真+体力/可达门槛，不合适自动返回 false 落穿到
+        // 概率扣杀：中前场(离网250px内)按 60% 概率先试跳杀——后场已在 preciseSmash 入口
+        // 禁扣；其内含切线角过网仿真+体力/跳跃冷却/可达门槛，不合适自动返回 false 落穿到
         // 下方调动分支；varianceRoll 用球心坐标哈希，满级联机双端同拍不分叉
         if (smartEnergy
                 && energy > GameProperties.jumpEnergy + GameProperties.heavyShotEnergy
-                && varianceRoll() < 0.35
+                && varianceRoll() < 0.60
                 && preciseSmash()) {
             return;
         }
@@ -533,11 +536,15 @@ public class ComputerDecision {
         return h - StrictMath.floor(h);
     }
 
-    // 高难度扣杀智能：先按挥拍切线预期出球角做物理过网仿真，再按体力选择跳杀/站立重扣——
+    // 高难度扣杀智能：先按挥拍切线预期出球角做物理过网仿真，满足跳杀条件才起跳扣——
     // 实际出球角由挥拍扫掠相位决定（=球相对肩部极角的切线方向），决策层只能按当前几何预期，
     // 接触延迟的下落由 SMASH_LAG_MARGIN 放宽兜住，StickMan 接触层安全网再兜一道
-    // 返回 true = 已执行扣杀；false = 预期压不过网，调用方落穿到常规挑/抽分支
+    // 返回 true = 已执行跳杀；false = 压不过网/后场/跳不了，调用方落穿到常规挑/抽分支
+    // （扣杀必须先跳再击球，不再有站立重扣路径）
     private boolean preciseSmash() {
+        // 后场禁扣：球离网超过中前场窗口时不扣杀，落穿到常规高远/平抽——
+        // 扣杀不求全场最大速，中前场压制比后场爆发更重要（避免 AI 退守底线）
+        if (Math.abs(badmintonX - GameProperties.netPosition) > SMASH_COURT_WINDOW) return false;
         double heightAbove = computerY - badmintonY; // 球高出肩部的像素
         // 球相对肩部的极角（y 轴向下）：右半场出球角=极角-90，左半场=极角+90（挥拍切线）
         double alpha = StrictMath.toDegrees(StrictMath.atan2(badmintonY - computerY, badmintonX - computerX));
@@ -585,19 +592,18 @@ public class ComputerDecision {
             }
         }
         if (!clearsNet) return false;
-        // 跳杀总价 = 跳20 + 重击35 = 55：体力不足、球不够高、或起跳后球撑不到挥拍弧就改站立重扣
+        // 跳杀总价 = 跳20 + 重击35 = 55。条件不满足（体力不足/球不够高/跳跃冷却中/
+        // 起跳后撑不到挥拍弧）就不扣，返回 false 落穿到常规挑/抽——
+        // 扣杀必须先跳再击球，严禁原地站立扣杀
         if (energy > GameProperties.jumpEnergy + GameProperties.heavyShotEnergy
+                && !isJumpCooldown
                 && heightAbove >= GameProperties.smashJumpHeight
                 && smashJumpKeepsContact()) {
-            // 起跳够得到更高击球点，按原逻辑高位卡位
             moveHorizontal(200);
-            superShot(true);
-        } else {
-            // 站立重扣：按球落到肩上40px处的横向位置提前就位，只耗35体力、无跳跃冷却
-            moveHorizontal(GameProperties.smashStandContactHeight);
-            superShot(false);
+            superShot();
+            return true;
         }
-        return true;
+        return false;
     }
 
     // 跳杀可达性终检：起跳初速700px/s，0.1s内肩膀抬高约60px，而发球类快坠球（vy≈300）
@@ -844,24 +850,18 @@ public class ComputerDecision {
         InterceptPrediction(double x, double t, double vy) { this.x = x; this.t = t; this.vy = vy; }
     }
 
-    // 重击（默认随挥起跳，兼容原有调用）
+    // 扣杀重击：恒带起跳（扣杀必须先跳再击球，站立重扣路径已删除）。
+    // 体力管理：跳杀 = 跳20 + 重击35 = 55，体力不足则降级为普通击球；
+    // 否则出招会被 StickMan 按“体力>35”规则静默降级成轻击，白跳一次还亏体力
     public void superShot() {
-        superShot(true);
-    }
-
-    // 重击；jump 为 false 时是站立重扣：省 25 体力、无跳跃冷却，衔接下一拍更快
-    public void superShot(boolean jump) {
-        // 体力管理：跳杀 = 跳25 + 重击35 = 60，站立重扣 = 35。体力不足则降级为普通击球；
-        // 否则出招会被 StickMan 按“体力>35”规则静默降级成轻击，白跳一次还亏体力
-        double cost = jump ? GameProperties.jumpEnergy + GameProperties.heavyShotEnergy
-                : GameProperties.heavyShotEnergy;
+        double cost = GameProperties.jumpEnergy + GameProperties.heavyShotEnergy;
         if (smartEnergy && energy <= cost) {
             middleShot();
             return;
         }
         isHeavyhit = true;
         isLighthit = false;
-        isJump = jump;
+        isJump = true;
         isSmashIntent = true; // 扣杀意图：接触层据此做下压角爆发处理
 
         boolean isRightSide = computerX > GameProperties.netPosition;

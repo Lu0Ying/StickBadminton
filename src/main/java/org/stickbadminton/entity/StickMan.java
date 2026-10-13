@@ -36,6 +36,11 @@ public class StickMan extends GameObject {
     // 本拍是否扣杀意图（ComputerDecision.superShot 路径）：接触层据此把起手相位
     // 算出的朝上角镜像成下压角，进 hitSpeedFor 的 2500 扣球档；平抽/防守重击不置位
     private boolean aiSmashIntent = false;
+    // 跳杀风存：起跳后先攒 6 帧(~0.1s，肩膀抬约68px)再挥拍，保证"先跳再扣"
+    private int smashWindupFrames = 0;
+    private boolean smashWindupDone = false;
+    // 起跳帧锁定的扣杀快照：风存结束帧恒按重击+扣杀意图出招
+    private boolean smashWindupPending = false;
     public boolean hasShotted = false; // 自本次击球动画开始以来是否打过球
     public static final boolean shotTypeUp = false;
     public static final boolean shotTypeDown = true;
@@ -320,7 +325,9 @@ public class StickMan extends GameObject {
             // do nothing
         }
         else if (isAIControlled) {
-            if (decision.isJump == true) {
+            // !isJumping 防二段跳：风存/决策每帧可能重复置位 isJump，
+            // 空中期间若再起跳会重置初速并重复扣体力（白跳+体力双倍消耗）
+            if (decision.isJump == true && !isJumping) {
                 if (!GameProperties.infiniteEnergyMode)
                     energyRemain -= GameProperties.jumpEnergy;
                 isJumping = true;
@@ -507,11 +514,42 @@ public class StickMan extends GameObject {
         }
         else {
             if (isAIControlled) {
-                if (decision.isShot == true) {
+                // AI 跳杀风存：起跳与挥拍同帧启动时，挥拍首帧肩膀仅抬~11px 就命中，
+                // 视觉是"扣完再跳"。跳杀(扣杀意图+起跳)先只起跳，风存6帧(~0.1s，
+                // 肩膀抬约68px)后下帧再挥拍——先跳、腾空、再扣。
+                // 风存期间用起跳帧锁定的扣杀快照(smashWindupPending)出招：
+                // 若等风存结束再看当帧 decision，球况一变 AI 会跳起来却只挑高远
+                boolean windupStart = decision.isShot && smashWindupFrames == 0
+                        && decision.isJump && decision.isSmashIntent && !smashWindupDone;
+                boolean swingNow;
+                if (windupStart) {
+                    smashWindupFrames = 6; // 本帧只起跳（isJump 分支已在上方执行）
+                    smashWindupPending = true;
+                    smashWindupDone = true; // 本拍走快照路径，屏蔽当帧重复出招
+                    swingNow = false;
+                }
+                else if (smashWindupFrames > 0) {
+                    smashWindupFrames--;
+                    swingNow = (smashWindupFrames == 0); // 风存结束帧用快照挥拍
+                }
+                else {
+                    swingNow = decision.isShot && !smashWindupDone;
+                    if (!decision.isShot)
+                        smashWindupDone = false; // 条件消失复位，避免漏掉下一拍的风存
+                }
+                if (swingNow) {
                     isShotting = true;
                     hasShotted = false;
-                    isHeavyShot = decision.isHeavyhit;
-                    aiSmashIntent = decision.isSmashIntent; // 扣杀意图随出招一并落地
+                    if (smashWindupPending) {
+                        // 跳杀快照：恒重击+扣杀意图，不受当帧重新决策影响
+                        isHeavyShot = true;
+                        aiSmashIntent = true;
+                        smashWindupPending = false;
+                    }
+                    else {
+                        isHeavyShot = decision.isHeavyhit;
+                        aiSmashIntent = decision.isSmashIntent; // 扣杀意图随出招一并落地
+                    }
                     if (isHeavyShot) {
                         if (GameProperties.infiniteEnergyMode)
                             isHeavyShot = true;
