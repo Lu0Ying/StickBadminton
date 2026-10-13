@@ -49,9 +49,12 @@ public class ComputerDecision {
     private static final double SMASH_CONTACT_OFFSET  = 6.0;     // 接触时的本方侧偏移，避免贴身打空
     private static final double SMASH_HIT_MARGIN      = 12.0;    // 击球圈放宽值
 
-    // 扣杀决策过网仿真的安全边距(px)：接触发生在决策后约0.1s，球仍在下落，
-    // 把过网余量放宽兜住这段下落（真正出球时 StickMan 还有接触层安全网兜底）
-    private static final double SMASH_LAG_MARGIN = 45.0;
+    // 扣杀决策过网仿真的安全边距上限(px)：接触发生在决策后约0.1s，球仍在下落，
+    // 实际边距按 badmintonSpeedY*0.1 动态计算并以此封顶（固定45会把正常扣杀全拒掉）
+    private static final double SMASH_LAG_MARGIN_CAP = 45.0;
+    // 决策层压平迭代上限(度)：切线角天然比过网角更下压，向本方前上方每次调5°直到能过网；
+    // 超过该上限说明本质不是扣杀球，交回常规分支（真正出球时 StickMan 接触层还有安全网兜底）
+    private static final double SMASH_FLATTEN_MAX_DEG = 30.0;
 
     // 跨帧记忆：用于判定“刚刚墙反弹”
     private static double prevBallX = Double.NaN;
@@ -215,9 +218,10 @@ public class ComputerDecision {
             decideShotStrategy();
         }
 
-        //考虑跳跃
+        //考虑跳跃（对手远离球网；用绝对值使左右半场 AI 判定对称——
+        //左侧 AI 的对手在右半场，旧式 netPosition-opponentX 恒为负导致永不跳跃）
         if (getDistance() < (100 + hitAreaRadius + racketRadius) &&
-                (GameProperties.netPosition - opponentX > 100) &&
+                Math.abs(opponentX - GameProperties.netPosition) > 100 &&
                 Math.abs(computerX - badmintonX) < 16)
         {
             moveVertical();
@@ -426,7 +430,11 @@ public class ComputerDecision {
             if (preciseSmash()) return;
         }
 
-        if (opponentDistance > 400 && GameProperties.netPosition - opponentX < defenceOpponentDistance) {
+        // “对手/自己离网多远”一律用绝对值：旧式 netPosition-x 只在 AI 在右半场时为正，
+        // 左侧 AI（对手在右）恒为负 → 分支判断全部失真，永远只会出高球轻击
+        double opponentNetDist = Math.abs(opponentX - GameProperties.netPosition);
+        double computerNetDist = Math.abs(computerX - GameProperties.netPosition);
+        if (opponentDistance > 400 && opponentNetDist < defenceOpponentDistance) {
             if (ballSpeed > 800) {
                 moveHorizontal(hitAreaRadius / 1.414);
                 middleShot();
@@ -434,8 +442,8 @@ public class ComputerDecision {
                 moveHorizontal(-hitAreaRadius);
                 highShot();
             }
-        } else if (opponentDistance > 200 && GameProperties.netPosition - opponentX < defenceOpponentDistance) {
-            if (computerX - GameProperties.netPosition < highShotDistance) {
+        } else if (opponentDistance > 200 && opponentNetDist < defenceOpponentDistance) {
+            if (computerNetDist < highShotDistance) {
                 moveHorizontal(-hitAreaRadius);
                 highShot();
             } else {
@@ -443,8 +451,7 @@ public class ComputerDecision {
                 middleShot();
             }
         } else {
-            if (computerX - GameProperties.netPosition < 200 ||
-                    GameProperties.netPosition - opponentX < defenceOpponentDistance) {
+            if (computerNetDist < 200 || opponentNetDist < defenceOpponentDistance) {
                 moveHorizontal(-hitAreaRadius);
                 highShot();
             } else if (ballSpeed > 600) {
@@ -472,9 +479,23 @@ public class ComputerDecision {
         else if (expectedAngle >= 360) expectedAngle -= 360;
         // 出球角不在扣球半圈（≥180° 是高球）→ 不算扣杀，交回常规分支
         if (expectedAngle >= 180) return false;
-        // 步进真实物理仿真查是否过触网碰撞线：2500 是 angle<180 的 heavyHit 固定档
-        if (!Badminton.launchClearsNet(badmintonX, badmintonY, expectedAngle, 2500.0, SMASH_LAG_MARGIN))
-            return false;
+        // 切线角天然比"能过网的角度"更下压（球在肩前下方时斜率≈|dx/dy|），
+        // 直接拿它仿真会把正常扣杀全拒掉（表现为 AI 不跳跃、不重击）。
+        // 与 StickMan 接触层安全网同向：每次向本方前上方调 5°（右半场 +5、左半场 -5，
+        // 绕360°均朝 270° 收敛），能过网即可扣杀；压平超过上限说明本质不是扣杀球。
+        // 过网边距按决策到接触（~0.1s）内球的下落量动态计算，而非固定值
+        double lagMargin = Math.min(SMASH_LAG_MARGIN_CAP, Math.max(0.0, badmintonSpeedY * 0.1));
+        double flattenStep = isRightSide ? 5.0 : -5.0;
+        boolean clearsNet = false;
+        // 2500 是 angle<180 的 heavyHit 固定档
+        for (double tuned = 0; tuned <= SMASH_FLATTEN_MAX_DEG + 1e-9; tuned += 5.0) {
+            double candidate = expectedAngle + flattenStep * tuned;
+            if (Badminton.launchClearsNet(badmintonX, badmintonY, candidate, 2500.0, lagMargin)) {
+                clearsNet = true;
+                break;
+            }
+        }
+        if (!clearsNet) return false;
         // 跳杀总价 = 跳25 + 重击35 = 60：体力不足或球不够高就改站立重扣，避免起跳后白跳
         if (energy > GameProperties.jumpEnergy + GameProperties.heavyShotEnergy
                 && heightAbove >= GameProperties.smashJumpHeight) {
@@ -572,7 +593,9 @@ public class ComputerDecision {
 
         double netX = GameProperties.netPosition;
         double vx = badmintonSpeedX;
-        boolean ballComingToMe = (computerX < netX && vx < 0) || (computerX > netX && vx > 0);
+        // 球正朝本方半场飞来（vx 指向网 = 指向我方）。旧符号写反，与 calculateTimeToNet
+        // 内的 movingTowardsNet 互斥，timeToNet 恒为 0 → shouldJump 永远不通过，此入口从未生效
+        boolean ballComingToMe = (computerX < netX && vx > 0) || (computerX > netX && vx < 0);
         if (!ballComingToMe) return;
 
         double timeToNet = calculateTimeToNet(netX, badmintonX, badmintonSpeedX, badmintonSpeedY);
@@ -740,7 +763,7 @@ public class ComputerDecision {
 
     // 中场球
     public void middleShot() {
-        double distance = computerX - GameProperties.netPosition;
+        double distance = Math.abs(computerX - GameProperties.netPosition); // 自己离网距离，左右半场对称
         // 体力管理：体力已不够一次重击就直接轻击（重击门槛是体力>35，边缘值会被静默降级，
         // 主动降级可让意图与实际动作一致）；满级路径按体力判断也是确定性的，双端不分叉
         boolean energyLight = smartEnergy && energy <= GameProperties.heavyShotEnergy;
