@@ -253,7 +253,7 @@ public class ComputerDecision {
 
         //提前起跳扣杀：高位/网前下落球不等进圈、不退后场等球，先跳(风存后空中截击)。
         //放在网前拦截分支之前：球快落到前场时直接网前跳起拦截扣杀
-        if (earlyJumpSmash(isShotCooldown)) return;
+        if (earlyJumpSmash(side, isShotCooldown)) return;
 
         //预测拦截
         if (handleFrontCourt(side, isShotCooldown)) return;
@@ -627,7 +627,7 @@ public class ComputerDecision {
     // 等球落进105px击球圈再决策时 vy 常已>400，起跳可达性推演(keepsContact)必拒，
     // AI 只能站着轻挡或退后场等球——"先跳再击球"的主路径。
     // 仅高难度(smartEnergy)启用；体力门槛(>55)天然限频：两次跳杀即见底，靠站桩回血续航
-    private boolean earlyJumpSmash(boolean isShotCooldown) {
+    private boolean earlyJumpSmash(int side, boolean isShotCooldown) {
         if (!smartEnergy || isShotCooldown || isJumpCooldown) return false;
         if (energy <= GameProperties.jumpEnergy + GameProperties.heavyShotEnergy) return false;
         double netDist = Math.abs(badmintonX - GameProperties.netPosition);
@@ -650,7 +650,7 @@ public class ComputerDecision {
             }
         }
         if (!clears) return false;
-        if (!earlySmashConnectable()) return false; // 风存+挥拍窗口内接不到球不白跳
+        if (!earlySmashConnectable(side)) return false; // 风存+挥拍窗口内接不到球不白跳
         // 分层概率：网前拦截必跳；中场75%、后场40%——varianceRoll 用球心坐标哈希，
         // 满级联机双端同拍不分叉
         if (netDist > FRONT_COURT_WINDOW) {
@@ -666,14 +666,16 @@ public class ComputerDecision {
         return true;
     }
 
-    // 提前跳杀可达性：风存6帧后进入挥拍动画(第7~15帧，挥拍首段0.15s内才判命中)，
-    // 逐帧推演肩点与球心距离——球心在肩点上方距≤hitArea+racket(挥拍弧扫到)、
-    // 或在肩点附近距≤racket(贴身兜底)即算截击成功。
-    // AI 横移一并推演：起跳前后都在朝球收差，慢速球可边跑边跳。
-    // 场边两处失真必须修正，否则球场边缘会误判"接得到"而跳起挥空：
-    // ①AI 中心被空气墙卡在 [playFieldLeft+宽/2, playFieldRight-宽/2]，不能假设走到球正下方
-    // ②球贴墙按真实物理反弹(0.6恢复系数)，否则模拟球飞出墙外与真实轨迹脱节
-    private boolean earlySmashConnectable() {
+    // 提前跳杀可达性：风存6帧+置位1帧后从第8帧起进入挥拍命中判定（前0.15s内），
+    // 逐帧推演并**复刻 StickMan 上方击球的真实命中公式**：拍头点(相位扫掠)距球心≤racket、
+    // 或球心贴 pivot≤racket（贴身兜底）才算截击成功。
+    // 旧版用"球在上方≤hitArea+racket 的距离圈"近似，比真实扫掠扇形宽 → 会误判接得到、
+    // 跳起后挥拍扫不到球（"跳起来接不动球"）。相位公式与 side 变换逐字对齐 StickMan。
+    // 另三处真实物理不可少：
+    // ①球受空气阻力(与 onUpdate 同公式，先Δv后位移)，否则快球推演位置偏离真实轨迹
+    // ②球贴墙反弹(0.6恢复系数)，否则模拟球飞出墙外与真实脱节
+    // ③AI 中心被空气墙卡在 [playFieldLeft+宽/2, playFieldRight-宽/2]，贴边追不平的水平差真实存在
+    private boolean earlySmashConnectable(int side) {
         double shoulderY = computerY;
         double pivotX = computerX;
         double jumpVy = -GameProperties.jumpSpeedY;
@@ -685,10 +687,15 @@ public class ComputerDecision {
         double maxPivot = GameProperties.playFieldRight - GameProperties.playerWidth / 2.0;
         // 球心贴图半宽：Badminton 左上角 x 撞墙时球心 = 墙 + 10.5（与 setCenterPosition 一致）
         final double ballHalf = 10.5;
-        for (int f = 1; f <= 15; f++) {
+        final double racketSq = GameProperties.racketRadius * GameProperties.racketRadius;
+        for (int f = 1; f <= 16; f++) {
             jumpVy += GameProperties.jumpGravity;
             shoulderY += jumpVy * GameProperties.frameTime;
-            ballVy += GameProperties.badmintonGravity;
+            // 球：先重力+空气阻力(Δv)，再位移——与 Badminton.onUpdate 逐字一致
+            double sp = StrictMath.sqrt(ballVx * ballVx + ballVy * ballVy);
+            double air = sp == 0 ? 0 : 0.00001 * sp * sp;
+            ballVx -= 2.7 * air * (ballVx / sp);
+            ballVy += GameProperties.badmintonGravity - 0.5 * air * (ballVy / sp);
             ballY += ballVy * GameProperties.frameTime;
             ballX += ballVx * GameProperties.frameTime;
             // 球贴墙反弹：与 Badminton.onUpdate 的钳位+0.6恢复系数一致
@@ -705,13 +712,26 @@ public class ComputerDecision {
             // AI 被空气墙卡住：贴边时追不平的那截水平差是真实存在的
             if (pivotX < minPivot) pivotX = minPivot;
             else if (pivotX > maxPivot) pivotX = maxPivot;
-            if (f < 7) continue; // 风存期不挥拍
-            double dx = ballX - pivotX, dy = ballY - shoulderY;
-            double distSq = dx * dx + dy * dy;
-            double limit = dy <= 0
-                    ? GameProperties.hitAreaRadius + GameProperties.racketRadius // 球在上方：挥拍弧
-                    : GameProperties.racketRadius;                               // 球在下方：贴身兜底
-            if (distSq <= limit * limit) return true;
+            if (f < 8) continue; // 前6帧风存+第7帧置位挥拍，第8帧起才进命中判定
+            double deltaT = (f - 7) / 60.0;
+            if (deltaT >= GameProperties.shotAnimationTime) break; // 命中判定仅动画前0.15s
+            // 与 StickMan 上方击球逐字一致的拍头相位：起手180+45，0.15s内扫至300+45，
+            // side=-1(右半场)做 180-θ 镜像
+            double nowAngle = 180 + deltaT
+                    * ((180 + 45 + GameProperties.hitAreaAngleUp - 180) / GameProperties.shotAnimationTime) + 45;
+            if (side == -1) nowAngle = 180 - nowAngle;
+            while (nowAngle < 0) nowAngle += 360;
+            while (nowAngle > 360) nowAngle -= 360;
+            double racketX = pivotX + StrictMath.cos(StrictMath.toRadians(nowAngle)) * GameProperties.hitAreaRadius;
+            double racketY = shoulderY + StrictMath.sin(StrictMath.toRadians(nowAngle)) * GameProperties.hitAreaRadius;
+            double hitDX = ballX - racketX, hitDY = ballY - racketY;
+            double pivotDX = ballX - pivotX, pivotDY = ballY - shoulderY;
+            // 真实判定还要求球在本方半场（越网后挥拍不再命中），否则推演会高估
+            boolean onMyHalf = (ballX - GameProperties.netPosition) * side <= 0;
+            boolean hit = onMyHalf
+                    && (hitDX * hitDX + hitDY * hitDY <= racketSq
+                    || pivotDX * pivotDX + pivotDY * pivotDY <= racketSq);
+            if (hit) return true;
         }
         return false;
     }
