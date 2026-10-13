@@ -496,9 +496,10 @@ public class ComputerDecision {
             }
         }
         if (!clearsNet) return false;
-        // 跳杀总价 = 跳25 + 重击35 = 60：体力不足或球不够高就改站立重扣，避免起跳后白跳
+        // 跳杀总价 = 跳25 + 重击35 = 60：体力不足、球不够高、或起跳后球撑不到挥拍弧就改站立重扣
         if (energy > GameProperties.jumpEnergy + GameProperties.heavyShotEnergy
-                && heightAbove >= GameProperties.smashJumpHeight) {
+                && heightAbove >= GameProperties.smashJumpHeight
+                && smashJumpKeepsContact()) {
             // 起跳够得到更高击球点，按原逻辑高位卡位
             moveHorizontal(200);
             superShot(true);
@@ -508,6 +509,27 @@ public class ComputerDecision {
             superShot(false);
         }
         return true;
+    }
+
+    // 跳杀可达性终检：起跳初速700px/s，0.1s内肩膀抬高约60px，而发球类快坠球（vy≈300）
+    // 同期下落约34px，肩膀会反超球——球落到肩膀下方后，上方挥拍扫掠弧（只扫肩上扇形）
+    // 整个动画窗口都够不到球，起跳接空还白耗25体力。
+    // 按 StickMan/Badminton 的逐帧语义（重力逐帧累加、不乘dt）推演接触时刻：
+    // 球仍在起跳后的肩膀上方才跳杀，否则降级站立重扣（肩膀不动，球下坠进圈照打）
+    private boolean smashJumpKeepsContact() {
+        double shoulderY = computerY;
+        double jumpVy = -GameProperties.jumpSpeedY;
+        double ballY = badmintonY;
+        double ballVy = badmintonSpeedY;
+        // 决策到接触约 0.1s = 6 帧（挥拍动画 0.15s 的前中段）
+        int contactFrames = 6;
+        for (int i = 0; i < contactFrames; i++) {
+            jumpVy += GameProperties.jumpGravity;
+            shoulderY += jumpVy * GameProperties.frameTime;
+            ballVy += GameProperties.badmintonGravity;
+            ballY += ballVy * GameProperties.frameTime;
+        }
+        return ballY <= shoulderY;
     }
 
     // 预判球飞到目标高度 targetY 时的水平位置（y 轴向下）
