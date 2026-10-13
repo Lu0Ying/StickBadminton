@@ -59,6 +59,14 @@ public class ComputerDecision {
     // 起跳 0.1s(挥拍接触时刻)肩膀抬高的像素：v0=700、g=35/帧，6帧累计约60px，
     // 高慢球按抬高后的肩点重算切线出球角，判断能否压成扣杀
     private static final double JUMP_RAISE_PX = 60.0;
+    // 对手位置观察：每 30 帧(0.5s)一个瞬时时间片，不用每帧跟踪；
+    // 时间片内拍型判定保持稳定，击球更有套路感
+    private static final int OBSERVE_INTERVAL = 30;
+    // 观察档位线（对手离网距离）：≤180 视为压在前场，>300 视为退守后场
+    private static final double OBS_FRONT_NET = 180.0;
+    private static final double OBS_BACK_NET = 300.0;
+    // 时间片间净位移超过 20px 才算明显移动（防抖，避免微晃误判趋势）
+    private static final double OBS_TREND_MIN = 20.0;
     private static final double NET_Y_MARGIN_ABOVE = 130.0;
     private static final double NET_Y_MARGIN_BELOW = 20.0;
     private static final double NET_ALIGN_DEADZONE = 4.0;
@@ -85,10 +93,19 @@ public class ComputerDecision {
     private static double prevBallVX = Double.NaN;
     private static int wallBounceCooldownFrames = 0;   // 墙反弹后禁止起跳的帧数
     private static final int WALL_BOUNCE_COOLDOWN_DEFAULT = 12; // ~0.2s @60fps
+    // 对手位置时间片采样：static 跨帧持久（ComputerDecision 每帧重建，与墙反弹冷却同模式），
+    // 按半场侧索引（0=side1 左侧AI，1=side-1 右侧AI）避免左右两个 AI 互相污染
+    private static final double[] oppSampleLast = new double[]{Double.NaN, Double.NaN};
+    private static final double[] oppSamplePrev = new double[]{Double.NaN, Double.NaN};
+    private static final int[] oppSampleCd = new int[]{0, 0};
 
     // 预判与状态
     private double predictedLandingX;
     private double predictedLandingY;
+    // 本帧观察结果（时间片内恒定，构造流程里 observeOpponent 赋值、variedShot 读取）
+    private double observedOppNetDist = Double.NaN;
+    private boolean observedOppRushNet = false;   // 对手正朝网压上
+    private boolean observedOppFallBack = false;  // 对手正向后退守
     private boolean isBallApproaching = false;
     private Random random = new Random();
     // G 键调试：p1 满级 AI。决策全部在构造器内完成，必须构造前定级，
@@ -228,6 +245,9 @@ public class ComputerDecision {
     }
 
     private void executeStrategy(int side, boolean isShotCooldown) {
+        // 对手位置瞬时观察（时间片采样），供下方击球策略与轻重击概率联合判定
+        observeOpponent(side, opponentX);
+
         //杀球防守
         if (handleSmashDefense(side, isShotCooldown)) return;
 
@@ -527,9 +547,8 @@ public class ComputerDecision {
         }
     }
 
-    // 回球变拍：让相同球况不至于永远回同一拍，提升观赏性。
-    // 80% 走局势偏好的稳妥拍，20% 反着来——多数正确、偶尔出其不意。
-    // 偏好方(高远/平抽)本身已按对手站位与球速算出，故整体仍合理，只是不再单调
+    // 回球变拍：体力充沛时按"策略(对手位置观察) + 基础轻重概率"联合判定，
+    // 观察给倾向、概率给不确定性——相同球况不再永远回同一拍
     private void variedShot(boolean preferHigh) {
         // 体力不充沛(≤50，即再打两次重击就见底)时强制轻击高远：省下重击体力，
         // 同时把对手压向底线、下一拍再放前场，用前后跑动消耗对手体力
@@ -537,16 +556,50 @@ public class ComputerDecision {
             highShot();
             return;
         }
-        double roll = varianceRoll();
-        // 后场偏向重击：深区发力压制对手底线，35% 轻击吊前场变节奏调动
-        if (Math.abs(computerX - GameProperties.netPosition) > SMASH_COURT_WINDOW) {
-            if (roll < 0.65) middleShot(); else highShot();
-            return;
+        // 策略+轻重概率联合判定：基础概率(后场65%重/中前场35%重)先立底，
+        // 再按时间片观察的对手占位与移动趋势修正，最后叠局势偏好 ±0.10，
+        // 与随机 roll 一次性决定轻重——观察是倾向，概率保证不确定性
+        double heavyProb = Math.abs(computerX - GameProperties.netPosition) > SMASH_COURT_WINDOW
+                ? 0.65 : 0.35;
+        if (!Double.isNaN(observedOppNetDist)) {
+            if (observedOppNetDist <= OBS_FRONT_NET) {
+                heavyProb += 0.25; // 对手压在前场：重击平抽穿透
+            } else if (observedOppNetDist > OBS_BACK_NET) {
+                heavyProb -= 0.15; // 对手退守后场：轻击高远继续把他钉深
+            }
+            if (observedOppRushNet) heavyProb -= 0.15;   // 对手急冲网前：轻吊让其急停回跑
+            if (observedOppFallBack) heavyProb += 0.10;  // 对手正在回退：重击追身压底线
         }
-        // 体力充沛时随机切换轻重：80% 走局势偏好的稳妥拍，20% 反着来增加球路变化
-        boolean chooseHigh = (roll < 0.8) ? preferHigh : !preferHigh;
-        if (chooseHigh) highShot(); else middleShot();
+        heavyProb += preferHigh ? -0.10 : 0.10;
+        heavyProb = clamp(0.05, 0.9, heavyProb);
+        double roll = varianceRoll();
+        if (roll < heavyProb) middleShot(); else highShot();
     }
+
+    // 对手位置瞬时观察：每 OBSERVE_INTERVAL 帧在时间片上记录一次对手位置，
+    // 时间片内取值恒定（不逐帧跟踪，拍型不随对手微晃抖动），相邻两片连线得移动趋势
+    private void observeOpponent(int side, double opponentX) {
+        int i = (side == 1) ? 0 : 1;
+        if (Double.isNaN(oppSampleLast[i]) || oppSampleCd[i] <= 0) {
+            oppSamplePrev[i] = Double.isNaN(oppSampleLast[i]) ? opponentX : oppSampleLast[i];
+            oppSampleLast[i] = opponentX;
+            oppSampleCd[i] = OBSERVE_INTERVAL;
+        } else {
+            oppSampleCd[i]--;
+        }
+        double last = oppSampleLast[i];
+        observedOppNetDist = Math.abs(last - GameProperties.netPosition);
+        double delta = last - oppSamplePrev[i];
+        double toNet = Math.signum(GameProperties.netPosition - last);
+        boolean moved = Math.abs(delta) >= OBS_TREND_MIN;
+        observedOppRushNet = moved && Math.signum(delta) == toNet;
+        observedOppFallBack = moved && Math.signum(delta) == -toNet;
+    }
+
+    // 观察结果只读口（联调/测试用）：对手离网距离为时间片采样值，NaN=尚无采样
+    public double observedOppNetDist() { return observedOppNetDist; }
+    public boolean observedOppRushNet() { return observedOppRushNet; }
+    public boolean observedOppFallBack() { return observedOppFallBack; }
 
     // [0,1) 伪随机源。满级(maxLevel)联机时必须双端同轨，不能用 Random——
     // 改由球心坐标导出：双端球轨迹经固定步长物理回放逐位一致(StrictMath)，
