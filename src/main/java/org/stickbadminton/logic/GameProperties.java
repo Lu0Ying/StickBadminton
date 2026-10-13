@@ -57,8 +57,8 @@ public class GameProperties {
     public static final double heavyShotEnergy = 35.0;
     // 轻击所耗体力 (体力归0时也能轻击)
     public static final double lightShotEnergy = 8.0;
-    // 跳跃所耗体力
-    public static final double jumpEnergy = 25.0;
+    // 跳跃所耗体力（25→20：适配 AI 跳跃概率提升，降低连跳的体力惩罚）
+    public static final double jumpEnergy = 20.0;
     // 平地移动时所恢复体力 (单位：体力/秒)
     public static final double moveEnergyRecover = 3.0;
     // 站着不动时所恢复体力 (单位：体力/秒)

@@ -220,9 +220,10 @@ public class ComputerDecision {
 
         //考虑跳跃（对手远离球网；用绝对值使左右半场 AI 判定对称——
         //左侧 AI 的对手在右半场，旧式 netPosition-opponentX 恒为负导致永不跳跃）
+        //水平对齐容差 16→40：旧值要求 AI 几乎正对球才考虑起跳，跳跃触发过少
         if (getDistance() < (100 + hitAreaRadius + racketRadius) &&
                 Math.abs(opponentX - GameProperties.netPosition) > 100 &&
-                Math.abs(computerX - badmintonX) < 16)
+                Math.abs(computerX - badmintonX) < 40)
         {
             moveVertical();
         }
@@ -704,19 +705,17 @@ public class ComputerDecision {
         boolean basicWindow = timeToNet > 0.22 && timeToNet < 0.9;
         if (!basicWindow) return false;
         if (isLikelyRecentWallBounce()) return false;
-        // 高难度：球低到“站立轻松够到”(肩上 hitAreaRadius 内)才不起跳——站立即打，
-        // 起跳白花25体力。原阈值是整个触及圈105px，把偏高球也排除了、跳跃过少；
-        // 下移到 hitAreaRadius(60px)，让 60~105px 的偏高球也能起跳截击(仍有下方
-        // 可达性终检 + 体力门槛兜底，不会起跳接空)
-        if (smartEnergy && badmintonY >= computerY - GameProperties.hitAreaRadius) return false;
-        // 体力管理：起跳要花 25 体力，起跳后至少保留 15 余量确保还能出球，
+        // 高难度：球低到“站立轻松够到”(肩上 45px 内)才不起跳——站立即打，起跳白费体力。
+        // 原阈值整个触及圈105px、上一轮60px，60px 以上的偏高球仍常被排除导致跳跃偏少
+        if (smartEnergy && badmintonY >= computerY - GameProperties.hitAreaRadius * 0.75) return false;
+        // 体力管理：起跳要花体力，起跳后至少保留 15 余量确保还能出球，
         // 体力不足先不起跳，避免连跳把体力掏空后跑不动也打不出
         if (smartEnergy && energy < GameProperties.jumpEnergy + GameProperties.jumpEnergyReserve) return false;
         if (maxLevel) return true; // 满级恒起跳：跳过随机概率，双端一致
 
-        // 难度概率（低难度也给较高概率，以免错过球）
+        // 难度概率：高难度(3级+)提到≥0.95，低难度维持原0.95*p的折扣
         double p = Math.max(0.5, difficultyLevel);
-        return random.nextDouble() < (0.95 * p);
+        return random.nextDouble() < (smartEnergy ? Math.max(0.95, p) : 0.95 * p);
     }
 
     // 强化“刚碰墙反弹”检测：结合速度符号翻转 + 临近墙体 + 冷却帧

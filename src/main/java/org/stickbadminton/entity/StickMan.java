@@ -369,7 +369,14 @@ public class StickMan extends GameObject {
                             // 击球判定用球心对球拍点（中心对中心）：旧版拿球左上角 getX/Y 去比
                             // 按玩家中心算出的球拍点，存在约10px系统偏移，墙边AI被空气墙卡住无法
                             // 再靠近时会把够得到的球误判成接不到。改球心即"球拍中心击球、减少边缘击球"
-                            if (Math.pow(badminton.getCenterX() - racketX, 2) + Math.pow(badminton.getCenterY() - racketY, 2)
+                            // 贴身兜底：球心贴近击球轴心(≤racketRadius)时在挥拍弧扫不到的"环内洞"里，
+                            // 球穿过身体会挥拍打空，补判为命中
+                            double pivotDX = badminton.getCenterX() - getCenterX();
+                            double pivotDY = badminton.getCenterY()
+                                    - (getCenterY() + GameProperties.playerHeight - GameProperties.hitAreaCenterHeight);
+                            boolean pivotHit = pivotDX * pivotDX + pivotDY * pivotDY
+                                    <= GameProperties.racketRadius * GameProperties.racketRadius;
+                            if (pivotHit || Math.pow(badminton.getCenterX() - racketX, 2) + Math.pow(badminton.getCenterY() - racketY, 2)
                                     <= Math.pow(GameProperties.racketRadius, 2)) {
                                 // 判定为打到球
                                 double hitAngle = nowAngle;
@@ -431,8 +438,14 @@ public class StickMan extends GameObject {
                                 double racketX = getCenterX() + Math.cos(Math.toRadians(nowAngle)) * GameProperties.hitAreaRadius;
                                 double racketY = getCenterY() + GameProperties.playerHeight - GameProperties.hitAreaCenterHeight
                                         + Math.sin(Math.toRadians(nowAngle)) * GameProperties.hitAreaRadius;
-                                // 与上方击球一致：用球心对球拍点，消除左上角偏移导致的边缘误判
-                                if (Math.pow(badminton.getCenterX() - racketX, 2) + Math.pow(badminton.getCenterY() - racketY, 2)
+                                // 与上方击球一致：用球心对球拍点，消除左上角偏移导致的边缘误判；
+                                // 同样补贴身兜底，球穿过身体不挥空
+                                double pivotDX = badminton.getCenterX() - getCenterX();
+                                double pivotDY = badminton.getCenterY()
+                                        - (getCenterY() + GameProperties.playerHeight - GameProperties.hitAreaCenterHeight);
+                                boolean pivotHit = pivotDX * pivotDX + pivotDY * pivotDY
+                                        <= GameProperties.racketRadius * GameProperties.racketRadius;
+                                if (pivotHit || Math.pow(badminton.getCenterX() - racketX, 2) + Math.pow(badminton.getCenterY() - racketY, 2)
                                     <= Math.pow(GameProperties.racketRadius, 2)) {
                                     double hitAngle = nowAngle;
                                     if (side == sideRight) {
