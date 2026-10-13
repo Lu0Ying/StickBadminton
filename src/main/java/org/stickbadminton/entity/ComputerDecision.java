@@ -274,14 +274,23 @@ public class ComputerDecision {
         // 杀球防守默认不跳，减少“起跳接空”
         isJump = false;
 
-        // 进入击球圈：强制“上托”轻击（高远防守）
+        // 进入击球圈：防守回球。原版无脑轻击高远，右侧持续重击时左侧会一直被动挑球，
+        // 缺乏反击。改为按体力交替——体力充足时改用重击平抽反击，体力不足才退回防守轻击。
+        // 用能量阈值(确定性)而非随机，满级联机双端同轨不分叉
         if (!isShotCooldown && getDistance() < (hitAreaRadius + racketRadius + SMASH_HIT_MARGIN)) {
             isShot = true;
-            isLighthit = true;
-            isHeavyhit = false;
+            // 重击反击门槛：够一次重击(35)后仍留 20 余量，避免打完被下一拍掏空；否则防守轻击
+            boolean counterHeavy = energy > GameProperties.heavyShotEnergy + 20.0;
+            isHeavyhit = counterHeavy;
+            isLighthit = !counterHeavy;
 
-            // 防守角度
-            double base = (side == 1) ? 300.0 : 240.0;
+            // 防守角度：轻击走高远挑球拉开，重击走平抽压回对手半场
+            double base;
+            if (counterHeavy) {
+                base = (side == 1) ? 330.0 : 210.0; // 平抽，落点偏对方后场
+            } else {
+                base = (side == 1) ? 300.0 : 240.0; // 高远防守
+            }
             superShotAngleDeg = base;
             return true; // 已完成处理
         }
@@ -427,6 +436,18 @@ public class ComputerDecision {
             }
             // 高难度：几何判定能过网才扣杀；压不过网时落穿到下方常规分支挑/抽过网，
             // 避免扣杀直接砸网或砸在自己半场
+            if (preciseSmash()) return;
+        }
+
+        // 网前跳扣：球贴近球网、位置高、水平速度慢（对方放网/搓球回过来的高挂球）——
+        // 这类球下坠慢、有充分起跳时间，是最该下压终结的一拍。复用 preciseSmash 的
+        // 过网仿真与跳/站决策：能压过网就扣(高挂球多为跳杀)，压不过落穿到常规分支。
+        // 仅高难度启用(体力管理路径)，1-2级保持原有简单行为
+        if (smartEnergy
+                && Math.abs(badmintonX - GameProperties.netPosition) < NET_X_WINDOW
+                && badmintonY < computerY - GameProperties.smashJumpHeight
+                && Math.abs(badmintonSpeedX) < 150.0
+                && badmintonSpeedY < 200.0) {
             if (preciseSmash()) return;
         }
 
