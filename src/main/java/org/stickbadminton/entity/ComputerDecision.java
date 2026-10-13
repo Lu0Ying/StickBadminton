@@ -35,6 +35,12 @@ public class ComputerDecision {
 
     // 网前判定参数
     private static final double NET_X_WINDOW = 140.0;
+    // 前半场窗口：本方半场(网到墙约380px)的一半。前场内的高球优先起跳扣杀，
+    // 后场不再为站立本就够得到的高球起跳挑球
+    private static final double FRONT_COURT_WINDOW = 190.0;
+    // 起跳 0.1s(挥拍接触时刻)肩膀抬高的像素：v0=700、g=35/帧，6帧累计约60px，
+    // 高慢球按抬高后的肩点重算切线出球角，判断能否压成扣杀
+    private static final double JUMP_RAISE_PX = 60.0;
     private static final double NET_Y_MARGIN_ABOVE = 130.0;
     private static final double NET_Y_MARGIN_BELOW = 20.0;
     private static final double NET_ALIGN_DEADZONE = 4.0;
@@ -440,12 +446,13 @@ public class ComputerDecision {
             if (preciseSmash()) return;
         }
 
-        // 网前跳扣：球贴近球网、位置高、水平速度慢（对方放网/搓球回过来的高挂球）——
-        // 这类球下坠慢、有充分起跳时间，是最该下压终结的一拍。复用 preciseSmash 的
-        // 过网仿真与跳/站决策：能压过网就扣(高挂球多为跳杀)，压不过落穿到常规分支。
+        // 前场跳扣：球在本方前半场(离网190px内)、位置高、水平速度慢（对方放网/搓球
+        // 回过来的高挂球与高慢球）——这类球下坠慢、有充分起跳时间，是最该下压终结的
+        // 一拍。复用 preciseSmash 的过网仿真与跳/站决策：站立切线朝上的高慢球由
+        // needsJump 路径按抬肩后角度压成跳杀，压不过落穿到常规分支。
         // 仅高难度启用(体力管理路径)，1-2级保持原有简单行为
         if (smartEnergy
-                && Math.abs(badmintonX - GameProperties.netPosition) < NET_X_WINDOW
+                && Math.abs(badmintonX - GameProperties.netPosition) < FRONT_COURT_WINDOW
                 && badmintonY < computerY - GameProperties.smashJumpHeight
                 && Math.abs(badmintonSpeedX) < 150.0
                 && badmintonSpeedY < 200.0) {
@@ -519,8 +526,28 @@ public class ComputerDecision {
         double expectedAngle = isRightSide ? alpha - 90 : alpha + 90;
         if (expectedAngle < 0) expectedAngle += 360;
         else if (expectedAngle >= 360) expectedAngle -= 360;
-        // 出球角不在扣球半圈（≥180° 是高球）→ 不算扣杀，交回常规分支
-        if (expectedAngle >= 180) return false;
+        // 出球角不在扣球半圈（≥180° 是高球，球在肩后/正上方）。
+        // 高慢球补救：球在本方前半场且慢速下坠时，接触时刻(~0.1s后)球会下落一段、
+        // 而 AI 跳杀会把肩点抬高60px并站到球的后下方(保证球在肩前上方)——
+        // 按"抬肩60px + 站位后挪40px"的接触几何重算角度，重算后仍≥180° 才放弃。
+        // 仅此窄场景启用，常规扣杀路径几何不变
+        if (expectedAngle >= 180) {
+            boolean highSlowBall = Math.abs(badmintonX - GameProperties.netPosition) < FRONT_COURT_WINDOW
+                    && Math.abs(badmintonSpeedX) < 150.0
+                    && badmintonSpeedY < 200.0
+                    && badmintonY < computerY - GameProperties.hitAreaRadius;
+            if (!highSlowBall) return false;
+            // 后挪方向：右半场 AI 自己在右侧(+x)，站到球右边让球落在肩前上方
+            double standX = computerX + (isRightSide ? 40.0 : -40.0);
+            double alphaContact = StrictMath.toDegrees(StrictMath.atan2(
+                    badmintonY - (computerY - JUMP_RAISE_PX), badmintonX - standX));
+            if (alphaContact < 0) alphaContact += 360;
+            double contactAngle = isRightSide ? alphaContact - 90 : alphaContact + 90;
+            if (contactAngle < 0) contactAngle += 360;
+            else if (contactAngle >= 360) contactAngle -= 360;
+            if (contactAngle >= 180) return false;
+            expectedAngle = contactAngle;
+        }
         // 切线角天然比"能过网的角度"更下压（球在肩前下方时斜率≈|dx/dy|），
         // 直接拿它仿真会把正常扣杀全拒掉（表现为 AI 不跳跃、不重击）。
         // 与 StickMan 接触层安全网同向：每次向本方前上方调 5°（右半场 +5、左半场 -5，
@@ -538,7 +565,7 @@ public class ComputerDecision {
             }
         }
         if (!clearsNet) return false;
-        // 跳杀总价 = 跳25 + 重击35 = 60：体力不足、球不够高、或起跳后球撑不到挥拍弧就改站立重扣
+        // 跳杀总价 = 跳20 + 重击35 = 55：体力不足、球不够高、或起跳后球撑不到挥拍弧就改站立重扣
         if (energy > GameProperties.jumpEnergy + GameProperties.heavyShotEnergy
                 && heightAbove >= GameProperties.smashJumpHeight
                 && smashJumpKeepsContact()) {
@@ -705,6 +732,9 @@ public class ComputerDecision {
         boolean basicWindow = timeToNet > 0.22 && timeToNet < 0.9;
         if (!basicWindow) return false;
         if (isLikelyRecentWallBounce()) return false;
+        // 高难度：起跳只留在本方前半场(离网190px内)——后场高球站定挑高远即可，
+        // 起跳纯耗体力还容易变成"跳起来挑高球"的无效观赏；前场高球由前场跳扣分支处理
+        if (smartEnergy && Math.abs(badmintonX - GameProperties.netPosition) > FRONT_COURT_WINDOW) return false;
         // 高难度：球低到“站立轻松够到”(肩上 45px 内)才不起跳——站立即打，起跳白费体力。
         // 原阈值整个触及圈105px、上一轮60px，60px 以上的偏高球仍常被排除导致跳跃偏少
         if (smartEnergy && badmintonY >= computerY - GameProperties.hitAreaRadius * 0.75) return false;
