@@ -586,7 +586,17 @@ public class ComputerDecision {
         double angle = tangentHitAngle();
         if (angle >= 180) return false; // 切线朝上（球在肩后/正上方）不提前跳
         double lagMargin = Math.min(SMASH_LAG_MARGIN_CAP, Math.max(0.0, badmintonSpeedY * 0.1));
-        if (!Badminton.launchClearsNet(badmintonX, badmintonY, angle, 2500.0, lagMargin)) return false;
+        // 与 preciseSmash 同款调平循环：单角对远球会被空气阻力拖到过网前先落地，
+        // 每次向本方前上方调5°(右半场+5、左半场-5)直到过网，压平超上限说明本质不是扣杀球
+        double flattenStep = (computerX > GameProperties.netPosition) ? 5.0 : -5.0;
+        boolean clears = false;
+        for (double tuned = 0; tuned <= SMASH_FLATTEN_MAX_DEG + 1e-9; tuned += 5.0) {
+            if (Badminton.launchClearsNet(badmintonX, badmintonY, angle + flattenStep * tuned, 2500.0, lagMargin)) {
+                clears = true;
+                break;
+            }
+        }
+        if (!clears) return false;
         if (!earlySmashConnectable()) return false; // 风存+挥拍窗口内接不到球不白跳
         // 分层概率：网前拦截必跳；中场75%、后场40%——varianceRoll 用球心坐标哈希，
         // 满级联机双端同拍不分叉
@@ -606,7 +616,10 @@ public class ComputerDecision {
     // 提前跳杀可达性：风存6帧后进入挥拍动画(第7~15帧，挥拍首段0.15s内才判命中)，
     // 逐帧推演肩点与球心距离——球心在肩点上方距≤hitArea+racket(挥拍弧扫到)、
     // 或在肩点附近距≤racket(贴身兜底)即算截击成功。
-    // AI 横移一并推演：起跳前后都在朝球收差，慢速球可边跑边跳
+    // AI 横移一并推演：起跳前后都在朝球收差，慢速球可边跑边跳。
+    // 场边两处失真必须修正，否则球场边缘会误判"接得到"而跳起挥空：
+    // ①AI 中心被空气墙卡在 [playFieldLeft+宽/2, playFieldRight-宽/2]，不能假设走到球正下方
+    // ②球贴墙按真实物理反弹(0.6恢复系数)，否则模拟球飞出墙外与真实轨迹脱节
     private boolean earlySmashConnectable() {
         double shoulderY = computerY;
         double pivotX = computerX;
@@ -614,15 +627,31 @@ public class ComputerDecision {
         double ballX = badmintonX, ballY = badmintonY;
         double ballVx = badmintonSpeedX, ballVy = badmintonSpeedY;
         double step = decisionMoveSpeed() * GameProperties.frameTime;
+        // AI 中心可达边界（与 moveHorizontal 的 left/rightBoundary 同公式）
+        double minPivot = GameProperties.playFieldLeft + GameProperties.playerWidth / 2.0;
+        double maxPivot = GameProperties.playFieldRight - GameProperties.playerWidth / 2.0;
+        // 球心贴图半宽：Badminton 左上角 x 撞墙时球心 = 墙 + 10.5（与 setCenterPosition 一致）
+        final double ballHalf = 10.5;
         for (int f = 1; f <= 15; f++) {
             jumpVy += GameProperties.jumpGravity;
             shoulderY += jumpVy * GameProperties.frameTime;
             ballVy += GameProperties.badmintonGravity;
             ballY += ballVy * GameProperties.frameTime;
             ballX += ballVx * GameProperties.frameTime;
+            // 球贴墙反弹：与 Badminton.onUpdate 的钳位+0.6恢复系数一致
+            if (ballX <= GameProperties.playFieldLeft + ballHalf) {
+                ballX = GameProperties.playFieldLeft + ballHalf;
+                ballVx = -ballVx * 0.6;
+            } else if (ballX >= GameProperties.playFieldRight + ballHalf) {
+                ballX = GameProperties.playFieldRight + ballHalf;
+                ballVx = -ballVx * 0.6;
+            }
             double gap = ballX - pivotX;
             if (Math.abs(gap) > step) pivotX += Math.signum(gap) * step;
             else pivotX = ballX;
+            // AI 被空气墙卡住：贴边时追不平的那截水平差是真实存在的
+            if (pivotX < minPivot) pivotX = minPivot;
+            else if (pivotX > maxPivot) pivotX = maxPivot;
             if (f < 7) continue; // 风存期不挥拍
             double dx = ballX - pivotX, dy = ballY - shoulderY;
             double distSq = dx * dx + dy * dy;
