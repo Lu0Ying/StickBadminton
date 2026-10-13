@@ -107,6 +107,24 @@ public class StickMan extends GameObject {
         return hitAngle;
     }
 
+    /**
+     * 拍面扫掠命中：球心到"拍轴心→拍头"线段的最短距离 ≤ racketRadius 即命中。
+     * 球拍是有面积的拍面而非一个点——原判定只查拍头点，球从拍杆中途穿过时挥空，
+     * 扣杀命中窗口只有 1-2 帧；线段口径把整个拍杆扫过区都算命中，更符合真实挥拍。
+     * 人类与 AI 共用（判定公平一致），联机由主机权威执行不分叉
+     */
+    private boolean racketSweepHit(double ballCX, double ballCY, double racketX, double racketY) {
+        double pivotX = getCenterX();
+        double pivotY = getCenterY() + GameProperties.playerHeight - GameProperties.hitAreaCenterHeight;
+        double segX = racketX - pivotX, segY = racketY - pivotY;
+        double lenSq = segX * segX + segY * segY;
+        double t = lenSq == 0 ? 0 : ((ballCX - pivotX) * segX + (ballCY - pivotY) * segY) / lenSq;
+        if (t < 0) t = 0; else if (t > 1) t = 1; // 投影夹紧在线段内
+        double nearX = pivotX + segX * t, nearY = pivotY + segY * t;
+        double dx = ballCX - nearX, dy = ballCY - nearY;
+        return dx * dx + dy * dy <= GameProperties.racketRadius * GameProperties.racketRadius;
+    }
+
     public StickMan(int side, int characterType) {
         super("stickman1", Sprite.loadImage("/images/stickman/stickman_head1.png")); //head
         this.side = side;
@@ -401,8 +419,7 @@ public class StickMan extends GameObject {
                                     - (getCenterY() + GameProperties.playerHeight - GameProperties.hitAreaCenterHeight);
                             boolean pivotHit = pivotDX * pivotDX + pivotDY * pivotDY
                                     <= GameProperties.racketRadius * GameProperties.racketRadius;
-                            if (pivotHit || Math.pow(badminton.getCenterX() - racketX, 2) + Math.pow(badminton.getCenterY() - racketY, 2)
-                                    <= Math.pow(GameProperties.racketRadius, 2)) {
+                            if (pivotHit || racketSweepHit(badminton.getCenterX(), badminton.getCenterY(), racketX, racketY)) {
                                 // 判定为打到球
                                 double hitAngle = nowAngle;
                                 if (side == sideRight) {
@@ -480,8 +497,7 @@ public class StickMan extends GameObject {
                                         - (getCenterY() + GameProperties.playerHeight - GameProperties.hitAreaCenterHeight);
                                 boolean pivotHit = pivotDX * pivotDX + pivotDY * pivotDY
                                         <= GameProperties.racketRadius * GameProperties.racketRadius;
-                                if (pivotHit || Math.pow(badminton.getCenterX() - racketX, 2) + Math.pow(badminton.getCenterY() - racketY, 2)
-                                    <= Math.pow(GameProperties.racketRadius, 2)) {
+                                if (pivotHit || racketSweepHit(badminton.getCenterX(), badminton.getCenterY(), racketX, racketY)) {
                                     double hitAngle = nowAngle;
                                     if (side == sideRight) {
                                         hitAngle -= 90;

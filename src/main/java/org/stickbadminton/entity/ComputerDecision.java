@@ -778,12 +778,19 @@ public class ComputerDecision {
                 continue;
             double racketX = pivotX + StrictMath.cos(StrictMath.toRadians(nowAngle)) * GameProperties.hitAreaRadius;
             double racketY = shoulderY + StrictMath.sin(StrictMath.toRadians(nowAngle)) * GameProperties.hitAreaRadius;
-            double hitDX = ballX - racketX, hitDY = ballY - racketY;
             double pivotDX = ballX - pivotX, pivotDY = ballY - shoulderY;
             // 真实判定还要求球在本方半场（越网后挥拍不再命中），否则推演会高估
             boolean onMyHalf = (ballX - GameProperties.netPosition) * side <= 0;
+            // 拍面扫掠判定(与 StickMan.racketSweepHit 同口径)：球心到拍轴→拍头线段
+            // 最短距离≤racket，把拍杆扫过区都算命中，而非只查拍头一个点
+            double segX = racketX - pivotX, segY = racketY - shoulderY;
+            double lenSq = segX * segX + segY * segY;
+            double t = lenSq == 0 ? 0 : ((ballX - pivotX) * segX + (ballY - shoulderY) * segY) / lenSq;
+            if (t < 0) t = 0; else if (t > 1) t = 1;
+            double nearX = pivotX + segX * t, nearY = shoulderY + segY * t;
+            double sweepDX = ballX - nearX, sweepDY = ballY - nearY;
             boolean hit = onMyHalf
-                    && (hitDX * hitDX + hitDY * hitDY <= racketSq
+                    && (sweepDX * sweepDX + sweepDY * sweepDY <= racketSq
                     || pivotDX * pivotDX + pivotDY * pivotDY <= racketSq);
             if (hit) return true;
         }
