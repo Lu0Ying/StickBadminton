@@ -52,14 +52,9 @@ public class ComputerDecision {
     // 提前起跳的水平对齐容差：粗筛门槛，真实裁判是 earlySmashConnectable 的逐帧推演
     // (含风存期横移收差)。放宽到150px：慢速球允许边跑边跳，不必先跑到后场等球再接
     private static final double EARLY_SMASH_ALIGN = 150.0;
-    // 场边(贴墙)区域宽度：AI 自身或球距左右空气墙 ≤ 该值视为贴边，起跳判定从严
-    private static final double EDGE_ZONE_WIDTH = 60.0;
-    // 场边严判的"连续命中帧"要求：白跳的真因是推演与真实挥拍常差 1 帧（贴边快球
-    // 1 帧≈25px），单帧擦边即拒会把真实接得到的球(45px 半径内真能打到)也误拒成
-    // 站定接不到。改为对 1 帧误差鲁棒的判据——连续 2 帧命中才放行：时序提前或
-    // 滞后 1 帧都至少有一帧落在扫掠区(真实挥拍必命中)，仅单帧擦边(时序敏感、
-    // 真实必挥空)才拒绝。命中半径保持真实判定的 45px 不加折扣
-    private static final int EDGE_CONSECUTIVE_HITS = 2;
+    // 注：曾尝试在贴墙60px内加额外"场边严判"（扫掠距×0.75/连续2帧），两版均回归
+    // （误拒真实可接球 → AI 不跳站定接不到），已回退至 v1.0 的真实相位推演口径——
+    // "场边跳起接不到"的根因是 SoundPlay 音效异常中断 heavyHit 出球，已单独修复
     // 提前起跳概率：网前球必跳（拦截最优先）；中后场分层给概率——中前场高、后场低，
     // 让慢速球优先获得起跳权重而不是退后场等待（3级常规档）
     private static final double EARLY_SMASH_PROB_MID = 0.75;
@@ -686,7 +681,6 @@ public class ComputerDecision {
         // 高度门槛：网前拦截位放宽(球快落到前场也跳)，其余按高位球标准
         double minHeight = netDist <= FRONT_COURT_WINDOW ? EARLY_SMASH_MIN_H_NET : EARLY_SMASH_MIN_H;
         if (computerY - badmintonY < minHeight) return false;
-        if (edgeZoneCheck(side)) return false; // 场边：真实挥拍推演未打实则不跳，站定接球
         if (Math.abs(computerX - badmintonX) > EARLY_SMASH_ALIGN) return false;
         double angle = tangentHitAngle();
         if (angle >= 180) return false; // 切线朝上（球在肩后/正上方）不提前跳
@@ -717,12 +711,6 @@ public class ComputerDecision {
         isJump = true;
         isSmashIntent = true;
         return true;
-    }
-
-    // AI 所在半场（side 约定：1=左、-1=右）。AI 不越网，位置即半场，
-    // 供 preciseSmash 等无 side 入参的分支取值
-    private int aiSide() {
-        return (computerX > GameProperties.netPosition) ? -1 : 1;
     }
 
     // 圈内概率扣杀（中前场）：按扣杀风格取概率
@@ -759,59 +747,6 @@ public class ComputerDecision {
             case SMASH_STYLE_PRECISE: return EARLY_SMASH_PROB_BACK_PRECISE;
             default: return EARLY_SMASH_PROB_BACK;
         }
-    }
-
-    // 场边严判入口：AI 自身贴墙、球即将贴墙，或球已到墙角/正在墙反弹——
-    // 这些场景下球心可达 840.5 而 AI 中心卡在 809，常年的 31px 水平差让推演
-    // "假命中"、真实挥拍却扫空(白跳还落地漏球)。场边用真实挥拍相位逐帧推演，
-    // 保持真实判定的 45px 命中半径（不折扣，避免把真接得到的球误拒成站定接不到），
-    // 额外要求"连续 2 帧命中"以对 1 帧时序误差鲁棒：单帧擦边=时序敏感、真实必挥空。
-    // 非场边不加严判，保持原判定
-    private boolean edgeZoneCheck(int side) {
-        double leftGap = badmintonX - GameProperties.playFieldLeft;
-        double rightGap = GameProperties.playFieldRight - badmintonX;
-        double wallGap = Math.min(leftGap, rightGap);
-        double pivotGap = Math.min(computerX - GameProperties.playFieldLeft,
-                GameProperties.playFieldRight - computerX);
-        boolean inEdge = pivotGap <= EDGE_ZONE_WIDTH || wallGap <= EDGE_ZONE_WIDTH;
-        if (!inEdge) return false; // 非场边：不加严判，保持原判定
-        // 场边：真实挥拍推演须连续帧命中才允许起跳，否则站定接球
-        return !edgeSolidConnectable(side);
-    }
-
-    // 场边用真实挥拍相位复刻提前跳杀的截击推演（口径与 earlySmashConnectable 一致，
-    // 命中半径同为真实判定的 45px）。场边额外要求"连续 2 帧命中"才放行：对推演与
-    // 真实的 1 帧时序误差鲁棒——只命中 1 帧(单帧擦边)说明时序敏感、真实挥拍大概率
-    // 扫空，判接不到站定不跳；含球墙反弹与 AI 空气墙钳制
-    private boolean edgeSolidConnectable(int side) {
-        double shoulderY = computerY;
-        double pivotX = computerX;
-        double jumpVy = -GameProperties.jumpSpeedY;
-        double ballX = badmintonX, ballY = badmintonY;
-        double ballVx = badmintonSpeedX, ballVy = badmintonSpeedY;
-        double step = decisionMoveSpeed() * GameProperties.frameTime;
-        int hitRun = 0;       // 连续命中帧计数
-        boolean useDown = false;
-        double[] st = {ballX, ballY, ballVx, ballVy, shoulderY, pivotX, jumpVy};
-        for (int f = 1; f <= 17; f++) {
-            stepPhysics(st, step);
-            ballX = st[0]; ballY = st[1]; ballVx = st[2]; ballVy = st[3];
-            shoulderY = st[4]; pivotX = st[5]; jumpVy = st[6];
-            if (f < 8) continue;
-            if (f == 8) {
-                useDown = (ballX - GameProperties.netPosition) * side <= 0
-                        && ballY > shoulderY - 46;
-            }
-            boolean hit = swingSweepDist(f - 7, side, pivotX, shoulderY, ballX, ballY, useDown)
-                    <= GameProperties.racketRadius;
-            if (hit) {
-                hitRun++;
-                if (hitRun >= EDGE_CONSECUTIVE_HITS) return true;
-            } else {
-                hitRun = 0;
-            }
-        }
-        return false; // 未形成连续命中：单帧擦边时序敏感、真实必挥空，站定不跳
     }
 
     // 跳杀风存跟随专用：朝球当前位置横移，边界钳制与 moveHorizontal 同公式
@@ -1006,8 +941,7 @@ public class ComputerDecision {
         if (energy > GameProperties.jumpEnergy + GameProperties.heavyShotEnergy
                 && !isJumpCooldown
                 && heightAbove >= GameProperties.smashJumpHeight
-                && smashJumpKeepsContact()
-                && !edgeZoneCheck(aiSide())) { // 场边：真实挥拍推演未打实则不跳，站定接球
+                && smashJumpKeepsContact()) {
             moveHorizontal(200);
             superShot();
             return true;
@@ -1132,9 +1066,7 @@ public class ComputerDecision {
             InterceptPrediction pred = predictAtY(idealHitY);
             if (pred.t > 0 && pred.t <= 1.0) {
                 double reach = decisionMoveSpeed() * pred.t + hitAreaRadius + racketRadius + 8.0;
-                // AI 不越网，位置即半场：与其它决策入口的 side 约定一致
-                int side = (computerX > GameProperties.netPosition) ? -1 : 1;
-                if (Math.abs(pred.x - computerX) <= reach && !edgeZoneCheck(side)) {
+                if (Math.abs(pred.x - computerX) <= reach) {
                     isJump = true;
                 }
             }
