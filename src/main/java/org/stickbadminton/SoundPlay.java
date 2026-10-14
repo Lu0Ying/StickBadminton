@@ -27,6 +27,19 @@ public class SoundPlay {
         loadSound("shot_heavy.mp3");
         loadSound("sigh.mp3");
         loadSound("title_bgm.mp3");
+        warmUpSounds();
+    }
+
+    // 对局音效预热：原生播放器创建从"对局中首次触发"提前到启动时——
+    // 扣杀首帧原本要叠加 fire.mp3/shot_heavy 的原生创建，与 40 粒 burst 同帧就是
+    // 肉眼可见的卡顿；预热后对局中恒为"复用已有播放器"零创建
+    private static final String[] WARM_UP_SOUNDS = {
+            "shot_heavy.mp3", "shot_light.mp3", "fire.mp3",
+            "add_score.mp3", "cheer.mp3", "net_crash.mp3", "sigh.mp3"
+    };
+
+    private static void warmUpSounds() {
+        for (String s : WARM_UP_SOUNDS) obtainPlayer(s); // 仅创建，不发声
     }
 
     private static void loadSound(String sourceUrl) {
@@ -111,20 +124,8 @@ public class SoundPlay {
         // 音效位于击球/计分等关键逻辑中，任何播放失败必须就地吞掉并丢弃坏实例，
         // 绝不允许异常逸出中断出球（曾导致 heavyHit 中断、球速未设置的"挥拍接不到球"）
         try {
-            MediaPlayer soundPlayer = oneShotPlayers.get(sourceUrl);
-            if (soundPlayer == null) {
-                Media media = soundCache.get(sourceUrl);
-                if (media == null) {
-                    // 如果音效没有预加载，则动态加载
-                    media = loadMedia(sourceUrl);
-                    if (media == null) {
-                        return;
-                    }
-                    soundCache.put(sourceUrl, media);
-                }
-                soundPlayer = new MediaPlayer(media);
-                oneShotPlayers.put(sourceUrl, soundPlayer);
-            }
+            MediaPlayer soundPlayer = obtainPlayer(sourceUrl);
+            if (soundPlayer == null) return;
             soundPlayer.setVolume(Math.max(0,Math.min(1,volume)));
             soundPlayer.seek(Duration.ZERO); // 从头重播，覆盖前一次未播完的同音效
             soundPlayer.play();
@@ -133,6 +134,22 @@ public class SoundPlay {
             oneShotPlayers.remove(sourceUrl);
             System.err.println("音效播放失败(不影响游戏): " + sourceUrl + " - " + e);
         }
+    }
+
+    // 取得（必要时创建）复用播放器；仅创建不发声，失败返回 null（不抛异常）
+    private static MediaPlayer obtainPlayer(String sourceUrl) {
+        MediaPlayer soundPlayer = oneShotPlayers.get(sourceUrl);
+        if (soundPlayer != null) return soundPlayer;
+        Media media = soundCache.get(sourceUrl);
+        if (media == null) {
+            // 如果音效没有预加载，则动态加载
+            media = loadMedia(sourceUrl);
+            if (media == null) return null;
+            soundCache.put(sourceUrl, media);
+        }
+        soundPlayer = new MediaPlayer(media);
+        oneShotPlayers.put(sourceUrl, soundPlayer);
+        return soundPlayer;
     }
 
     //手动移除不需要的音效（缓存 Media 与复用播放器一并清理）

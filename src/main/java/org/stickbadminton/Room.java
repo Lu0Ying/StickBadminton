@@ -57,14 +57,17 @@ public class Room {
     }
 
     public void removeUiNode(Node node) {
-        uiNodes.forEach( pack -> {
-            if (pack.getKey() == node) {
+        // 反向遍历：避免在 forEach 中 remove 造成并发修改异常；
+        // 命中即移除并返回，不再扫全表（原实现在删除后仍继续遍历后续元素）
+        for (int i = uiNodes.size() - 1; i >= 0; i--) {
+            if (uiNodes.get(i).getKey() == node) {
                 if (isActive) {
                     FXGL.removeUINode(node);
                 }
-                uiNodes.remove(pack);
+                uiNodes.remove(i);
+                return;
             }
-        });
+        }
     }
 
     public UIObject addUiObject(UIObject uiObject, int x, int y) {
