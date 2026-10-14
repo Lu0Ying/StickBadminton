@@ -122,19 +122,18 @@ public class Badminton extends GameObject {
             // 释放检测双端同构执行（客户端按键来自服务器注入，固定初速双端一致）。
             // 发球方是 AI（单人模式右半场常驻 AI，或 G 键把 p1 切成 AI）时自动释放，
             // 替代原先的 matchMode==1 特判：单人行为不变，联机 AI 发球走同一路径。
-            // 5级AI发球力度 ×1.1（人类与G键满级恒为1.0，联机双端同值）
+            // 5级AI不再叠 ×1.1 属性倍率（已取消），发球初速与4级/人类完全一致
             StickMan serverStickman = getServerStickman();
-            double servePower = serverStickman != null ? serverStickman.getStatMultiplier() : 1.0;
             if (serverStickman != null && serverStickman.isAIControlled) {
                 isFrozen = false;
-                speedX = 250 * sideServe * servePower;
-                speedY = 300 * servePower;
+                speedX = 250 * sideServe;
+                speedY = 300;
             }
             else if (((sideServe == StickMan.sideRight) && (KeyInput.isKeyHolding(KeyCode.Q) || KeyInput.isKeyHolding(KeyCode.E)))
                     || ((sideServe == StickMan.sideLeft) && (KeyInput.isKeyHolding(KeyCode.U) || KeyInput.isKeyHolding(KeyCode.O)))) {
                 isFrozen = false;
-                speedX = 250 * sideServe * servePower;
-                speedY = 300 * servePower;
+                speedX = 250 * sideServe;
+                speedY = 300;
             }
             return;
         }
@@ -211,15 +210,8 @@ public class Badminton extends GameObject {
         // 拖尾粒子与 TouchedTime 递增统一在 onUpdate 开头的渲染块处理，避免一帧双跳
     }
 
+    // 5级AI ×1.1 力度倍率已取消：所有 AI 与人类击球初速恒用同一档位表
     public void lightHit(double angle) {
-        lightHit(angle, 1.0);
-    }
-
-    /**
-     * @param powerMul 力度倍率：5级AI ×1.1，人类与其它难度为 1.0。
-     *                 联机 HIT 回放走1参重载、随后被权威初速覆盖，不影响双端同步
-     */
-    public void lightHit(double angle, double powerMul) {
         // angle: 击打角度
         // 被击打（力度小)
         SoundPlay.playSound("shot_light.mp3", 0.4);
@@ -229,7 +221,7 @@ public class Badminton extends GameObject {
             angle -= 360;
         isHitted = true;
         // 档位表抽成静态方法，供 AI 出球过网仿真复用同一公式（逐字一致，双端确定性不变）
-        double speed = hitSpeedFor(false, angle, getCenterX(), powerMul);
+        double speed = hitSpeedFor(false, angle, getCenterX());
         speedY = speed * StrictMath.sin(StrictMath.toRadians(angle));
         speedX = speed * StrictMath.cos(StrictMath.toRadians(angle));
         emitter.setNumParticles(4);
@@ -238,13 +230,6 @@ public class Badminton extends GameObject {
     }
 
     public void heavyHit(double angle) {
-        heavyHit(angle, 1.0);
-    }
-
-    /**
-     * @param powerMul 力度倍率：5级AI ×1.1，人类与其它难度为 1.0
-     */
-    public void heavyHit(double angle, double powerMul) {
         // angle: 击打角度
         // 被击打（力度大）
         SoundPlay.playSound("shot_heavy.mp3", 1.0);
@@ -253,7 +238,7 @@ public class Badminton extends GameObject {
         while (angle > 360)
             angle -= 360;
         isHitted = true;
-        double speed = hitSpeedFor(true, angle, getCenterX(), powerMul);
+        double speed = hitSpeedFor(true, angle, getCenterX());
         speedY = speed * StrictMath.sin(StrictMath.toRadians(angle));
         speedX = speed * StrictMath.cos(StrictMath.toRadians(angle));
 
@@ -266,23 +251,20 @@ public class Badminton extends GameObject {
      * 击球初速档位：角度 180° 内为“扣球”固定档，其余按击球点到网距离分近/中/远三档。
      * lightHit/heavyHit 与 AI 过网仿真共用同一公式，避免两处抄表走样。
      */
-    public static double hitSpeedFor(boolean heavy, double angle, double ballCenterX, double powerMul) {
+    public static double hitSpeedFor(boolean heavy, double angle, double ballCenterX) {
         while (angle < 0)
             angle += 360;
         while (angle > 360)
             angle -= 360;
-        double speed;
         if (angle < 180) // 扣球
-            speed = heavy ? 2500 : 1200;
-        else if (ballCenterX >= GameProperties.netPosition - GameProperties.powerDistance
+            return heavy ? 2500 : 1200;
+        if (ballCenterX >= GameProperties.netPosition - GameProperties.powerDistance
                 && ballCenterX <= GameProperties.netPosition + GameProperties.powerDistance) // 近场
-            speed = heavy ? 900 : 500;
-        else if (ballCenterX <= GameProperties.netPosition - GameProperties.powerDistance * 2
+            return heavy ? 900 : 500;
+        if (ballCenterX <= GameProperties.netPosition - GameProperties.powerDistance * 2
                 || ballCenterX >= GameProperties.netPosition + GameProperties.powerDistance * 2) // 远场
-            speed = heavy ? 1300 : 900;
-        else
-            speed = heavy ? 1100 : 700;
-        return speed * powerMul;
+            return heavy ? 1300 : 900;
+        return heavy ? 1100 : 700;
     }
 
     /**

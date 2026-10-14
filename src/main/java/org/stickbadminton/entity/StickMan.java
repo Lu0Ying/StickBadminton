@@ -51,21 +51,12 @@ public class StickMan extends GameObject {
     public double energyRemain = 100.0; // 满格体力 = 100
 
     /**
-     * 本角色属性倍率：5级 AI（非 G 键满级）移速与击打力度 ×1.1；
-     * 人类与其它难度恒为 1.0——联机 G 键满级路径不叠倍率，保证双端一致。
-     */
-    public double getStatMultiplier() {
-        if (!isAIControlled || aiMaxLevel || GameProperties.difficultyLevel != 5)
-            return 1.0;
-        return GameProperties.level5StatBoost;
-    }
-
-    /**
-     * 当前实际移速：体力不足 fullSpeedEnergy 时线性衰减，5级AI 再乘属性倍率。
+     * 当前实际移速：体力不足 fullSpeedEnergy 时线性衰减。
      * AI 决策层（走位预判/跳跃可达性）必须用同一公式，否则低体力时会误判“跑得到”。
+     * 5级 AI 不再叠 ×1.1 属性倍率（已取消），与 4 级完全一致，仅靠扣杀风格分层区分。
      */
     public double getEffectiveMoveSpeed() {
-        double baseMoveSpeed = GameProperties.moveSpeed * getStatMultiplier();
+        double baseMoveSpeed = GameProperties.moveSpeed;
         if (GameProperties.infiniteEnergyMode)
             return baseMoveSpeed;
         return energyRemain > GameProperties.fullSpeedEnergy ? baseMoveSpeed
@@ -88,7 +79,7 @@ public class StickMan extends GameObject {
             while (candidate >= 360) candidate -= 360;
             // 接触点已在挥拍圆弧上，边距12只留轻微相位/步进误差
             if (Badminton.launchClearsNet(fromX, fromY, candidate,
-                    Badminton.hitSpeedFor(isHeavyShot, candidate, fromX, getStatMultiplier()), 12.0))
+                    Badminton.hitSpeedFor(isHeavyShot, candidate, fromX), 12.0))
                 return candidate;
         }
         return hitAngle; // 24次仍无解（极罕见），维持原角度
@@ -105,6 +96,18 @@ public class StickMan extends GameObject {
         while (hitAngle < 0) hitAngle += 360;
         while (hitAngle >= 360) hitAngle -= 360;
         return hitAngle;
+    }
+
+    /**
+     * 4级AI 扣杀是否跳过过网兜底（概率砸网失误）。
+     * 4级是"激进"风格：扣杀多、但约30% 拍不经过网安全网，允许砸网/不过网的失误，
+     * 以此与5级、G键满级的"精准"（必过网、成功率极高）拉开层次。
+     * 仅单人模式的4级会走到这里——联机与G键满级恒不跳过，双端判定不受随机影响。
+     */
+    private boolean skipNetGuardOnSmash() {
+        if (aiMaxLevel || GameProperties.difficultyLevel != 4) return false;
+        if (!isAIControlled || !aiSmashIntent || !isHeavyShot) return false;
+        return shotVariance.nextDouble() < 0.3;
     }
 
     /**
@@ -274,7 +277,7 @@ public class StickMan extends GameObject {
         }
         else decision = new ComputerDecision();
 
-        // 水平移动相关：与 AI 决策层共用同一移速公式（体力插值 + 5级属性倍率）
+        // 水平移动相关：与 AI 决策层共用同一移速公式（体力插值）
         double moveSpeed = getEffectiveMoveSpeed();
         if (isAIControlled) {
             if (decision.isMoveRight == true) {
@@ -444,10 +447,12 @@ public class StickMan extends GameObject {
                                 if (isAIControlled && aiSmashIntent && isHeavyShot && hitAngle > 180)
                                     hitAngle = 360 - hitAngle;
                                 // AI 击球随机偏差(高难±5°/低难±14°)后再经过网安全网兜底——
-                                // 高难不会因随机量出现击球不过网，低难允许失误
+                                // 高难不会因随机量出现击球不过网，低难允许失误；
+                                // 4级扣杀约30%跳过兜底(概率不过网)，5级/满级恒兜底
                                 if (isAIControlled) {
                                     hitAngle = applyShotVariance(hitAngle);
-                                    hitAngle = adjustAINetSafeAngle(hitAngle, badminton.getCenterX(), badminton.getCenterY());
+                                    if (!skipNetGuardOnSmash())
+                                        hitAngle = adjustAINetSafeAngle(hitAngle, badminton.getCenterX(), badminton.getCenterY());
                                 }
                                 // 击球判定唯一权威是主机/单机；联机客户端只更新本地动画标志，
                                 // 球的表现由服务器广播的 HIT 回显触发，避免双份音效/特效与判定分叉
@@ -456,9 +461,9 @@ public class StickMan extends GameObject {
                                     // 先执行击球算出权威初速，再随消息上报，
                                     // 客户端直接采用该初速，避免重算公式/档位不一致导致轨迹分叉
                                     if (isHeavyShot)
-                                        badminton.heavyHit(hitAngle, getStatMultiplier());
+                                        badminton.heavyHit(hitAngle);
                                     else
-                                        badminton.lightHit(hitAngle, getStatMultiplier());
+                                        badminton.lightHit(hitAngle);
                                     if (MatchController.getNetClient() != null) {
                                         String type = isHeavyShot ? "HEAVY" : "LIGHT";
                                         String hitMsg = String.format("HIT_REQUEST:%s:%.2f:%.2f:%.2f:%.2f:%.2f",
@@ -518,9 +523,11 @@ public class StickMan extends GameObject {
                                             hitAngle = 250;
                                     }
                                     // AI 击球随机偏差 + 贴地捞球挑球角的过网兜底（人类不干预）
+                                    // 4级扣杀约30%跳过兜底，与上方击球路径同一策略
                                     if (isAIControlled) {
                                         hitAngle = applyShotVariance(hitAngle);
-                                        hitAngle = adjustAINetSafeAngle(hitAngle, badminton.getCenterX(), badminton.getCenterY());
+                                        if (!skipNetGuardOnSmash())
+                                            hitAngle = adjustAINetSafeAngle(hitAngle, badminton.getCenterX(), badminton.getCenterY());
                                     }
                                     // 击球判定唯一权威是主机/单机；联机客户端只更新本地动画标志，
                                     // 球的表现由服务器广播的 HIT 回显触发
@@ -528,9 +535,9 @@ public class StickMan extends GameObject {
                                     if (localAuthority) {
                                         // 先击球算出权威初速再上报，客户端直接采用避免重算分叉
                                         if (isHeavyShot)
-                                            badminton.heavyHit(hitAngle, getStatMultiplier());
+                                            badminton.heavyHit(hitAngle);
                                         else
-                                            badminton.lightHit(hitAngle, getStatMultiplier());
+                                            badminton.lightHit(hitAngle);
                                         if (MatchController.getNetClient() != null) {
                                             String type = isHeavyShot ? "HEAVY" : "LIGHT";
                                             String hitMsg = String.format("HIT_REQUEST:%s:%.2f:%.2f:%.2f:%.2f:%.2f",
