@@ -54,10 +54,12 @@ public class ComputerDecision {
     private static final double EARLY_SMASH_ALIGN = 150.0;
     // 场边(贴墙)区域宽度：AI 自身或球距左右空气墙 ≤ 该值视为贴边，起跳判定从严
     private static final double EDGE_ZONE_WIDTH = 60.0;
-    // 场边严判的扫掠安全系数：贴边球速快、又赶墙反弹，推演与真实常差 1 帧(~25px)，
-    // 仅"擦到拍面"(扫掠距≈45)的接球在场边极易打空——要求扫掠距 ≤ 45*0.75 才算
-    // "打实"，够不到就判接不到、站定不跳；真正接得到的球扫掠距很近(如贴墙反弹仅18px)不受影响
-    private static final double EDGE_SWEEP_SOLID_FACTOR = 0.75;
+    // 场边严判的"连续命中帧"要求：白跳的真因是推演与真实挥拍常差 1 帧（贴边快球
+    // 1 帧≈25px），单帧擦边即拒会把真实接得到的球(45px 半径内真能打到)也误拒成
+    // 站定接不到。改为对 1 帧误差鲁棒的判据——连续 2 帧命中才放行：时序提前或
+    // 滞后 1 帧都至少有一帧落在扫掠区(真实挥拍必命中)，仅单帧擦边(时序敏感、
+    // 真实必挥空)才拒绝。命中半径保持真实判定的 45px 不加折扣
+    private static final int EDGE_CONSECUTIVE_HITS = 2;
     // 提前起跳概率：网前球必跳（拦截最优先）；中后场分层给概率——中前场高、后场低，
     // 让慢速球优先获得起跳权重而不是退后场等待（3级常规档）
     private static final double EARLY_SMASH_PROB_MID = 0.75;
@@ -762,9 +764,9 @@ public class ComputerDecision {
     // 场边严判入口：AI 自身贴墙、球即将贴墙，或球已到墙角/正在墙反弹——
     // 这些场景下球心可达 840.5 而 AI 中心卡在 809，常年的 31px 水平差让推演
     // "假命中"、真实挥拍却扫空(白跳还落地漏球)。场边用真实挥拍相位逐帧推演，
-    // 并把命中口径从"擦到拍面(≤45px)"收紧到"打实(≤45*0.75)"——掠过球只擦到
-    // 拍面边缘、极易因 1 帧时序差打空，够不到就判接不到、站定不跳；真正接得到
-    // 的球(如贴墙反弹)扫掠距很近，不受影响。非场边不加严判，保持原判定
+    // 保持真实判定的 45px 命中半径（不折扣，避免把真接得到的球误拒成站定接不到），
+    // 额外要求"连续 2 帧命中"以对 1 帧时序误差鲁棒：单帧擦边=时序敏感、真实必挥空。
+    // 非场边不加严判，保持原判定
     private boolean edgeZoneCheck(int side) {
         double leftGap = badmintonX - GameProperties.playFieldLeft;
         double rightGap = GameProperties.playFieldRight - badmintonX;
@@ -773,13 +775,14 @@ public class ComputerDecision {
                 GameProperties.playFieldRight - computerX);
         boolean inEdge = pivotGap <= EDGE_ZONE_WIDTH || wallGap <= EDGE_ZONE_WIDTH;
         if (!inEdge) return false; // 非场边：不加严判，保持原判定
-        // 场边：真实挥拍推演必须"打实"才允许起跳，否则站定接球
+        // 场边：真实挥拍推演须连续帧命中才允许起跳，否则站定接球
         return !edgeSolidConnectable(side);
     }
 
     // 场边用真实挥拍相位复刻提前跳杀的截击推演（口径与 earlySmashConnectable 一致，
-    // 但阈值更严：扫掠距 ≤ racket*安全系数 才算"打实"，够不到判接不到）。
-    // 含球墙反弹与 AI 空气墙钳制
+    // 命中半径同为真实判定的 45px）。场边额外要求"连续 2 帧命中"才放行：对推演与
+    // 真实的 1 帧时序误差鲁棒——只命中 1 帧(单帧擦边)说明时序敏感、真实挥拍大概率
+    // 扫空，判接不到站定不跳；含球墙反弹与 AI 空气墙钳制
     private boolean edgeSolidConnectable(int side) {
         double shoulderY = computerY;
         double pivotX = computerX;
@@ -787,7 +790,7 @@ public class ComputerDecision {
         double ballX = badmintonX, ballY = badmintonY;
         double ballVx = badmintonSpeedX, ballVy = badmintonSpeedY;
         double step = decisionMoveSpeed() * GameProperties.frameTime;
-        final double solidDist = GameProperties.racketRadius * EDGE_SWEEP_SOLID_FACTOR;
+        int hitRun = 0;       // 连续命中帧计数
         boolean useDown = false;
         double[] st = {ballX, ballY, ballVx, ballVy, shoulderY, pivotX, jumpVy};
         for (int f = 1; f <= 17; f++) {
@@ -799,10 +802,16 @@ public class ComputerDecision {
                 useDown = (ballX - GameProperties.netPosition) * side <= 0
                         && ballY > shoulderY - 46;
             }
-            if (swingSweepDist(f - 7, side, pivotX, shoulderY, ballX, ballY, useDown) <= solidDist)
-                return true;
+            boolean hit = swingSweepDist(f - 7, side, pivotX, shoulderY, ballX, ballY, useDown)
+                    <= GameProperties.racketRadius;
+            if (hit) {
+                hitRun++;
+                if (hitRun >= EDGE_CONSECUTIVE_HITS) return true;
+            } else {
+                hitRun = 0;
+            }
         }
-        return false;
+        return false; // 未形成连续命中：单帧擦边时序敏感、真实必挥空，站定不跳
     }
 
     // 跳杀风存跟随专用：朝球当前位置横移，边界钳制与 moveHorizontal 同公式
