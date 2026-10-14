@@ -5,6 +5,7 @@ import org.stickbadminton.fx.NetAnimation;
 import org.stickbadminton.fx.ParticleFX;
 import org.stickbadminton.logic.GameProperties;
 import org.stickbadminton.logic.MatchController;
+import org.stickbadminton.logic.MissTrace;
 
 import com.almasb.fxgl.particle.ParticleComponent;
 import com.almasb.fxgl.particle.ParticleEmitter;
@@ -105,6 +106,8 @@ public class Badminton extends GameObject {
             ParticleFX.closeParticle(emitter);
             TouchedTime++;
         }
+
+        MissTrace.tick(); // 失分诊断：每逻辑帧推进帧号（未启用时早退）
 
         if (isFrozen) {
             speedY = 0;
@@ -344,6 +347,8 @@ public class Badminton extends GameObject {
             // 仅主机/单机做落地裁决计分：客户端等主机 SCORE 事件驱动，避免双端裁决分叉
             boolean localAuthority = MatchController.getNetClient() == null || MatchController.isHost();
             if (localAuthority && inRoom != null) {
+                // 诊断：落地即落盘本球完整记录（含挥拍命中/挥空/拒绝原因）
+                MissTrace.onPoint(getCenterX() > 450 ? 1 : -1, getCenterX());
                 ((MatchController) inRoom.getObject("controller")).onBallGroundHit(getCenterX() > 450 ? 1 : -1);
             }
         }

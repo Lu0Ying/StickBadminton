@@ -1,5 +1,6 @@
 package org.stickbadminton.entity;
 import org.stickbadminton.logic.GameProperties;
+import org.stickbadminton.logic.MissTrace;
 import java.util.Random;
 
 public class ComputerDecision {
@@ -145,6 +146,8 @@ public class ComputerDecision {
     private double energy = 100.0;
     // StickMan 传入的实际移速（体力插值），仅体力管理路径参与预判
     private double effectiveMoveSpeed;
+    // 失分诊断：本帧跳跃/扣杀被拒原因码（仅 MissTrace 开启时被各拒绝点赋值）
+    private String traceRej = "";
 
     public ComputerDecision() {}
 
@@ -218,15 +221,45 @@ public class ComputerDecision {
         if (isBallApproaching) {
             if (shouldReact()) {
                 executeStrategy(side, isShotCooldown);
+            } else {
+                traceRej = "noReact"; // 反应随机门拒绝（低难度 shouldReact）
             }
         } else if (badmintonY < GameProperties.floorBallY - 50) {
             // 无球/回位
             offBallPositioning(side);
         }
 
+        emitDecisionTrace(side, isShotCooldown);
+
         // 记忆当前球状态
         prevBallX = badmintonX;
         prevBallVX = badmintonSpeedX;
+    }
+
+    // 失分诊断：给本帧追加一个拒绝原因码（仅开启时生效，多码逗号分隔）
+    private void rejMark(String code) {
+        if (!MissTrace.isEnabled()) return;
+        traceRej = traceRej.isEmpty() ? code : traceRej + "," + code;
+    }
+
+    // 失分诊断：每帧一行（仅 MissTrace 开启时拼串；含本帧所有跳跃/扣杀拒绝原因码）
+    // 格式：D f=? s=? | ball x,y,vx,vy | ai x,cd,cdjmp | acc=0/1 | shot/kind/jump | rej=code
+    // rej 码的裁读：smProb=圈内概率扣杀被概率门拒(need,roll=故意不扣)、
+    // eXxx=提前跳杀各道硬门、jXxx=普通跳跃门、dcd=击球圈未达、cd=冷却
+    private void emitDecisionTrace(int side, boolean shotCooldown) {
+        if (!MissTrace.isEnabled()) return;
+        boolean onMySide = (side == 1) ? (badmintonX < GameProperties.netPosition)
+                : (badmintonX > GameProperties.netPosition);
+        double gap = Math.abs(computerX - badmintonX);
+        double dist = Math.sqrt(gap * gap + (computerY - badmintonY) * (computerY - badmintonY));
+        String kind = isSmashIntent ? "smash" : isHeavyhit ? "heavy" : isLighthit ? "light" : "-";
+        MissTrace.decision(String.format(
+                "D f=%d s=%s | ball %.0f,%.0f,%.0f,%.0f | ai %.0f cd=%b cdjmp=%b | acc=%d dist=%.0f | shot=%b %s jump=%b | rej=%s",
+                MissTrace.frame(), side > 0 ? "L" : "R",
+                badmintonX, badmintonY, badmintonSpeedX, badmintonSpeedY,
+                computerX, shotCooldown, isJumpCooldown,
+                onMySide ? 1 : 0, dist,
+                isShot, kind, isJump, traceRej));
     }
 
     // 决策层预判用的移速：体力管理按实际移速（低体力跑得慢，预判要同步变慢，
@@ -283,7 +316,7 @@ public class ComputerDecision {
         observeOpponent(side, opponentX);
 
         //杀球防守
-        if (handleSmashDefense(side, isShotCooldown)) return;
+        if (handleSmashDefense(side, isShotCooldown)) { rejMark("def"); return; }
 
         //提前起跳扣杀：高位/网前下落球不等进圈、不退后场等球，先跳(风存后空中截击)。
         //放在网前拦截分支之前：球快落到前场时直接网前跳起拦截扣杀
@@ -295,13 +328,14 @@ public class ComputerDecision {
         if (jumpSmashFollow[sideIdx] > 0) {
             jumpSmashFollow[sideIdx]--;
             if (isJumpCooldown) {
+                rejMark("wf"); // 风存跟随窗口内（已起跳，本帧只跟球）
                 moveFollowBallX();
                 return; // 风存期只跟球：不出招(风存状态机管挥拍)、不另跳
             }
         }
 
         //预测拦截
-        if (handleFrontCourt(side, isShotCooldown)) return;
+        if (handleFrontCourt(side, isShotCooldown)) { rejMark("fc"); return; }
 
         //位置调整
         adjustPosition();
@@ -309,6 +343,8 @@ public class ComputerDecision {
         //常规击球
         if (!isShotCooldown && getDistance() < (hitAreaRadius + racketRadius)) {
             decideShotStrategy();
+        } else if (traceRej.isEmpty()) {
+            rejMark("dcd"); // 未进击球圈或挥拍冷却中：本帧无法出招
         }
 
         //考虑跳跃（对手远离球网；用绝对值使左右半场 AI 判定对称——
@@ -319,6 +355,8 @@ public class ComputerDecision {
                 Math.abs(computerX - badmintonX) < 40)
         {
             moveVertical();
+        } else if (!isJump && traceRej.isEmpty()) {
+            rejMark("jPre"); // 普通跳跃前置未过：距离/对手位置/水平对齐
         }
     }
     //杀球防守
@@ -549,13 +587,17 @@ public class ComputerDecision {
         // 概率扣杀（圈内路径）：按扣杀风格分层——3级原概率(中前场60%/后场35%)、
         // 4级激进(85%/55%，多扣)、5级与满级精准(40%/20%，少扣但每次必过网成功率高)；
         // 其内含切线角过网仿真+体力/跳跃冷却/可达门槛，不合适自动返回 false
-        // 落穿到下方调动分支；varianceRoll 双端同拍不分叉
-        if (smartEnergy
-                && energy > GameProperties.jumpEnergy + GameProperties.heavyShotEnergy
-                && varianceRoll() < (Math.abs(badmintonX - GameProperties.netPosition) > SMASH_COURT_WINDOW
-                        ? smashProbBack() : smashProbMid())
-                && preciseSmash()) {
-            return;
+        // 落穿到下方调动分支；varianceRoll 双端同拍不分叉。
+        // 诊断：概率门失败记 smProb(need,roll)=本拍故意不扣（仍会 variedShot 正常回球），
+        // 精确重构保持原短路语义与 varianceRoll 恰好一次调用（随机流不偏移）
+        if (smartEnergy && energy > GameProperties.jumpEnergy + GameProperties.heavyShotEnergy) {
+            double need = Math.abs(badmintonX - GameProperties.netPosition) > SMASH_COURT_WINDOW
+                    ? smashProbBack() : smashProbMid();
+            double roll = varianceRoll();
+            if (roll < need && preciseSmash()) {
+                return;
+            }
+            if (roll >= need) rejMark(String.format("smProb(need%.2f,roll%.2f)", need, roll));
         }
 
         // “对手/自己离网多远”一律用绝对值：旧式 netPosition-x 只在 AI 在右半场时为正，
@@ -674,16 +716,23 @@ public class ComputerDecision {
     // AI 只能站着轻挡或退后场等球——"先跳再击球"的主路径。
     // 仅高难度(smartEnergy)启用；体力门槛(>55)天然限频：两次跳杀即见底，靠站桩回血续航
     private boolean earlyJumpSmash(int side, boolean isShotCooldown) {
-        if (!smartEnergy || isShotCooldown || isJumpCooldown) return false;
-        if (energy <= GameProperties.jumpEnergy + GameProperties.heavyShotEnergy) return false;
+        if (!smartEnergy || isShotCooldown || isJumpCooldown) {
+            if (MissTrace.isEnabled()) {
+                if (!smartEnergy) rejMark("eOff");
+                else if (isShotCooldown) rejMark("eCd");
+                else rejMark("eJcd");
+            }
+            return false;
+        }
+        if (energy <= GameProperties.jumpEnergy + GameProperties.heavyShotEnergy) { rejMark("eEne"); return false; }
         double netDist = Math.abs(badmintonX - GameProperties.netPosition);
-        if (badmintonSpeedY <= 0) return false; // 只接下落球，上升球交给常规分支
+        if (badmintonSpeedY <= 0) { rejMark("eUp"); return false; } // 只接下落球，上升球交给常规分支
         // 高度门槛：网前拦截位放宽(球快落到前场也跳)，其余按高位球标准
         double minHeight = netDist <= FRONT_COURT_WINDOW ? EARLY_SMASH_MIN_H_NET : EARLY_SMASH_MIN_H;
-        if (computerY - badmintonY < minHeight) return false;
-        if (Math.abs(computerX - badmintonX) > EARLY_SMASH_ALIGN) return false;
+        if (computerY - badmintonY < minHeight) { rejMark("eH"); return false; }
+        if (Math.abs(computerX - badmintonX) > EARLY_SMASH_ALIGN) { rejMark("eAl"); return false; }
         double angle = tangentHitAngle();
-        if (angle >= 180) return false; // 切线朝上（球在肩后/正上方）不提前跳
+        if (angle >= 180) { rejMark("eAng"); return false; } // 切线朝上（球在肩后/正上方）不提前跳
         double lagMargin = Math.min(SMASH_LAG_MARGIN_CAP, Math.max(0.0, badmintonSpeedY * 0.1));
         // 与 preciseSmash 同款调平循环：单角对远球会被空气阻力拖到过网前先落地，
         // 每次向本方前上方调5°(右半场+5、左半场-5)直到过网，压平超上限说明本质不是扣杀球
@@ -695,13 +744,17 @@ public class ComputerDecision {
                 break;
             }
         }
-        if (!clears) return false;
-        if (!earlySmashConnectable(side)) return false; // 风存+挥拍窗口内接不到球不白跳
+        if (!clears) { rejMark("eNet"); return false; }
+        if (!earlySmashConnectable(side)) { rejMark("eCon"); return false; } // 风存+挥拍窗口内接不到球不白跳
         // 分层概率：网前拦截必跳；中后场按扣杀风格取概率(3级原概率/4级激进/5级与满级精准)；
         // varianceRoll 用球心坐标哈希，满级联机双端同拍不分叉
         if (netDist > FRONT_COURT_WINDOW) {
             double prob = (netDist <= SMASH_COURT_WINDOW) ? earlyProbMid() : earlyProbBack();
-            if (varianceRoll() >= prob) return false;
+            double roll = varianceRoll();
+            if (roll >= prob) { // 概率层故意不跳（诊断关键证据：need/roll 显式入档）
+                rejMark(String.format("eProb(need%.2f,roll%.2f)", prob, roll));
+                return false;
+            }
         }
         moveFollowBallX(); // 触发帧就朝球当前x走(不用preLanding落点：落点常在球后方)
         jumpSmashFollow[(side == 1) ? 0 : 1] = 12; // 开风存跟随窗口，覆盖风存6帧+挥拍
@@ -906,7 +959,7 @@ public class ComputerDecision {
                     && Math.abs(badmintonSpeedX) < 150.0
                     && badmintonSpeedY < 200.0
                     && badmintonY < computerY - GameProperties.hitAreaRadius;
-            if (!highSlowBall) return false;
+            if (!highSlowBall) { rejMark("prAng"); return false; }
             // 后挪方向：右半场 AI 自己在右侧(+x)，站到球右边让球落在肩前上方
             double standX = computerX + (isRightSide ? 40.0 : -40.0);
             double alphaContact = StrictMath.toDegrees(StrictMath.atan2(
@@ -915,7 +968,7 @@ public class ComputerDecision {
             double contactAngle = isRightSide ? alphaContact - 90 : alphaContact + 90;
             if (contactAngle < 0) contactAngle += 360;
             else if (contactAngle >= 360) contactAngle -= 360;
-            if (contactAngle >= 180) return false;
+            if (contactAngle >= 180) { rejMark("prAng"); return false; }
             expectedAngle = contactAngle;
         }
         // 切线角天然比"能过网的角度"更下压（球在肩前下方时斜率≈|dx/dy|），
@@ -934,19 +987,17 @@ public class ComputerDecision {
                 break;
             }
         }
-        if (!clearsNet) return false;
+        if (!clearsNet) { rejMark("prNet"); return false; }
         // 跳杀总价 = 跳20 + 重击35 = 55。条件不满足（体力不足/球不够高/跳跃冷却中/
         // 起跳后撑不到挥拍弧）就不扣，返回 false 落穿到常规挑/抽——
         // 扣杀必须先跳再击球，严禁原地站立扣杀
-        if (energy > GameProperties.jumpEnergy + GameProperties.heavyShotEnergy
-                && !isJumpCooldown
-                && heightAbove >= GameProperties.smashJumpHeight
-                && smashJumpKeepsContact()) {
-            moveHorizontal(200);
-            superShot();
-            return true;
-        }
-        return false;
+        if (!(energy > GameProperties.jumpEnergy + GameProperties.heavyShotEnergy)) { rejMark("prEne"); return false; }
+        if (isJumpCooldown) { rejMark("prJcd"); return false; }
+        if (heightAbove < GameProperties.smashJumpHeight) { rejMark("prH"); return false; }
+        if (!smashJumpKeepsContact()) { rejMark("prKeeps"); return false; }
+        moveHorizontal(200);
+        superShot();
+        return true;
     }
 
     // 跳杀可达性终检：起跳初速700px/s，0.1s内肩膀抬高约60px，而发球类快坠球（vy≈300）
@@ -1099,22 +1150,25 @@ public class ComputerDecision {
 
     private boolean shouldJump(double timeToNet) {
         boolean basicWindow = timeToNet > 0.22 && timeToNet < 0.9;
-        if (!basicWindow) return false;
-        if (isLikelyRecentWallBounce()) return false;
+        if (!basicWindow) { rejMark("jWin"); return false; }
+        if (isLikelyRecentWallBounce()) { rejMark("jWall"); return false; }
         // 高难度：起跳只留在本方前半场(离网190px内)——后场高球站定挑高远即可，
         // 起跳纯耗体力还容易变成"跳起来挑高球"的无效观赏；前场高球由前场跳扣分支处理
-        if (smartEnergy && Math.abs(badmintonX - GameProperties.netPosition) > FRONT_COURT_WINDOW) return false;
+        if (smartEnergy && Math.abs(badmintonX - GameProperties.netPosition) > FRONT_COURT_WINDOW) { rejMark("jBack"); return false; }
         // 高难度：球低到“站立轻松够到”(肩上 45px 内)才不起跳——站立即打，起跳白费体力。
         // 原阈值整个触及圈105px、上一轮60px，60px 以上的偏高球仍常被排除导致跳跃偏少
-        if (smartEnergy && badmintonY >= computerY - GameProperties.hitAreaRadius * 0.75) return false;
+        if (smartEnergy && badmintonY >= computerY - GameProperties.hitAreaRadius * 0.75) { rejMark("jLow"); return false; }
         // 体力管理：起跳要花体力，起跳后至少保留 15 余量确保还能出球，
         // 体力不足先不起跳，避免连跳把体力掏空后跑不动也打不出
-        if (smartEnergy && energy < GameProperties.jumpEnergy + GameProperties.jumpEnergyReserve) return false;
+        if (smartEnergy && energy < GameProperties.jumpEnergy + GameProperties.jumpEnergyReserve) { rejMark("jEne"); return false; }
         if (maxLevel) return true; // 满级恒起跳：跳过随机概率，双端一致
 
         // 难度概率：高难度(3级+)提到≥0.95，低难度维持原0.95*p的折扣
         double p = Math.max(0.5, difficultyLevel);
-        return random.nextDouble() < (smartEnergy ? Math.max(0.95, p) : 0.95 * p);
+        double threshold = smartEnergy ? Math.max(0.95, p) : 0.95 * p;
+        double roll = random.nextDouble(); // 与原式同为恰好一次随机调用（随机流不偏移）
+        if (roll >= threshold) rejMark("jProb");
+        return roll < threshold;
     }
 
     // 强化“刚碰墙反弹”检测：结合速度符号翻转 + 临近墙体 + 冷却帧

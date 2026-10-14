@@ -118,6 +118,7 @@ public class MatchController extends GameObject{
         ballHitGroundTimer = 0.0;
         scoreChangeTimer = 0.01;
         playBGMTimer = 0.0;
+        MissTrace.resetRally(); // 失分诊断：开球即开始记录首个球
     }
     public void onBallGroundHit(int winner) {
         ballHitGroundTimer = 1.0;

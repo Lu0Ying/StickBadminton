@@ -83,6 +83,8 @@ public class GameProperties {
     // 以下为变量
     // 人机难度
     public static int difficultyLevel; // 1 ~ 5
+    // 失分诊断日志开关：逐帧记录 AI 决策/拒绝原因与挥拍事件，落地写 miss_trace.log
+    public static boolean missTraceEnabled = true;
     // 双方人物类型
     public static int characterType1 = 1;
     public static int characterType2 = 1;

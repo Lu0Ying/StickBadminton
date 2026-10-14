@@ -4,6 +4,7 @@ import org.stickbadminton.entity.Badminton;
 import org.stickbadminton.entity.ComputerDecision;
 import org.stickbadminton.logic.GameProperties;
 import org.stickbadminton.logic.MatchController;
+import org.stickbadminton.logic.MissTrace;
 
 import javafx.geometry.Point2D;
 import javafx.scene.image.Image;
@@ -108,6 +109,24 @@ public class StickMan extends GameObject {
         if (aiMaxLevel || GameProperties.difficultyLevel != 4) return false;
         if (!isAIControlled || !aiSmashIntent || !isHeavyShot) return false;
         return shotVariance.nextDouble() < 0.3;
+    }
+
+    /**
+     * 失分诊断：命中事件（含档位表判出的出球初速，供与 SWING_MISS/落地对账）。
+     * 仅 MissTrace 开启时拼串；调用点在 hasShotted 置位后，不影响任何游戏状态。
+     */
+    private void traceHit(Badminton badminton, double hitAngle) {
+        if (!MissTrace.isEnabled()) return;
+        double speed = Badminton.hitSpeedFor(isHeavyShot, hitAngle, badminton.getCenterX());
+        MissTrace.event(String.format(
+                "E HIT f=%d s=%s %s %s | ang=%.0f spd=%.0f | ball %.0f,%.0f -> %.0f,%.0f",
+                MissTrace.frame(), side > 0 ? "L" : "R",
+                aiSmashIntent ? "smash" : "normal",
+                isHeavyShot ? "heavy" : "light",
+                hitAngle, speed,
+                badminton.getCenterX(), badminton.getCenterY(),
+                badminton.speedX, badminton.speedY));
+        MissTrace.onHit();
     }
 
     /**
@@ -369,6 +388,9 @@ public class StickMan extends GameObject {
                 isJumping = true;
                 jumpCooldownTimer = GameProperties.jumpCooldown;
                 speedY = -GameProperties.jumpSpeedY;
+                if (MissTrace.isEnabled()) // 带 format 的实参先于方法早退求值，必须外层判断
+                    MissTrace.event(String.format("E JUMP f=%d s=%s y=%.0f e=%.0f",
+                            MissTrace.frame(), side > 0 ? "L" : "R", getCenterY(), energyRemain));
             }
         }
         else if ((KeyInput.isKeyHolding(KeyCode.W) && side == sideRight) || (KeyInput.isKeyHolding(KeyCode.I) && side == sideLeft)) {
@@ -392,6 +414,14 @@ public class StickMan extends GameObject {
             if (shotCooldownTimer <= 0) {
                 isShotting = false;
                 shotCooldownTimer = 0;
+                // 诊断：整段挥拍动画结束仍未命中 = 真实挥空（含球已过网/相位窗口错位）
+                if (MissTrace.isEnabled() && !hasShotted && badminton != null)
+                    MissTrace.event(String.format(
+                            "E SWING_MISS f=%d s=%s | ball %.0f,%.0f,%.0f,%.0f | ai %.0f,%.0f | up=%b",
+                            MissTrace.frame(), side > 0 ? "L" : "R",
+                            badminton.getCenterX(), badminton.getCenterY(),
+                            badminton.speedX, badminton.speedY,
+                            getCenterX(), getCenterY(), shotType == shotTypeUp));
             }
             else if (hasShotted == false && badminton.isShotable
                     && (badminton.getCenterX() - GameProperties.netPosition) * side <= 0){
@@ -474,6 +504,7 @@ public class StickMan extends GameObject {
                                 }
                                 hasShotted = true;
                                 isReadyingServe = false;
+                                traceHit(badminton, hitAngle); // 诊断：本拍命中事件
                             }
                         }
                     }
@@ -548,6 +579,7 @@ public class StickMan extends GameObject {
                                     }
                                     hasShotted = true;
                                     isReadyingServe = false;
+                                    traceHit(badminton, hitAngle); // 诊断：本拍命中事件
                                 }
                             }
                         }
@@ -583,6 +615,17 @@ public class StickMan extends GameObject {
                 if (swingNow) {
                     isShotting = true;
                     hasShotted = false;
+                    if (MissTrace.isEnabled())
+                        MissTrace.event(String.format(
+                                "E SWING f=%d s=%s %s windup=%b | ball %.0f,%.0f,%.0f,%.0f | ai %.0f,%.0f",
+                                MissTrace.frame(), side > 0 ? "L" : "R",
+                                decision.isSmashIntent ? "smash" : decision.isHeavyhit ? "heavy" : "light",
+                                smashWindupPending,
+                                badminton != null ? badminton.getCenterX() : -1,
+                                badminton != null ? badminton.getCenterY() : -1,
+                                badminton != null ? badminton.speedX : -1,
+                                badminton != null ? badminton.speedY : -1,
+                                getCenterX(), getCenterY()));
                     if (smashWindupPending) {
                         // 跳杀快照：恒重击+扣杀意图，不受当帧重新决策影响
                         isHeavyShot = true;
