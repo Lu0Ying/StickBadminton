@@ -148,6 +148,9 @@ public class ComputerDecision {
     private double effectiveMoveSpeed;
     // 失分诊断：本帧跳跃/扣杀被拒原因码（仅 MissTrace 开启时被各拒绝点赋值）
     private String traceRej = "";
+    // 本构造的半场与球是否在本方半场（StickMan 挥拍起手时做"本拍真能扫到"预演用）
+    private int traceSide = 0;
+    private boolean onMyHalfNow = false;
 
     public ComputerDecision() {}
 
@@ -162,6 +165,8 @@ public class ComputerDecision {
         this.effectiveMoveSpeed = effectiveMoveSpeed;
         this.smartEnergy = maxLevel || GameProperties.difficultyLevel >= GameProperties.energyManageDifficulty;
         // 初始化基本信息
+        this.traceSide = side;
+        this.onMyHalfNow = (badmintonX - GameProperties.netPosition) * side <= 0;
         this.badmintonSpeedX = badmintonSpeedX;
         this.badmintonSpeedY = badmintonSpeedY;
         this.badmintonX = badmintonX;
@@ -876,10 +881,16 @@ public class ComputerDecision {
 
     // 推演公共物理步：球受空气阻力(先Δv后位移，与 Badminton.onUpdate 一致)、
     // 贴墙0.6反弹、AI 中心横移收差并被空气墙钳制——三处缺一都会让预判与真实脱节。
-    // 数组为推演状态[ballX,ballY,ballVx,ballVy,shoulderY,pivotX,jumpVy]，原地更新不新建
-    private static void stepPhysics(double[] st, double step) {
-        double jumpVy = st[6] + GameProperties.jumpGravity;
-        double shoulderY = st[4] + jumpVy * GameProperties.frameTime;
+    // 数组为推演状态[ballX,ballY,ballVx,ballVy,shoulderY,pivotX,jumpVy]，原地更新不新建。
+    // airborne=false 时肩静止（站定拍肩膀不移动）且不推进垂直速度；
+    // airborne=true 走起跳推进（风存拍/决策层跳杀推演）
+    private static void stepPhysics(double[] st, double step, boolean airborne) {
+        double jumpVy = st[6];
+        double shoulderY = st[4];
+        if (airborne) {
+            jumpVy += GameProperties.jumpGravity;
+            shoulderY += jumpVy * GameProperties.frameTime;
+        }
         double ballVx = st[2], ballVy = st[3];
         double sp = StrictMath.sqrt(ballVx * ballVx + ballVy * ballVy);
         double air = sp == 0 ? 0 : 0.00001 * sp * sp;
@@ -909,35 +920,99 @@ public class ComputerDecision {
         st[4] = shoulderY; st[5] = pivotX; st[6] = jumpVy;
     }
 
-    // 提前跳杀可达性：风存6帧+置位1帧后从第8帧起进入挥拍命中判定（前0.15s内），
-    // 逐帧推演并**复刻 StickMan 的真实命中公式**（swingPhaseHit）才算截击成功。
-    // 旧版用"球在上方≤hitArea+racket 的距离圈"近似，比真实扫掠扇形宽 → 会误判接得到、
-    // 跳起后挥拍扫不到球（"跳起来接不动球"）。
-    // 另三处真实物理（stepPhysics）：空气阻力、贴墙反弹、AI 空气墙钳制
+    // 起跳推进版（决策层跳杀推演用）
+    private static void stepPhysics(double[] st, double step) {
+        stepPhysics(st, step, true);
+    }
+
+    // 提前跳杀可达性：风存6帧+起手1帧后进入挥拍命中判定，逐帧推演并**复刻 StickMan
+    // 的真实命中公式**（swingPhaseHit）才算截击成功。
+    // 帧对齐(2026-10-15 P2 失分实证)：真实时序=决策帧起跳(同帧扣20)→风存6帧→
+    // 决策+6帧起手(拍型此刻定、再扣35)→决策+7帧首接触(deltaT=1/60)。
+    // 旧推演 useDown 定于 f=8、命中从 f=8 起——比真实晚1~2帧；且收差步长用
+    // 决策时刻满速(250)，而真实风存期体力已掉出满速区间(54→34→19 → 227→171px/s)，
+    // 两处偏差让推演多算约6px收差 → 乐观误判"能打到" → 起跳挥空+0.5s冷却，
+    // 冷却恰好挡住球真正进入可接带的时刻(P2: 球落地f1170、冷却到f1169)
     private boolean earlySmashConnectable(int side) {
         double shoulderY = computerY;
         double pivotX = computerX;
         double jumpVy = -GameProperties.jumpSpeedY;
         double ballX = badmintonX, ballY = badmintonY;
         double ballVx = badmintonSpeedX, ballVy = badmintonSpeedY;
-        double step = decisionMoveSpeed() * GameProperties.frameTime;
-        // 出招帧确定的拍型：真实逻辑在挥拍置位帧按球位选上/下方击球(球低于肩上46px
+        // 收差步长按真实体力消耗分段：风存期只扣了跳(20)，起手帧再扣重击(35)。
+        // 仅体力管理路径分段（1-2级保留满速推演的原"乱"误差，行为不变）
+        double windupStep, swingStep;
+        if (smartEnergy && !GameProperties.infiniteEnergyMode) {
+            windupStep = moveSpeedAfterDrain(energy - GameProperties.jumpEnergy) * GameProperties.frameTime;
+            swingStep = moveSpeedAfterDrain(energy - GameProperties.jumpEnergy - GameProperties.heavyShotEnergy)
+                    * GameProperties.frameTime;
+        } else {
+            windupStep = swingStep = decisionMoveSpeed() * GameProperties.frameTime;
+        }
+        // 出招帧确定的拍型：真实逻辑在起手帧(决策+6)按球位选上/下方击球(球低于肩上46px
         // 且在本方半场 → 下方击球)，两套相位完全不同，必须跟着真实走
         boolean useDown = false;
         double[] st = {ballX, ballY, ballVx, ballVy, shoulderY, pivotX, jumpVy};
         for (int f = 1; f <= 17; f++) {
-            stepPhysics(st, step);
+            stepPhysics(st, f <= 6 ? windupStep : swingStep);
             ballX = st[0]; ballY = st[1]; ballVx = st[2]; ballVy = st[3];
             shoulderY = st[4]; pivotX = st[5]; jumpVy = st[6];
-            if (f < 8) continue; // 前6帧风存+第7帧置位挥拍，第8帧起才进命中判定
-            if (f == 8) {
-                // 拍型在出招帧(第7帧)按当帧球位选定；推演用第8帧起始位置近似(±1帧)
+            if (f < 7 && ballLanded(ballY, ballVy)) return false; // 风存期球已落地，无从截击
+            if (f == 6) {
+                // 拍型在真实起手帧(决策+6)按当帧球位选定
                 useDown = (ballX - GameProperties.netPosition) * side <= 0
                         && ballY > shoulderY - 46; // 真实条件: 球Y > getCenterY()-30 即肩上46px以下
             }
-            if (swingPhaseHit(f - 7, side, pivotX, shoulderY, ballX, ballY, useDown)) return true;
+            if (f < 7) continue; // 首接触帧=决策+7(起手后第1帧, deltaT=1/60)
+            if (swingPhaseHit(f - 6, side, pivotX, shoulderY, ballX, ballY, useDown)) return true;
         }
         return false;
+    }
+
+    // 出招后的真实移动速度：按 StickMan.getEffectiveMoveSpeed 同款体力插值，
+    // 输入 e 为该阶段扣除体力后的剩余量（跳-20、再重击-35）
+    private static double moveSpeedAfterDrain(double e) {
+        if (GameProperties.infiniteEnergyMode) return GameProperties.moveSpeed;
+        return e > GameProperties.fullSpeedEnergy ? GameProperties.moveSpeed
+                : (GameProperties.moveSpeed0 + (GameProperties.moveSpeed - GameProperties.moveSpeed0)
+                        * e / GameProperties.fullSpeedEnergy);
+    }
+
+    /**
+     * 挥拍起手校验（StickMan 挥拍起手帧调用）：用当帧真实状态预演本拍接触窗口
+     * 能否扫到球（与 earlySmashConnectable 同相位几何，起点=当帧、拍型当帧定、
+     * 收差用本拍扣完体力后的移速）。返回 false = 明确打不到 → 不起手——
+     * 避免白挥后 0.5s 冷却挡住随后真正可接的时刻（2026-10-15 P2 失分根因：
+     * 推演晚1~2帧+满速乐观 → 挥空 → 冷却到 f1169 而球 f1170 落地）。
+     * 起手后球进窗口自然重试，不会"站定不接"。
+     *
+     * @param heavy  本拍是否重击（定体力扣减后的收差步长）
+     * @param jumpVy0 当前垂直速度：风存拍=起跳6帧后(-jumpSpeedY+6*gravity)；
+     *                站定拍=0。肩静止近似对站定拍精确，对风存拍保守偏低（拒了转普通拍无害）
+     */
+    public boolean connectableThisSwing(boolean heavy, double jumpVy0) {
+        if (traceSide == 0) return true; // 默认构造(无状态)不拦
+        // 球已过本方半场：真实命中判定同样要求 (x-net)*side<=0，必打不到
+        if ((badmintonX - GameProperties.netPosition) * traceSide > 0) return false;
+        double postEnergy = energy - (heavy ? GameProperties.heavyShotEnergy : GameProperties.lightShotEnergy);
+        double step = moveSpeedAfterDrain(postEnergy) * GameProperties.frameTime;
+        // 拍型当帧（真实 shotType：球越网 <0 且球在 cy-30 之下 = 肩上46px以下）
+        boolean useDown = (badmintonX - GameProperties.netPosition) * traceSide < 0
+                && badmintonY > computerY - 46;
+        double[] st = {badmintonX, badmintonY, badmintonSpeedX, badmintonSpeedY,
+                computerY, computerX, jumpVy0};
+        boolean airborne = jumpVy0 != 0; // 站定拍肩静止；风存拍按当前垂直速度继续推进
+        for (int f = 1; f <= 17; f++) {
+            stepPhysics(st, step, airborne);
+            if (ballLanded(st[1], st[3])) return false; // 推演中球已落地：之后的命中都是假的
+            if (swingPhaseHit(f, traceSide, st[5], st[4], st[0], st[1], useDown)) return true;
+        }
+        return false;
+    }
+
+    // 推演终止判据：与 Badminton.onUpdate 落地判定同口径 nextY = y+vy*frameTime >= floorBallY
+    private static boolean ballLanded(double ballY, double ballVy) {
+        return ballY + ballVy * GameProperties.frameTime >= GameProperties.floorBallY;
     }
 
     // 高难度扣杀智能（圈内路径）：球已落进击球圈时按挥拍切线预期出球角做物理过网仿真，
@@ -1200,7 +1275,12 @@ public class ComputerDecision {
         }
     }
 
-    // 预测球在目标高度 targetY 时的 X 与所需时间
+    // 预测球在目标高度 targetY 时的 X 与所需时间。
+    // 与 preLanding 同款口径（当年 preLanding 的三处修复此处曾漏）：
+    // ①球已在目标高度或更低且不再上升 → 永远穿不过目标，早退返回当前X——
+    //   否则空转 maxSteps 拿到 5 秒假预测，调用方(防守对位)会追假点乱跑(P1 失分根因)；
+    // ②Δv 按步施加不乘 frameTime（乘 dt 加速度弱60倍，与真实轨迹脱节）；
+    // ③触墙 0.6 反弹，避免预测点飞出墙外
     private InterceptPrediction predictAtY(double targetY) {
         double dt = GameProperties.frameTime;
 
@@ -1208,6 +1288,10 @@ public class ComputerDecision {
         double y = badmintonY;
         double vx = badmintonSpeedX;
         double vy = badmintonSpeedY;
+
+        // 不可达早退：球已在目标高度或下方且仍下落 → 永远穿不过上方的目标
+        // （与 preLanding 同款；否则空转 maxSteps 拿到 5 秒假预测，调用方追假点乱跑）
+        if (y >= targetY && vy >= 0) return new InterceptPrediction(x, 0.0, vy);
 
         double time = 0.0;
         int steps = 0, maxSteps = 300;
@@ -1217,14 +1301,20 @@ public class ComputerDecision {
             double speed = Math.sqrt(vx * vx + vy * vy);
 
             if (speed == 0) {
-                vy += GameProperties.badmintonGravity * dt;
+                vy += GameProperties.badmintonGravity;
             } else {
                 double air = 0.00001 * (speed * speed);
-                double ax = -2.7 * air * (vx / speed);
-                double ay = GameProperties.badmintonGravity - 0.5 * air * (vy / speed);
+                vx -= 2.7 * air * (vx / speed);
+                vy += GameProperties.badmintonGravity - 0.5 * air * (vy / speed);
+            }
 
-                vx += ax * dt;
-                vy += ay * dt;
+            // 触墙反弹：与 Badminton.onUpdate 的钳位+0.6恢复系数一致
+            double nextX = x + vx * dt;
+            if (nextX <= GameProperties.playFieldLeft || nextX >= GameProperties.playFieldRight) {
+                double leftSq = (x - GameProperties.playFieldLeft) * (x - GameProperties.playFieldLeft);
+                double rightSq = (GameProperties.playFieldRight - x) * (GameProperties.playFieldRight - x);
+                x = leftSq < rightSq ? GameProperties.playFieldLeft : GameProperties.playFieldRight;
+                vx = -vx * 0.6;
             }
 
             x += vx * dt;

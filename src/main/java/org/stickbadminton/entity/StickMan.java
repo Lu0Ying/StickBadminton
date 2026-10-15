@@ -112,6 +112,17 @@ public class StickMan extends GameObject {
     }
 
     /**
+     * 起手前校验（AI 专用）：本拍是否真能扫到球——用决策层当帧真实状态预演。
+     * heavy=本拍重击(风存拍恒重击/普通拍看决策)，jumpVy0=风存拍的当前垂直速度(站定0)。
+     * 人类玩家不出校验（手感不变）；默认构造 decision(traceSide=0) 直接放行
+     */
+    private boolean canSwingHit(ComputerDecision decision, boolean windupPending) {
+        if (!isAIControlled) return true;
+        boolean heavy = windupPending || decision.isHeavyhit;
+        return decision.connectableThisSwing(heavy, isJumping ? speedY : 0);
+    }
+
+    /**
      * 失分诊断：命中事件（含档位表判出的出球初速，供与 SWING_MISS/落地对账）。
      * 仅 MissTrace 开启时拼串；调用点在 hasShotted 置位后，不影响任何游戏状态。
      */
@@ -611,6 +622,23 @@ public class StickMan extends GameObject {
                     swingNow = decision.isShot && !smashWindupDone;
                     if (!decision.isShot)
                         smashWindupDone = false; // 条件消失复位，避免漏掉下一拍的风存
+                }
+                // 起手校验：用当帧真实状态预演本拍接触窗口能否扫到球，明确打不到则不起手。
+                // 白挥会白耗体力+进入0.5s挥拍冷却，冷却反而挡住随后真正可接的时刻
+                // （2026-10-15 P2 实证：挥空冷却到 f1169、球 f1170 落地）。
+                // 拒绝后下帧 decision 仍会重新决策/重试，球况一变立即恢复出拍
+                if (swingNow && !canSwingHit(decision, smashWindupPending)) {
+                    if (smashWindupPending) {
+                        smashWindupPending = false;
+                        smashWindupDone = false; // 解除屏蔽：后续帧按普通路径重新决策
+                    }
+                    if (MissTrace.isEnabled())
+                        MissTrace.event(String.format("E SWING_SKIP f=%d s=%s | ball %.0f,%.0f,%.0f,%.0f | ai %.0f,%.0f",
+                                MissTrace.frame(), side > 0 ? "L" : "R",
+                                badminton.getCenterX(), badminton.getCenterY(),
+                                badminton.speedX, badminton.speedY,
+                                getCenterX(), getCenterY()));
+                    swingNow = false;
                 }
                 if (swingNow) {
                     isShotting = true;
