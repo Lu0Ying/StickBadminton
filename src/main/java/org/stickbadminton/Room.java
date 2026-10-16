@@ -16,6 +16,10 @@ public class Room {
     private boolean isClearing;
     public boolean isClearing() { return isClearing; }
 
+    // 当前活跃房间：ESC 菜单浮层不在 Room 体系内，需要从这里取“从哪个房间切走”
+    private static Room current;
+    public static Room getCurrent() { return current; }
+
     public Room() {}
 
     public GameObject addObject(GameObject gameObject) {
@@ -87,6 +91,7 @@ public class Room {
     public void enter() {
         objects.forEach(o -> o.activate());
         isActive = true;
+        current = this;
         uiNodes.forEach( pack -> FXGL.addUINode(pack.getKey(),
                 pack.getValue().getKey(), pack.getValue().getValue()));
     }

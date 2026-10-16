@@ -2,6 +2,7 @@ package org.stickbadminton.room;
 import org.stickbadminton.Sprite;
 import org.stickbadminton.logic.GameProperties;
 import org.stickbadminton.room.RoomGameplay;
+import org.stickbadminton.room.RoomTitle;
 import org.stickbadminton.ui.HintAIDifficulty;
 import org.stickbadminton.ui.InfiniteEnergySettingDisplay;
 import org.stickbadminton.ui.UIImageButton;
@@ -49,6 +50,14 @@ public class RoomStickmanSelect extends Room{
         undoButton.setOnAction(e-> {
             SoundPlay.playSound("button_select.mp3", 100);
             onUndoButtonClick();
+        });
+
+        // 返回主菜单按钮（位置与联机选人界面的 back 保持一致）
+        UIImageButton backButton = new UIImageButton("images/buttons/button_back.png");
+        addUiObject(backButton, 30, 480);
+        backButton.setOnAction(e -> {
+            SoundPlay.playSound("button_select.mp3", 100);
+            new SwitchRoomEffect(this, new RoomTitle());
         });
 
         UIImageButton infiniteEnergyButton=new UIImageButton("images/buttons/button_rectanglerounded.png");

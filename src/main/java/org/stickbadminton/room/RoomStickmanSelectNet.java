@@ -113,8 +113,8 @@ public class RoomStickmanSelectNet extends Room {
             onUndoButtonClick();
         });
 
-        // 返回按钮：复用 undo 素材（button_back 缺 _hover 图会被 UIImageButton 判为资源缺失）
-        UIImageButton backButton = new UIImageButton("images/buttons/button_undo.png");
+        // 返回按钮：button_back 素材（常态+hover 图齐备），与撤销按钮的 undo 素材区分
+        UIImageButton backButton = new UIImageButton("images/buttons/button_back.png");
         addUiObject(backButton, 30, 480);
         backButton.setOnAction(e -> {
             SoundPlay.playSound("button_select.mp3", 100);

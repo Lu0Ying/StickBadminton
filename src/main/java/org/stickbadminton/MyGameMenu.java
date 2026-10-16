@@ -22,6 +22,9 @@ import com.almasb.fxgl.particle.ParticleComponent;
 import javafx.geometry.Pos;
 import javafx.scene.layout.Pane;
 import javafx.scene.Node;
+import org.stickbadminton.logic.MatchController;
+import org.stickbadminton.room.RoomGameplay;
+import org.stickbadminton.room.RoomStickmanSelect;
 import org.stickbadminton.room.RoomTitle;
 
 public class MyGameMenu extends FXGLMenu {
@@ -59,10 +62,27 @@ public class MyGameMenu extends FXGLMenu {
             FXGL.getGameController().startNewGame();
         });
 
-        VBox box = new VBox(30, title, resumeButton, backButton, exitButton);
+        // 中途重开：仅对战中有效（菜单是全局单例，标题界面按 ESC 也会出现）
+        Button restartButton = new Button("重新开始");
+        restartButton.setStyle("-fx-font-family: '黑体'; -fx-font-size: 18px; -fx-font-weight: bold; -fx-padding: 10px 20px;");
+        restartButton.setOnAction(e -> {
+            if (!(Room.getCurrent() instanceof RoomGameplay)) return;
+            switchRoom(MatchController.getNetClient() != null ? new RoomTitle() : new RoomGameplay());
+        });
+
+        // 更换角色：返回选人界面；联机会话先断开，避免残留席位
+        Button changeCharacterButton = new Button("更换角色");
+        changeCharacterButton.setStyle("-fx-font-family: '黑体'; -fx-font-size: 18px; -fx-font-weight: bold; -fx-padding: 10px 20px;");
+        changeCharacterButton.setOnAction(e -> {
+            if (!(Room.getCurrent() instanceof RoomGameplay)) return;
+            MatchController.endSession();
+            switchRoom(new RoomStickmanSelect());
+        });
+
+        VBox box = new VBox(30, title, resumeButton, restartButton, changeCharacterButton, backButton, exitButton);
         box.setAlignment(Pos.CENTER);
         box.setTranslateX(FXGL.getAppWidth() / 2.0 - 150);
-        box.setTranslateY(FXGL.getAppHeight() / 2.0 - 150);
+        box.setTranslateY(FXGL.getAppHeight() / 2.0 - 210);
 
         getContentRoot().getChildren().add(box);
         getInput().addAction(new UserAction("Exit Menu") {
@@ -71,6 +91,17 @@ public class MyGameMenu extends FXGLMenu {
                 SoundPlay.playBackgroundMusic();
             }
         }, KeyCode.ESCAPE);
+    }
+
+    // 关闭本菜单并切房间：菜单打开期间引擎是暂停的，必须先恢复否则切换动画的组件不推进
+    private void switchRoom(Room target) {
+        Room from = Room.getCurrent();
+        fireResume(); // 关闭 SubScene
+        FXGL.getGameController().resumeEngine(); // 兜底：确保引擎恢复跑帧
+        SoundPlay.playBackgroundMusic(); // 与 ESC 退出菜单的口径一致，恢复被菜单停掉的 BGM
+        if (from != null) {
+            new SwitchRoomEffect(from, target);
+        }
     }
 
     @Override
