@@ -130,10 +130,15 @@ public class MatchController extends GameObject{
         scoreChangeTimer = 0.01;
         playBGMTimer = 0.0;
         MissTrace.resetRally(); // 失分诊断：开球即开始记录首个球
+        MatchAimAssist.reset(); // 滑动窗口漏接记忆：不跨局
     }
     public void onBallGroundHit(int winner) {
         ballHitGroundTimer = 1.0;
         lastPointWinner = winner;
+        // 滑动窗口漏接：按本分结果记一次窗口成绩（单人 AI 在右半场）
+        MatchAimAssist.resolveRally(winner);
+        // 4-5级回合精度惩罚复位：下一回合的准确性不受上一回合扣杀/接杀影响
+        clearRallyAccDropIfPresent();
 
         // 计算本球得分后的目标分
         pendingLeft = readDigit("score_left");
@@ -145,6 +150,16 @@ public class MatchController extends GameObject{
         if (isHost && netClient != null) {
             netClient.sendLine(String.format("SCORE:%d:%d", pendingLeft, pendingRight));
         }
+    }
+
+    /**
+     * 4-5级回合精度惩罚复位（球落地=回合结束）：左右两个火柴人都清一次，
+     * 单人只有右 AI 会置位该标记，多清无副作用
+     */
+    private void clearRallyAccDropIfPresent() {
+        if (inRoom == null) return;
+        if (inRoom.getObject("stickman_right") instanceof StickMan right) right.clearRallyAccDrop();
+        if (inRoom.getObject("stickman_left") instanceof StickMan left) left.clearRallyAccDrop();
     }
 
     /**

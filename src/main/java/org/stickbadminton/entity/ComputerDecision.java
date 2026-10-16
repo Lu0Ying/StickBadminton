@@ -1,5 +1,6 @@
 package org.stickbadminton.entity;
 import org.stickbadminton.logic.GameProperties;
+import org.stickbadminton.logic.MatchAimAssist;
 import org.stickbadminton.logic.MissTrace;
 import java.util.Random;
 
@@ -34,9 +35,9 @@ public class ComputerDecision {
     public boolean isSmashIntent = false;
     public double difficultyLevel;
 
-    // 反应时间
-    private static final double REACTION_TIME_MIN = 0.05;
-    private static final double REACTION_TIME_MAX = 0.7;
+    // 反应/起跳门槛值已移入各难度档案（Noob1/Normal2/Lure3/Aggro4/Precise5），
+    // 这里只保留"预设失误回合"的横移速度系数（跑位欠步手感）
+    private static final double MISS_MOVE_SCALE = 0.55;
 
     // 网前判定参数
     private static final double NET_X_WINDOW = 140.0;
@@ -56,28 +57,8 @@ public class ComputerDecision {
     // 注：曾尝试在贴墙60px内加额外"场边严判"（扫掠距×0.75/连续2帧），两版均回归
     // （误拒真实可接球 → AI 不跳站定接不到），已回退至 v1.0 的真实相位推演口径——
     // "场边跳起接不到"的根因是 SoundPlay 音效异常中断 heavyHit 出球，已单独修复
-    // 提前起跳概率：网前球必跳（拦截最优先）；中后场分层给概率——中前场高、后场低，
-    // 让慢速球优先获得起跳权重而不是退后场等待（3级常规档）
-    private static final double EARLY_SMASH_PROB_MID = 0.75;
-    private static final double EARLY_SMASH_PROB_BACK = 0.40;
-    // 扣杀风格分层：4级"激进"——多跳多扣(中前场95%/后场60%)，代价是约30%扣杀
-    // 不经过网兜底(StickMan.skipNetGuardOnSmash)允许砸网；5级与G键满级"精准"——
-    // 少扣(中前场55%/后场25%)但每次出球必经兜底+±5°小偏差，成功率极高
-    private static final double EARLY_SMASH_PROB_MID_AGGRO = 0.95;
-    private static final double EARLY_SMASH_PROB_BACK_AGGRO = 0.60;
-    private static final double EARLY_SMASH_PROB_MID_PRECISE = 0.55;
-    private static final double EARLY_SMASH_PROB_BACK_PRECISE = 0.25;
-    // 圈内概率扣杀分层：3级维持原 35%/60%，4级激进上调，5级与满级精准下调
-    private static final double IN_RING_PROB_BACK_NORMAL = 0.35;
-    private static final double IN_RING_PROB_MID_NORMAL = 0.60;
-    private static final double IN_RING_PROB_BACK_AGGRO = 0.55;
-    private static final double IN_RING_PROB_MID_AGGRO = 0.85;
-    private static final double IN_RING_PROB_BACK_PRECISE = 0.20;
-    private static final double IN_RING_PROB_MID_PRECISE = 0.40;
-    // 扣杀风格档位
-    private static final int SMASH_STYLE_NORMAL = 0;   // 3级：原概率
-    private static final int SMASH_STYLE_AGGRO = 1;    // 4级：多扣、约30%不过网
-    private static final int SMASH_STYLE_PRECISE = 2;  // 5级与G键满级：少扣、必过网
+    // 扣杀概率分层（圈内/提前、后场/中前场）已移入各难度档案（inRing*/early* 字段），
+    // 3级常规档(35/60、40/75)即 1/2 级与 3 级共用的默认值，档案各自声明
     // 起跳 0.1s(挥拍接触时刻)肩膀抬高的像素：v0=700、g=35/帧，6帧累计约60px，
     // 高慢球按抬高后的肩点重算切线出球角，判断能否压成扣杀
     private static final double JUMP_RAISE_PX = 60.0;
@@ -96,8 +77,9 @@ public class ComputerDecision {
     private static final double WALL_BOUNCE_GAP = 22.0;  // 增大贴墙阈值
 
     // 杀球防守参数（新）
-    private static final double SMASH_SPEED_THRESHOLD = 900.0;   // 合速度阈值
-    private static final double SMASH_VY_THRESHOLD    = 350.0;   // 竖直向下速度阈值（y正向下）
+    // 杀球判定口径（包内共享：StickMan 接杀后触发回合精度惩罚用同一阈值）
+    static final double SMASH_SPEED_THRESHOLD = 900.0;   // 合速度阈值
+    static final double SMASH_VY_THRESHOLD    = 350.0;   // 竖直向下速度阈值（y正向下）
     private static final double SMASH_INTERCEPT_Y_MIN = 30.0;    // 肩上方最小拦截高度
     private static final double SMASH_INTERCEPT_Y_MAX = 90.0;    // 肩上方最大拦截高度
     private static final double SMASH_CONTACT_OFFSET  = 6.0;     // 接触时的本方侧偏移，避免贴身打空
@@ -140,9 +122,9 @@ public class ComputerDecision {
     // 体力管理（难度 ≥3 或 G 键满级启用）：低体力收敛跳跃/重击、站桩回血、按实际移速预判；
     // 1-2级不启用，保持原有的“乱”行为
     private boolean smartEnergy = false;
-    // 扣杀风格：3级原概率、4级激进(多跳多扣、约30%不过网)、5级与G键满级精准(少扣必过网)。
-    // 仅单人模式的 4/5 级用到随机概率，联机无对应 AI、双端不分叉
-    private int smashStyle = SMASH_STYLE_NORMAL;
+    // 当前档难度档案：反应/起跳/扣杀概率/兜底/精度惩罚等特质参数的唯一来源
+    // （满级时取 5 级档案——联机同轨的随机点调用频率不变）
+    private AIDifficultyProfile profile = Precise5.INSTANCE;
     private double energy = 100.0;
     // StickMan 传入的实际移速（体力插值），仅体力管理路径参与预判
     private double effectiveMoveSpeed;
@@ -163,7 +145,9 @@ public class ComputerDecision {
         this.maxLevel = maxLevel;
         this.energy = energyRemain;
         this.effectiveMoveSpeed = effectiveMoveSpeed;
-        this.smartEnergy = maxLevel || GameProperties.difficultyLevel >= GameProperties.energyManageDifficulty;
+        // 难度档案先定级（反应/起跳/扣杀概率/兜底都读它），满级沿用5级档案
+        this.profile = maxLevel ? Precise5.INSTANCE : AIDifficultyProfile.byDifficulty();
+        this.smartEnergy = maxLevel || profile.energyManaged();
         // 初始化基本信息
         this.traceSide = side;
         this.onMyHalfNow = (badmintonX - GameProperties.netPosition) * side <= 0;
@@ -178,39 +162,21 @@ public class ComputerDecision {
         this.isJumpCooldown = isJumpCooldown;
         this.superShotPoint = computerY - 30;
 
-        // 难度（如项目中有统一难度，可替换）
-        // this.difficultyLevel = GameProperties.difficultyLevel;
+        // 决策系数直接取档案（1级0.5、2级0.8、3级0.9、4/5级1.0）；满级固定1.0，
+        // 不改全局档位号，对手 AI 不被顺带抬档
+        this.difficultyLevel = maxLevel ? 1.0 : profile.coeff;
         if (maxLevel) {
-            // 满级覆盖：难度 1.0 + 满判定半径，不动全局 difficultyLevel（避免对手 AI 顺带满级）
-            this.difficultyLevel = 1.0;
             this.racketRadius = GameProperties.racketRadius;
             this.hitAreaRadius = GameProperties.hitAreaRadius;
         }
-        else if (GameProperties.difficultyLevel == 1)
-            this.difficultyLevel = 0.5;
-        else if (GameProperties.difficultyLevel == 2)
-            this.difficultyLevel = 0.8; // 2级由0.7调至0.8；仍不启用体力管理，保持“乱”的行为
-        else if (GameProperties.difficultyLevel == 3)
-            this.difficultyLevel = 0.9;
-        else if (GameProperties.difficultyLevel == 4)
-            this.difficultyLevel = 1.0;
-        else
-            this.difficultyLevel = 1.0; // 5级：决策与4级完全同基础，仅扣杀风格分层
-        // 扣杀风格分层：仅单人模式按难度分档——4级激进(多扣但约30%允许砸网)、
-        // 5级与 G 键满级(左侧AI)精准(少扣、必过网)；3级保持原判定不受本次改动影响。
-        // maxLevel 路径只读 varianceRoll(球心哈希)与体力阈值，恒兜底，联机双端不分叉
-        if (maxLevel || GameProperties.difficultyLevel == 5) this.smashStyle = SMASH_STYLE_PRECISE;
-        else if (GameProperties.difficultyLevel == 4) this.smashStyle = SMASH_STYLE_AGGRO;
-        else this.smashStyle = SMASH_STYLE_NORMAL;
-        if(random.nextDouble()>difficultyLevel*0.1)
-        {
-            this.racketRadius = GameProperties.racketRadius*difficultyLevel;
-            this.hitAreaRadius = GameProperties.hitAreaRadius*difficultyLevel;
+        // 判圈随难度收缩，保留低概率随机满圈的历史行为（满系数档两分支同值，恒满圈）
+        if (random.nextDouble() > difficultyLevel * 0.1) {
+            this.racketRadius = GameProperties.racketRadius * difficultyLevel;
+            this.hitAreaRadius = GameProperties.hitAreaRadius * difficultyLevel;
+        } else {
+            this.racketRadius = GameProperties.racketRadius;
+            this.hitAreaRadius = GameProperties.hitAreaRadius;
         }
-        else{
-        this.racketRadius = GameProperties.racketRadius;
-        this.hitAreaRadius = GameProperties.hitAreaRadius;
-    }
 
 
         // 更新墙反弹冷却
@@ -250,6 +216,7 @@ public class ComputerDecision {
     // 失分诊断：每帧一行（仅 MissTrace 开启时拼串；含本帧所有跳跃/扣杀拒绝原因码）
     // 格式：D f=? s=? | ball x,y,vx,vy | ai x,cd,cdjmp | acc=0/1 | shot/kind/jump | rej=code
     // rej 码的裁读：smProb=圈内概率扣杀被概率门拒(need,roll=故意不扣)、
+    // lSmash=1-2级低难度扣杀概率门拒(need=故意不扣)、
     // eXxx=提前跳杀各道硬门、jXxx=普通跳跃门、dcd=击球圈未达、cd=冷却
     private void emitDecisionTrace(int side, boolean shotCooldown) {
         if (!MissTrace.isEnabled()) return;
@@ -271,6 +238,15 @@ public class ComputerDecision {
     // 否则 AI 会误判“跑得到”而漏球）；1-2 级保持固定满速，保留原有的预判误差（“乱”的一部分）
     private double decisionMoveSpeed() {
         return smartEnergy ? effectiveMoveSpeed : GameProperties.moveSpeed;
+    }
+
+    // 预设失误回合的跑位打折：滑动窗口武装拍内横移只出 55% 速度——
+    // AI 追快球/大角度球时跑位不到位，球够不到自然挥空/漏接；
+    // 与出球压角(MatchAimAssist 消费拍)同回合配合，只在单人低难度出现
+    private double moveSpeedForThisFrame() {
+        return MatchAimAssist.isArmed() && !maxLevel
+                ? decisionMoveSpeed() * MISS_MOVE_SCALE
+                : decisionMoveSpeed();
     }
 
     // 无球时的基础站位
@@ -311,9 +287,9 @@ public class ComputerDecision {
 
     private boolean shouldReact() {
         if (maxLevel) return true; // 满级恒反应：消除随机门槛，保证双端决策同轨
-        // 低难度也给到高反应，避免“等太久错过网前球”
-        double reactionTime = REACTION_TIME_MIN;
-        return random.nextDouble() > reactionTime;
+        // 按难度档案分层：菜鸟(1级0.50)每帧只有一半概率过门→平均慢半拍，
+        // 5级0.02接近立即反应；网前快球低难度漏接属预期的难度差异
+        return random.nextDouble() > profile.reactionGate;
     }
 
     private void executeStrategy(int side, boolean isShotCooldown) {
@@ -532,16 +508,13 @@ public class ComputerDecision {
     private void adjustPosition() {
         double idealX = predictedLandingX;
         double distance = idealX - computerX;
-        double maxMoveDistance = decisionMoveSpeed() * GameProperties.frameTime;
+        double maxMoveDistance = moveSpeedForThisFrame() * GameProperties.frameTime;
 
-        if(difficultyLevel == 1) {
-            distance *= 1.0;
-        } else {
-            // 旧缩放(d*0.1+0.03)会把停止阈值放大到 50px 以上，低等级触及圈仅约 52px，
-            // AI 停在圈边缘外漏球、显得站位呆；改为线性缩放：1级0.75、2级0.9、3级0.95、4/5级1.0，
-            // 站位始终收敛到触及圈内，满级(difficultyLevel=1.0)行为与旧版完全一致，联机不分叉
-            distance *= (0.5 + 0.5 * difficultyLevel);
-        }
+        // 旧缩放(d*0.1+0.03)会把停止阈值放大到 50px 以上，低等级触及圈仅约 52px，
+        // AI 停在圈边缘外漏球、显得站位呆；改为线性缩放：1级0.75、2级0.9、3级0.95、4/5级1.0，
+        // 站位始终收敛到触及圈内，满级(difficultyLevel=1.0)行为与旧版完全一致，联机不分叉。
+        // （原 if(difficultyLevel==1) 分支与该公式在系数1.0处取值相同，已合并）
+        distance *= (0.5 + 0.5 * difficultyLevel);
 
         if (Math.abs(distance) > maxMoveDistance) {
             if (distance > 0) { isMoveRight = true; isMoveLeft = false; }
@@ -566,10 +539,15 @@ public class ComputerDecision {
 
         if (canSmash && (!smartEnergy || badmintonSpeedY >= 0)) {
             if (!smartEnergy) {
-                // 1-2级保持原有“一律跳杀”行为不变
-                moveHorizontal(200);
-                superShot();
-                return;
+                // 1-2级圈内扣杀走档案门槛：菜鸟(1级) 55%、普通(2级) 80%——
+                // 其余落穿到下方常规回球分支，两档扣杀积极性不再雷同
+                if (varianceRoll() < profile.lowSmashGate) {
+                    moveHorizontal(200);
+                    superShot();
+                    return;
+                }
+                if (MissTrace.isEnabled())
+                    rejMark(String.format("lSmash(need%.2f)", profile.lowSmashGate)); // 实参先于早退求值，须外层守卫
             }
             // 高难度：几何判定能过网才扣杀；压不过网时落穿到下方常规分支挑/抽过网，
             // 避免扣杀直接砸网或砸在自己半场
@@ -664,6 +642,9 @@ public class ComputerDecision {
             if (observedOppFallBack) heavyProb += 0.10;  // 对手正在回退：重击追身压底线
         }
         heavyProb += preferHigh ? -0.10 : 0.10;
+        // 3级"诱饵"档案：重击倾向 ×0.4 —— 多出高远把进攻权交给玩家，
+        // 自己靠体力管理+高跳跃概率专注接球；扣杀失误由免过网兜底天然放大
+        heavyProb *= profile.heavyScale;
         heavyProb = clamp(0.05, 0.9, heavyProb);
         double roll = varianceRoll();
         if (roll < heavyProb) middleShot(); else highShot();
@@ -771,46 +752,19 @@ public class ComputerDecision {
         return true;
     }
 
-    // 圈内概率扣杀（中前场）：按扣杀风格取概率
-    private double smashProbMid() {
-        switch (smashStyle) {
-            case SMASH_STYLE_AGGRO: return IN_RING_PROB_MID_AGGRO;
-            case SMASH_STYLE_PRECISE: return IN_RING_PROB_MID_PRECISE;
-            default: return IN_RING_PROB_MID_NORMAL;
-        }
-    }
+    // 圈内/提前扣杀概率：统一取当前档档案（档案按档声明，无风格 switch）
+    private double smashProbMid() { return profile.inRingMid; }
 
-    // 圈内概率扣杀（后场）：按扣杀风格取概率
-    private double smashProbBack() {
-        switch (smashStyle) {
-            case SMASH_STYLE_AGGRO: return IN_RING_PROB_BACK_AGGRO;
-            case SMASH_STYLE_PRECISE: return IN_RING_PROB_BACK_PRECISE;
-            default: return IN_RING_PROB_BACK_NORMAL;
-        }
-    }
+    private double smashProbBack() { return profile.inRingBack; }
 
-    // 提前起跳扣杀概率（中前场）：按扣杀风格取概率
-    private double earlyProbMid() {
-        switch (smashStyle) {
-            case SMASH_STYLE_AGGRO: return EARLY_SMASH_PROB_MID_AGGRO;
-            case SMASH_STYLE_PRECISE: return EARLY_SMASH_PROB_MID_PRECISE;
-            default: return EARLY_SMASH_PROB_MID;
-        }
-    }
+    private double earlyProbMid() { return profile.earlyMid; }
 
-    // 提前起跳扣杀概率（后场）：按扣杀风格取概率
-    private double earlyProbBack() {
-        switch (smashStyle) {
-            case SMASH_STYLE_AGGRO: return EARLY_SMASH_PROB_BACK_AGGRO;
-            case SMASH_STYLE_PRECISE: return EARLY_SMASH_PROB_BACK_PRECISE;
-            default: return EARLY_SMASH_PROB_BACK;
-        }
-    }
+    private double earlyProbBack() { return profile.earlyBack; }
 
     // 跳杀风存跟随专用：朝球当前位置横移，边界钳制与 moveHorizontal 同公式
     private void moveFollowBallX() {
         double distance = badmintonX - computerX;
-        double maxMoveDistance = decisionMoveSpeed() * GameProperties.frameTime;
+        double maxMoveDistance = moveSpeedForThisFrame() * GameProperties.frameTime;
         double leftBoundary = GameProperties.playFieldLeft + GameProperties.playerWidth / 2;
         double rightBoundary = GameProperties.playFieldRight - GameProperties.playerWidth / 2;
         if (computerX < leftBoundary) {
@@ -1150,7 +1104,7 @@ public class ComputerDecision {
         double idealHitX = preLanding(targetY);
 
         double distance = idealHitX - computerX;
-        double maxMoveDistance = decisionMoveSpeed() * GameProperties.frameTime;
+        double maxMoveDistance = moveSpeedForThisFrame() * GameProperties.frameTime;
 
         // 低难度也留一定精度
         if (random.nextDouble() > difficultyLevel) {
@@ -1238,10 +1192,10 @@ public class ComputerDecision {
         if (smartEnergy && energy < GameProperties.jumpEnergy + GameProperties.jumpEnergyReserve) { rejMark("jEne"); return false; }
         if (maxLevel) return true; // 满级恒起跳：跳过随机概率，双端一致
 
-        // 难度概率：高难度(3级+)提到≥0.95，低难度维持原0.95*p的折扣
-        double p = Math.max(0.5, difficultyLevel);
-        double threshold = smartEnergy ? Math.max(0.95, p) : 0.95 * p;
-        double roll = random.nextDouble(); // 与原式同为恰好一次随机调用（随机流不偏移）
+        // 档案门槛（数值即原实现：1级0.475/2级0.76/3级0.95/4级0.98/5级0.85）——
+        // 4级更爱跳、5级跳跃收敛。roll 先取再比（调用次数不变，随机流不偏移）
+        double threshold = profile.jumpGate;
+        double roll = random.nextDouble();
         if (roll >= threshold) rejMark("jProb");
         return roll < threshold;
     }

@@ -3,6 +3,7 @@ import org.stickbadminton.Sprite;
 import org.stickbadminton.entity.Badminton;
 import org.stickbadminton.entity.ComputerDecision;
 import org.stickbadminton.logic.GameProperties;
+import org.stickbadminton.logic.MatchAimAssist;
 import org.stickbadminton.logic.MatchController;
 import org.stickbadminton.logic.MissTrace;
 import org.stickbadminton.ui.AISpeechBubble;
@@ -40,12 +41,18 @@ public class StickMan extends GameObject {
     private boolean aiSmashIntent = false;
     // AI 击球角度随机源：仅接触层本地生成偏差；联机权威出球角由主机 HIT 消息下发，双端不分叉
     private final java.util.Random shotVariance = new java.util.Random();
+    // 扣杀失误率/回合精度惩罚等档位特质已移入难度档案（Aggro4 0.35+5°、Precise5 0.15+2°…），
+    // 本类经 AIDifficultyProfile.byDifficulty() 读取，不再持档位常量
+    private final AIDifficultyProfile profile = AIDifficultyProfile.byDifficulty();
     // 跳杀风存：起跳后先攒 6 帧(~0.1s，肩膀抬约68px)再挥拍，保证"先跳再扣"
     private int smashWindupFrames = 0;
     private boolean smashWindupDone = false;
     // 起跳帧锁定的扣杀快照：风存结束帧恒按重击+扣杀意图出招
     private boolean smashWindupPending = false;
     public boolean hasShotted = false; // 自本次击球动画开始以来是否打过球
+    // 4-5级：本回合已触发"自己扣杀或接起玩家扣杀" → 出球偏差加大（见 shotVarianceSpread），
+    // 回合结束由 MatchController 落地判分时 clearRallyAccDrop 复位
+    private boolean rallyAccDrop = false;
     public static final boolean shotTypeUp = false;
     public static final boolean shotTypeDown = true;
     private double shotCooldownTimer = 0;
@@ -89,11 +96,20 @@ public class StickMan extends GameObject {
 
     /**
      * AI 击球随机偏差：每拍给出手角度叠加 ±spread°，让球路不可预测、对手难以预判。
-     * 高难(满级/3级+)仅 ±5° 且随后必经 adjustAINetSafeAngle 过网兜底，不会出现击球不过网；
-     * 低难 ±14° 更发散，允许失误（无所谓）。仅 AI 生效，人类手感不变
+     * 精度按难度递进（原 1-2级±14°、3-5级±5° 两档）：3级精度减小至±10°、
+     * 4级微微降低至±7°、5级与满级准度不变±5°——1-2级维持原±14°；
+     * 且 1-3 级不走过网兜底(见 shouldGuardNet)，下网/出界属低难度允许的失误。
+     * 仅 AI 生效，人类手感不变
      */
     private double applyShotVariance(double hitAngle) {
-        double spread = (aiMaxLevel || GameProperties.difficultyLevel >= 3) ? 5.0 : 14.0;
+        // 出球偏差取自档位档案：3级10°、4级7°、5级5°、1-2级14°（满级=5级档案±5°）
+        double spread = (aiMaxLevel || GameProperties.difficultyLevel >= 5) ? 5.0
+                : profile.shotSpread();
+        // 4-5级回合精度惩罚：本回合已扣杀/已接起玩家扣杀 → 档案追加偏差
+        // （4级 ±7→±12 更明显，5级 ±5→±7 轻微；满级不参与，联机不分叉）
+        if (rallyAccDrop && !aiMaxLevel) {
+            spread = profile.shotSpreadWithRallyDrop();
+        }
         hitAngle += (shotVariance.nextDouble() - 0.5) * 2.0 * spread;
         while (hitAngle < 0) hitAngle += 360;
         while (hitAngle >= 360) hitAngle -= 360;
@@ -101,15 +117,63 @@ public class StickMan extends GameObject {
     }
 
     /**
-     * 4级AI 扣杀是否跳过过网兜底（概率砸网失误）。
-     * 4级是"激进"风格：扣杀多、但约30% 拍不经过网安全网，允许砸网/不过网的失误，
-     * 以此与5级、G键满级的"精准"（必过网、成功率极高）拉开层次。
-     * 仅单人模式的4级会走到这里——联机与G键满级恒不跳过，双端判定不受随机影响。
+     * 本拍是否需要过网兜底：1-3级低难度不兜底——出球角可能压不过网，直接砸网，
+     * 这就是给玩家的"接得到但 AI 会自己失误"的真实感；4/5级仅扣杀按各自失误率
+     * 概率跳过兜底(4激进0.35、5精准0.15)，普通回球恒兜底。
+     * 滑动窗口预设的失误拍(MatchAimAssist)不兜底——预设失误必须真的失误。
+     * 仅单人模式按难度生效——联机与 G 键满级恒走兜底，双端判定不受随机影响
+     */
+    private boolean shouldGuardNet() {
+        if (aiMaxLevel) return true;
+        // 预设失误拍在调用点已被 netWardMissAngle 分支截走并消费，此处只处理常规拍；
+        // 1-3级档案豁免兜底（低难度允许砸网/出界），4/5级仅扣杀按档案失误率概率跳过
+        if (profile.exemptFromNetGuard()) return false;
+        return !skipNetGuardOnSmash();
+    }
+
+    /**
+     * 滑动窗口预设失误的出球角：朝网的下压角（±15°）——肩点在网顶之下，
+     * 下压从站位/起跳击打必然砸网或先落自己半场，视觉即"AI 这一拍自己失误了"。
+     * 仅单人本地生效
+     */
+    private double netWardMissAngle() {
+        double base = (side == sideRight) ? 50.0 : 130.0; // 左玩家朝+x、右玩家(AI)朝-x 的下压
+        return base + (shotVariance.nextDouble() - 0.5) * 30.0;
+    }
+
+    /**
+     * 4-5级回合精度惩罚的触发判定：本拍命中时若为"自己扣杀"或"接起玩家扣杀
+     * （来球合速度>900 且竖直下坠>350，与 isIncomingSmash 同口径）"，
+     * 置位本回合标记——惩罚作用于该拍之后的出球（扣杀这一拍本身不受影响），
+     * 落地判分时复位。仅单人 4/5 级；须在 heavyHit/lightHit 改速之前调用
+     * （读取的是来球速度）
+     */
+    private void updateRallyAccDrop(Badminton badminton) {
+        // 档案 accDrop=0 的档(1-3级)直接退出；4级+5.0°、5级+2.0°才参与
+        if (!isAIControlled || aiMaxLevel || rallyAccDrop) return;
+        if (profile.accDropAfterSmash <= 0.0) return;
+        boolean ownSmash = aiSmashIntent && isHeavyShot;
+        double incomingSpeed = Math.sqrt(badminton.speedX * badminton.speedX
+                + badminton.speedY * badminton.speedY);
+        boolean receivedSmash = incomingSpeed > ComputerDecision.SMASH_SPEED_THRESHOLD
+                && badminton.speedY > ComputerDecision.SMASH_VY_THRESHOLD;
+        if (ownSmash || receivedSmash) rallyAccDrop = true;
+    }
+
+    /** 回合结束（球落地）：精度惩罚复位，下一回合不受上一回合扣杀影响 */
+    public void clearRallyAccDrop() {
+        rallyAccDrop = false;
+    }
+
+    /**
+     * 4/5级AI 扣杀是否跳过过网兜底（概率砸网失误）——失误率取档位档案
+     * （Aggro4 35%、Precise5 15%；1-3级整体免兜底、满级恒兜底不走此路）。
+     * 仅单人模式的4/5级会走到这里——联机与G键满级恒不跳过，双端判定不受随机影响。
      */
     private boolean skipNetGuardOnSmash() {
-        if (aiMaxLevel || GameProperties.difficultyLevel != 4) return false;
-        if (!isAIControlled || !aiSmashIntent || !isHeavyShot) return false;
-        return shotVariance.nextDouble() < 0.3;
+        if (aiMaxLevel || !isAIControlled || !aiSmashIntent || !isHeavyShot) return false;
+        if (profile.smashMissRate <= 0.0) return false;
+        return shotVariance.nextDouble() < profile.smashMissRate;
     }
 
     /**
@@ -142,25 +206,28 @@ public class StickMan extends GameObject {
     }
 
     /**
-     * 单人模式右侧 AI 扣杀命中：触发头顶对白气泡随机出一句挑衅台词。
+     * 单人模式右侧 AI 进攻击球（上/下方击球命中）：仅真扣杀（扣杀意图+重击）
+     * 才武装气泡的在途标记并同步出挑衅台词，随后对手接住该扣杀才触发惊讶台词；
+     * 普通回球不武装（扣杀被接才说话）。台词按难度档取 Quotes1~5，风格随角色特质。
      * 气泡只在单人房创建（双人/联机 getUiObject 返回 null 即静默跳过）；
-     * side==sideLeft 的值 -1 对应右半场（sideLeft/sideRight 常量按朝向命名，见 onUpdate 注释），
-     * 左侧 G 键满级 AI 不会说话；isHeavyShot 过能量降级检查，体力不足被降级成轻击的"扣杀"不出台词
+     * side==sideLeft 的值 -1 对应右半场，左侧 G 键满级 AI 不参与说话
      */
     private void notifySmashSpeech() {
-        if (!isAIControlled || side != sideLeft || !aiSmashIntent || !isHeavyShot) return;
+        if (!isAIControlled || side != sideLeft) return;
         if (inRoom == null) return;
         if (inRoom.getUiObject("ai_speech_bubble") instanceof AISpeechBubble bubble) {
-            bubble.onSmash();
+            bubble.onSmash(aiSmashIntent && isHeavyShot);
         }
     }
 
     /**
-     * 玩家回击本分内 AI 的扣杀：触发头顶随机"被接住"台词。
-     * 仅左半场（sideRight=1）人类玩家生效；气泡按在途扣杀标记自行过滤（AI 没扣/球已落地不出句）
+     * 对手回击本分内右侧 AI 的扣杀：触发头顶随机惊讶系台词（3级"纳尼"系、其余按档性格）。
+     * 只看半场不看谁在控——左半场是"对手侧"（人类玩家，或按 G 后的满级 AI），
+     * 旧版加 isAIControlled 门槛会把 G 键模式的左 AI 挡掉，导致整个回击链不触发。
+     * 气泡按在途标记自行过滤（右侧 AI 本分没扣杀 / 球已落地不出句）
      */
     private void notifyPlayerReturn() {
-        if (isAIControlled || side != sideRight) return;
+        if (side != sideRight) return;
         if (inRoom == null) return;
         if (inRoom.getUiObject("ai_speech_bubble") instanceof AISpeechBubble bubble) {
             bubble.onPlayerReturn();
@@ -514,13 +581,23 @@ public class StickMan extends GameObject {
                                 // 仅 AI 扣杀生效，人类手感与普通重击不动
                                 if (isAIControlled && aiSmashIntent && isHeavyShot && hitAngle > 180)
                                     hitAngle = 360 - hitAngle;
-                                // AI 击球随机偏差(高难±5°/低难±14°)后再经过网安全网兜底——
-                                // 高难不会因随机量出现击球不过网，低难允许失误；
-                                // 4级扣杀约30%跳过兜底(概率不过网)，5级/满级恒兜底
+                                // AI 击球随机偏差(按难度 ±18/14/10/12/5°)后再按难度决定过网兜底：
+                                // 1-3级不兜底(允许砸网失误)，4/5级扣杀按概率跳过(35%/15%)，
+                                // 其余必兜底；满级恒兜底
                                 if (isAIControlled) {
-                                    hitAngle = applyShotVariance(hitAngle);
-                                    if (!skipNetGuardOnSmash())
-                                        hitAngle = adjustAINetSafeAngle(hitAngle, badminton.getCenterX(), badminton.getCenterY());
+                                    // 滑动窗口预设失误拍：直接压向网的下压角，跳过一切修正
+                                    // （AI 自己的发球拍不算，不吃预设）
+                                    if (MatchAimAssist.isArmed() && !aiMaxLevel && !isReadyingServe) {
+                                        MatchAimAssist.consume(); // 同回合只失误这一次
+                                        hitAngle = netWardMissAngle();
+                                    } else {
+                                        hitAngle = applyShotVariance(hitAngle);
+                                        if (shouldGuardNet())
+                                            hitAngle = adjustAINetSafeAngle(hitAngle, badminton.getCenterX(), badminton.getCenterY());
+                                    }
+                                    // 4-5级：本拍触发扣杀/接杀后置位回合精度惩罚（本拍偏差已按原档算完，
+                                    // 仍在 heavyHit 改速前调用以读到真实来球速度）
+                                    updateRallyAccDrop(badminton);
                                 }
                                 // 击球判定唯一权威是主机/单机；联机客户端只更新本地动画标志，
                                 // 球的表现由服务器广播的 HIT 回显触发，避免双份音效/特效与判定分叉
@@ -593,12 +670,19 @@ public class StickMan extends GameObject {
                                         else if (hitAngle > 250)
                                             hitAngle = 250;
                                     }
-                                    // AI 击球随机偏差 + 贴地捞球挑球角的过网兜底（人类不干预）
-                                    // 4级扣杀约30%跳过兜底，与上方击球路径同一策略
+                                    // AI 击球随机偏差(按难度分层) + 过网兜底按难度决定
+                                    // 1-3级不兜底(允许砸网失误)，4/5级扣杀按概率跳过(35%/15%)
                                     if (isAIControlled) {
-                                        hitAngle = applyShotVariance(hitAngle);
-                                        if (!skipNetGuardOnSmash())
-                                            hitAngle = adjustAINetSafeAngle(hitAngle, badminton.getCenterX(), badminton.getCenterY());
+                                        if (MatchAimAssist.isArmed() && !aiMaxLevel && !isReadyingServe) {
+                                            MatchAimAssist.consume(); // 同回合只失误这一次
+                                            hitAngle = netWardMissAngle(); // 预设失误拍：压网下压角
+                                        } else {
+                                            hitAngle = applyShotVariance(hitAngle);
+                                            if (shouldGuardNet())
+                                                hitAngle = adjustAINetSafeAngle(hitAngle, badminton.getCenterX(), badminton.getCenterY());
+                                        }
+                                        // 4-5级回合精度惩罚触发（本拍偏差已按原档算完，仍读真实来球速度）
+                                        updateRallyAccDrop(badminton);
                                     }
                                     // 击球判定唯一权威是主机/单机；联机客户端只更新本地动画标志，
                                     // 球的表现由服务器广播的 HIT 回显触发
