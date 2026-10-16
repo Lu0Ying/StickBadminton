@@ -3,6 +3,7 @@ import org.stickbadminton.Sprite;
 import org.stickbadminton.entity.Badminton;
 import org.stickbadminton.entity.StickMan;
 import org.stickbadminton.logic.GameProperties;
+import org.stickbadminton.ui.AISpeechBubble;
 import org.stickbadminton.ui.UIDigitView;
 import org.stickbadminton.ui.UIGameOver;
 
@@ -32,6 +33,16 @@ public class MatchController extends GameObject{
     // changeScore 时统一 set —— 双端 set 同一目标值，避免各自 +1 增量产生计数偏差
     private int pendingLeft = 0;
     private int pendingRight = 0;
+
+    // 单人模式右侧 AI 的对白气泡（单机才有，联机为 null）：计分台词由本类触发、跟随每帧驱动
+    private AISpeechBubble speechBubble = null;
+    private StickMan speechTarget = null;
+
+    /** 单人对战房绑定气泡与跟随目标（右侧 AI），双人/联机不绑定即全程无台词 */
+    public void bindSpeechBubble(AISpeechBubble bubble, StickMan target) {
+        this.speechBubble = bubble;
+        this.speechTarget = target;
+    }
 
 
     // 设置方法（static：会话状态全局唯一，选人房/对战房/退出路径统一经 endSession 收口）
@@ -182,6 +193,11 @@ public class MatchController extends GameObject{
             ((UIDigitView) scoreRight).setCurrentNumber(pendingRight);
         }
 
+        // 单人 AI 台词：AI 失分/失分时大比分、AI 领先/赛点按条件随机出句（lastPointWinner: 1=左侧玩家得分）
+        if (speechBubble != null) {
+            speechBubble.onScore(pendingLeft, pendingRight, lastPointWinner == 1);
+        }
+
         //判断获胜
         if (pendingLeft >= 9 || pendingRight >= 9) {
             // 游戏结束，显示结果
@@ -236,10 +252,17 @@ public class MatchController extends GameObject{
         }
         gPrevHeld = gHeld;
 
+        // 台词气泡跟随右侧 AI：计时推进与头顶定位每逻辑帧执行（未绑定时为空操作）。
+        // 房间离开时本对象与气泡同步 deactivate/移除，故无需再判存活
+        if (speechBubble != null && speechTarget != null) {
+            speechBubble.tick(speechTarget.getX(), speechTarget.getY());
+        }
+
         if (matchEndTimer > 0.0) {
             matchEndTimer -= GameProperties.frameTime;
             if (matchEndTimer <= 0.0) {
                 SoundPlay.stopBackgroundMusic();
+                if (speechBubble != null) speechBubble.hide(); // 收起残留台词，避免盖住结算界面
                 showGameResult(lastPointWinner == 1 ? "玩家 1" : "玩家 2");
                 deactivate();
                 return;

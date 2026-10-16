@@ -5,6 +5,7 @@ import org.stickbadminton.entity.ComputerDecision;
 import org.stickbadminton.logic.GameProperties;
 import org.stickbadminton.logic.MatchController;
 import org.stickbadminton.logic.MissTrace;
+import org.stickbadminton.ui.AISpeechBubble;
 
 import javafx.geometry.Point2D;
 import javafx.scene.image.Image;
@@ -138,6 +139,32 @@ public class StickMan extends GameObject {
                 badminton.getCenterX(), badminton.getCenterY(),
                 badminton.speedX, badminton.speedY));
         MissTrace.onHit();
+    }
+
+    /**
+     * 单人模式右侧 AI 扣杀命中：触发头顶对白气泡随机出一句挑衅台词。
+     * 气泡只在单人房创建（双人/联机 getUiObject 返回 null 即静默跳过）；
+     * side==sideLeft 的值 -1 对应右半场（sideLeft/sideRight 常量按朝向命名，见 onUpdate 注释），
+     * 左侧 G 键满级 AI 不会说话；isHeavyShot 过能量降级检查，体力不足被降级成轻击的"扣杀"不出台词
+     */
+    private void notifySmashSpeech() {
+        if (!isAIControlled || side != sideLeft || !aiSmashIntent || !isHeavyShot) return;
+        if (inRoom == null) return;
+        if (inRoom.getUiObject("ai_speech_bubble") instanceof AISpeechBubble bubble) {
+            bubble.onSmash();
+        }
+    }
+
+    /**
+     * 玩家回击本分内 AI 的扣杀：触发头顶随机"被接住"台词。
+     * 仅左半场（sideRight=1）人类玩家生效；气泡按在途扣杀标记自行过滤（AI 没扣/球已落地不出句）
+     */
+    private void notifyPlayerReturn() {
+        if (isAIControlled || side != sideRight) return;
+        if (inRoom == null) return;
+        if (inRoom.getUiObject("ai_speech_bubble") instanceof AISpeechBubble bubble) {
+            bubble.onPlayerReturn();
+        }
     }
 
     /**
@@ -516,6 +543,8 @@ public class StickMan extends GameObject {
                                 hasShotted = true;
                                 isReadyingServe = false;
                                 traceHit(badminton, hitAngle); // 诊断：本拍命中事件
+                                notifySmashSpeech(); // 单人右侧 AI 扣杀命中：头顶随机台词
+                                notifyPlayerReturn(); // 玩家本分内回击 AI 扣杀：随机惊讶/敬意台词
                             }
                         }
                     }
@@ -591,6 +620,8 @@ public class StickMan extends GameObject {
                                     hasShotted = true;
                                     isReadyingServe = false;
                                     traceHit(badminton, hitAngle); // 诊断：本拍命中事件
+                                    notifySmashSpeech(); // 单人右侧 AI 扣杀命中：头顶随机台词
+                                    notifyPlayerReturn(); // 玩家本分内回击 AI 扣杀：随机惊讶/敬意台词
                                 }
                             }
                         }

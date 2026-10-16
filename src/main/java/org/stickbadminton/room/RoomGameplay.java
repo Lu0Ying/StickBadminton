@@ -5,6 +5,7 @@ import org.stickbadminton.entity.StickMan;
 import org.stickbadminton.fx.NetAnimation;
 import org.stickbadminton.logic.GameProperties;
 import org.stickbadminton.logic.MatchController;
+import org.stickbadminton.ui.AISpeechBubble;
 import org.stickbadminton.ui.EnergyDisplay;
 import org.stickbadminton.ui.HintKeyboard;
 import org.stickbadminton.ui.UIDigitView;
@@ -195,6 +196,13 @@ public class RoomGameplay extends Room {
         GameObject stickmanLeft = addObject(new StickMan(1, GameProperties.characterType1));
         stickmanLeft.setPosition(200, GameProperties.floorY - GameProperties.playerHeight - 11);
         stickmanLeft.setName("stickman_left");
+
+        // 单人模式：右侧 AI 头顶对白气泡（扣杀/比分台词），双人与联机不显示
+        if (GameProperties.matchMode == 1 && netClient == null) {
+            AISpeechBubble speechBubble = new AISpeechBubble();
+            addUiObject(speechBubble, 0, 0).setName("ai_speech_bubble");
+            matchController.bindSpeechBubble(speechBubble, (StickMan) stickmanRight);
+        }
 
         if (!GameProperties.infiniteEnergyMode) {
             addObject(new EnergyDisplay(1)).setPosition(100, 30);
