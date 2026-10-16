@@ -19,6 +19,42 @@ final class Quotes1 implements AISpeechQuotes {
         };
     }
 
+    @Override public String[] smashMiss() {
+        return new String[]{
+                "啊……飞出去了……",
+                "呜，砸网了！",
+                "我就说拍子不对！",
+                "这、这不算！",
+                "差一点点……真的就一点点！",
+                "怎么没过去呀！",
+                "手滑！又是手滑！",
+                "我我我我不是故意的！"
+        };
+    }
+
+    @Override public String[] praise() {
+        return new String[]{
+                "哇……你怎么打到的！",
+                "好、好厉害……",
+                "这一拍我接不住啦",
+                "你练过吧？！",
+                "教教我嘛……",
+                "诶诶，好球！我服了！",
+                "被你帅到了……"
+        };
+    }
+
+    @Override public String[] matchPoint() {
+        return new String[]{
+                "还差一分……加油加油！",
+                "我、我还能打！",
+                "别让我输在这里呀……",
+                "手心出汗了……再来！",
+                "稳住稳住……",
+                "求求了，让我赢一次吧！"
+        };
+    }
+
     @Override public String[] taunt() {
         return new String[]{
                 "嘿嘿，我好像要赢了？",

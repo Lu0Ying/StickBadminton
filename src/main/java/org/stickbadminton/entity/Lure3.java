@@ -11,6 +11,7 @@ final class Lure3 extends AIDifficultyProfile {
     private Lure3() {
         super(3, /*coeff*/0.9, /*reactionGate*/0.20, /*jumpGate*/0.95,
                 /*inRingBack*/0.35, /*inRingMid*/0.60, /*earlyBack*/0.40, /*earlyMid*/0.75,
-                /*lowSmashGate*/0.0, /*heavyScale*/0.4, /*smashMissRate*/0.0, /*accDrop*/0.0);
+                /*lowSmashGate*/0.0, /*heavyScale*/0.4, /*smashMissRate*/0.0, /*accDrop*/0.0,
+                /*smashReceive*/0.28); // 诱饵接杀偏弱——正合"诱你扣、再送分"的角色
     }
 }

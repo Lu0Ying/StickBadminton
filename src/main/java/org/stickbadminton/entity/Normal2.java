@@ -11,6 +11,7 @@ final class Normal2 extends AIDifficultyProfile {
     private Normal2() {
         super(2, /*coeff*/0.8, /*reactionGate*/0.35, /*jumpGate*/0.76,
                 /*inRingBack*/0.35, /*inRingMid*/0.60, /*earlyBack*/0.40, /*earlyMid*/0.75,
-                /*lowSmashGate*/0.80, /*heavyScale*/1.0, /*smashMissRate*/0.0, /*accDrop*/0.0);
+                /*lowSmashGate*/0.80, /*heavyScale*/1.0, /*smashMissRate*/0.0, /*accDrop*/0.0,
+                /*smashReceive*/0.18); // 普通玩家接杀大多反应不过来
     }
 }

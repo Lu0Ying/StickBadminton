@@ -20,6 +20,40 @@ final class Quotes2 implements AISpeechQuotes {
         };
     }
 
+    @Override public String[] smashMiss() {
+        return new String[]{
+                "这拍失误了……",
+                "砸网了，我的。",
+                "出手急了。",
+                "力量过了。",
+                "哎，出界了。",
+                "角度没压住。",
+                "该稳一下的。"
+        };
+    }
+
+    @Override public String[] praise() {
+        return new String[]{
+                "好球！",
+                "漂亮！这拍接得好！",
+                "可以啊，反应真快！",
+                "这都被你打穿了……",
+                "打得不错，佩服。",
+                "好球，攻得我措手不及。"
+        };
+    }
+
+    @Override public String[] matchPoint() {
+        return new String[]{
+                "赛点了，稳住！",
+                "最后一分，专注！",
+                "咬住，别放松！",
+                "深呼吸……就这一分！",
+                "顶住，打完这一分！",
+                "拼了，别留遗憾！"
+        };
+    }
+
     @Override public String[] taunt() {
         return new String[]{
                 "状态不错，Nice~",

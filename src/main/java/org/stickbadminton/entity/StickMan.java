@@ -207,8 +207,8 @@ public class StickMan extends GameObject {
 
     /**
      * 单人模式右侧 AI 进攻击球（上/下方击球命中）：仅真扣杀（扣杀意图+重击）
-     * 才武装气泡的在途标记并同步出挑衅台词，随后对手接住该扣杀才触发惊讶台词；
-     * 普通回球不武装（扣杀被接才说话）。台词按难度档取 Quotes1~5，风格随角色特质。
+     * 才武装气泡的在途标记，**出拍瞬间不说话**——被回击出惊讶句、直接落地得分出成功句、
+     * 砸网出界出自失句，均由 onScore 按本分剧情分岔。台词按难度档取 Quotes1~5。
      * 气泡只在单人房创建（双人/联机 getUiObject 返回 null 即静默跳过）；
      * side==sideLeft 的值 -1 对应右半场，左侧 G 键满级 AI 不参与说话
      */
@@ -221,17 +221,30 @@ public class StickMan extends GameObject {
     }
 
     /**
-     * 对手回击本分内右侧 AI 的扣杀：触发头顶随机惊讶系台词（3级"纳尼"系、其余按档性格）。
-     * 只看半场不看谁在控——左半场是"对手侧"（人类玩家，或按 G 后的满级 AI），
-     * 旧版加 isAIControlled 门槛会把 G 键模式的左 AI 挡掉，导致整个回击链不触发。
-     * 气泡按在途标记自行过滤（右侧 AI 本分没扣杀 / 球已落地不出句）
+     * 左半场"对手侧"击球命中时的台词分岔（只看半场不看谁在控——人类玩家，或按 G 后的满级 AI）：
+     * 回击了右侧 AI 的在途扣杀 → 惊讶系台词；对手真扣杀（重击+扣球档下压击角）→ 夸赞句，
+     * 普通重击/挑球不出惊喜话。两句都由气泡入队、待球心过网才显示，没过网就落地的
+     * 随落地作废——"没接扣杀却出被接语录"由此杜绝。
+     * 旧版加 isAIControlled 门槛会把 G 键模式的左 AI 挡掉，导致整个回击链不触发
      */
-    private void notifyPlayerReturn() {
+    private void notifyPlayerReturn(double hitAngle) {
         if (side != sideRight) return;
         if (inRoom == null) return;
-        if (inRoom.getUiObject("ai_speech_bubble") instanceof AISpeechBubble bubble) {
-            bubble.onPlayerReturn();
-        }
+        if (!(inRoom.getUiObject("ai_speech_bubble") instanceof AISpeechBubble bubble)) return;
+        bubble.onPlayerHit(isPlayerSmash(hitAngle));
+    }
+
+    /**
+     * 本拍是否"真扣杀"：击角归一化后落在 180° 内的下压扣球档（hitSpeedFor 扣球分支）
+     * 且为重击——与 AI 侧 aiSmashIntent&&isHeavyShot 同义（人类无扣杀意图字段）。
+     * 命中处的 hitAngle 已是物理终角（AI 的扣杀镜像与角度修正都在其之前执行），
+     * 故人类/AI 满级 G 键共用同一判据
+     */
+    private boolean isPlayerSmash(double hitAngle) {
+        if (!isHeavyShot) return false;
+        while (hitAngle < 0) hitAngle += 360;
+        while (hitAngle >= 360) hitAngle -= 360;
+        return hitAngle < 180;
     }
 
     /**
@@ -394,10 +407,12 @@ public class StickMan extends GameObject {
         ComputerDecision decision;
         if (isAIControlled && badminton != null && opponentObj != null) {
             // aiMaxLevel 作为构造参数传入：决策在构造器内完成，事后改字段已来不及；
-            // 体力与实际移速一并传入，供体力管理决策（跳跃预算/重击预算/预判）使用
+            // 体力与实际移速一并传入，供体力管理决策（跳跃预算/重击预算/预判）使用；
+            // 对手(玩家)体力传入供 5 级"玩家残血(<30)才扣杀"体力门判定
             decision = new ComputerDecision(aiMaxLevel, side, getCenterX(), getCenterY() + GameProperties.playerHeight - GameProperties.hitAreaCenterHeight,
                     isShotting, isJumping, badminton.getCenterX(), badminton.getCenterY(), badminton.speedX, badminton.speedY, opponentObj.getCenterX(), opponentObj.getCenterY(),
-                    energyRemain, getEffectiveMoveSpeed());
+                    energyRemain, getEffectiveMoveSpeed(),
+                    (opponentObj instanceof StickMan opp) ? opp.energyRemain : 100.0);
         }
         else decision = new ComputerDecision();
 
@@ -620,8 +635,8 @@ public class StickMan extends GameObject {
                                 hasShotted = true;
                                 isReadyingServe = false;
                                 traceHit(badminton, hitAngle); // 诊断：本拍命中事件
-                                notifySmashSpeech(); // 单人右侧 AI 扣杀命中：头顶随机台词
-                                notifyPlayerReturn(); // 玩家本分内回击 AI 扣杀：随机惊讶/敬意台词
+                                notifySmashSpeech(); // 单人右侧 AI 扣杀命中：登记剧情
+                                notifyPlayerReturn(hitAngle); // 左半场回击/扣杀：过网确认后出惊讶或夸赞句
                             }
                         }
                     }
@@ -704,8 +719,8 @@ public class StickMan extends GameObject {
                                     hasShotted = true;
                                     isReadyingServe = false;
                                     traceHit(badminton, hitAngle); // 诊断：本拍命中事件
-                                    notifySmashSpeech(); // 单人右侧 AI 扣杀命中：头顶随机台词
-                                    notifyPlayerReturn(); // 玩家本分内回击 AI 扣杀：随机惊讶/敬意台词
+                                    notifySmashSpeech(); // 单人右侧 AI 扣杀命中：登记剧情
+                                    notifyPlayerReturn(hitAngle); // 左半场回击/扣杀：过网确认后出惊讶或夸赞句
                                 }
                             }
                         }

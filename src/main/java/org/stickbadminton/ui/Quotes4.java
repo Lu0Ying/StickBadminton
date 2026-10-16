@@ -21,6 +21,40 @@ final class Quotes4 implements AISpeechQuotes {
         };
     }
 
+    @Override public String[] smashMiss() {
+        return new String[]{
+                "啧！砸网了！",
+                "可恶……力量过了！",
+                "这球居然丢了！？",
+                "急了，是我急了！",
+                "下拍补回来！！",
+                "唔啊——出界了！",
+                "我居然失误……好火大！"
+        };
+    }
+
+    @Override public String[] praise() {
+        return new String[]{
+                "好！这拍够狠！",
+                "痛快！再用力点！",
+                "哈——打得漂亮！",
+                "这才像话！接得漂亮！",
+                "可以！你也有两下子！",
+                "好球！这样才有意思！"
+        };
+    }
+
+    @Override public String[] matchPoint() {
+        return new String[]{
+                "最后几分，一口气打穿！！",
+                "赛点？拿下它！",
+                "全力爆发，就现在！！",
+                "别怂，一鼓作气！",
+                "听到了吗？胜利在叫！！",
+                "拼到底，不留退路！"
+        };
+    }
+
     @Override public String[] taunt() {
         return new String[]{
                 "看到了吗！这就是力量！",

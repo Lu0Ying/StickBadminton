@@ -97,6 +97,10 @@ public class ComputerDecision {
     private static double prevBallVX = Double.NaN;
     private static int wallBounceCooldownFrames = 0;   // 墙反弹后禁止起跳的帧数
     private static final int WALL_BOUNCE_COOLDOWN_DEFAULT = 12; // ~0.2s @60fps
+    // 接杀反应闩锁（跨帧，ComputerDecision 每帧重建与墙反弹冷却同模式，按半场侧索引）：
+    // 来球判为扣杀的整拍只掷一次 smashReceiveChance——拒绝后 latch 保持"拒"，
+    // 本拍期间 AI 不再反应(站定看着球飞过/落地)；击到或球落地时复位
+    private static final int[] smashLatch = new int[]{0, 0}; // 0=未掷 1=过 2=拒
     // 对手位置时间片采样：static 跨帧持久（ComputerDecision 每帧重建，与墙反弹冷却同模式），
     // 按半场侧索引（0=side1 左侧AI，1=side-1 右侧AI）避免左右两个 AI 互相污染
     private static final double[] oppSampleLast = new double[]{Double.NaN, Double.NaN};
@@ -126,6 +130,10 @@ public class ComputerDecision {
     // （满级时取 5 级档案——联机同轨的随机点调用频率不变）
     private AIDifficultyProfile profile = Precise5.INSTANCE;
     private double energy = 100.0;
+    // 对手(玩家)体力：仅 5 级非满级扣杀门读取（玩家体力 <30 才允许扣杀）
+    private double opponentEnergy = 100.0;
+    // 5级扣杀门：玩家体力阈值（仅 5 级生效，满级/G键不走此门）
+    private static final double SMASH_REQUIRE_OPPONENT_LOW_ENERGY = 30.0;
     // StickMan 传入的实际移速（体力插值），仅体力管理路径参与预判
     private double effectiveMoveSpeed;
     // 失分诊断：本帧跳跃/扣杀被拒原因码（仅 MissTrace 开启时被各拒绝点赋值）
@@ -140,11 +148,12 @@ public class ComputerDecision {
                             double hitCenterX, double hitCenterY, boolean isShotCooldown, boolean isJumpCooldown,
                             double badmintonX, double badmintonY, double badmintonSpeedX, double badmintonSpeedY,
                             double opponentX, double opponentY,
-                            double energyRemain, double effectiveMoveSpeed)
+                            double energyRemain, double effectiveMoveSpeed, double opponentEnergy)
     {
         this.maxLevel = maxLevel;
         this.energy = energyRemain;
         this.effectiveMoveSpeed = effectiveMoveSpeed;
+        this.opponentEnergy = opponentEnergy;
         // 难度档案先定级（反应/起跳/扣杀概率/兜底都读它），满级沿用5级档案
         this.profile = maxLevel ? Precise5.INSTANCE : AIDifficultyProfile.byDifficulty();
         this.smartEnergy = maxLevel || profile.energyManaged();
@@ -217,6 +226,7 @@ public class ComputerDecision {
     // 格式：D f=? s=? | ball x,y,vx,vy | ai x,cd,cdjmp | acc=0/1 | shot/kind/jump | rej=code
     // rej 码的裁读：smProb=圈内概率扣杀被概率门拒(need,roll=故意不扣)、
     // lSmash=1-2级低难度扣杀概率门拒(need=故意不扣)、
+    // eOppE/prOppE=5级体力门拒(玩家体力≥30，非残血不扣杀)、
     // eXxx=提前跳杀各道硬门、jXxx=普通跳跃门、dcd=击球圈未达、cd=冷却
     private void emitDecisionTrace(int side, boolean shotCooldown) {
         if (!MissTrace.isEnabled()) return;
@@ -285,9 +295,31 @@ public class ComputerDecision {
                 badmintonY < GameProperties.floorBallY - 30;
     }
 
+    /**
+     * 5级扣杀体力门：仅单人 5 级(非满级)生效——玩家体力 ≥30 时不主动扣杀
+     * （扣杀留给残血玩家收头，满血只做调动回球）。满级(G键)不走此门，联机同轨不破
+     */
+    private boolean opponentLowEnoughToSmash() {
+        if (maxLevel) return true;
+        if (profile.level != 5) return true;
+        return opponentEnergy < SMASH_REQUIRE_OPPONENT_LOW_ENERGY;
+    }
+
     private boolean shouldReact() {
-        if (maxLevel) return true; // 满级恒反应：消除随机门槛，保证双端决策同轨
-        // 按难度档案分层：菜鸟(1级0.50)每帧只有一半概率过门→平均慢半拍，
+        if (maxLevel) return true; // 满级恒反应：消除随机门槛，保证双端决策同轨（不掷接杀门，同轨不破）
+        int latchIdx = (traceSide == 1) ? 0 : 1;
+        // ①接玩家扣杀：连续"扣杀来球"期间整拍只掷一次——5级60%、4级40%、
+        // 1-3级按档递减(28/18/10%)。拒绝后闩锁保持"拒"，本拍 shouldReact 恒 false →
+        // AI 站定不反应，视觉即"这记扣杀没接住"；来球不再读作扣杀(减速/击回/落地)即清闩，
+        // 下一记扣杀重新掷
+        if (isIncomingSmash(traceSide)) {
+            if (smashLatch[latchIdx] == 0)
+                smashLatch[latchIdx] = random.nextDouble() < profile.smashReceiveChance ? 1 : 2;
+            if (smashLatch[latchIdx] == 2) return false;
+        } else {
+            smashLatch[latchIdx] = 0;
+        }
+        // ②常规逐帧反应门：菜鸟(1级0.50)每帧只有一半概率过门→平均慢半拍，
         // 5级0.02接近立即反应；网前快球低难度漏接属预期的难度差异
         return random.nextDouble() > profile.reactionGate;
     }
@@ -711,6 +743,8 @@ public class ComputerDecision {
             return false;
         }
         if (energy <= GameProperties.jumpEnergy + GameProperties.heavyShotEnergy) { rejMark("eEne"); return false; }
+        // 5级体力门：玩家没残血(≥30)不提前跳扣，落穿常规回球（玩家体力掉下30才开始扣）
+        if (!opponentLowEnoughToSmash()) { rejMark("eOppE"); return false; }
         double netDist = Math.abs(badmintonX - GameProperties.netPosition);
         if (badmintonSpeedY <= 0) { rejMark("eUp"); return false; } // 只接下落球，上升球交给常规分支
         // 高度门槛：网前拦截位放宽(球快落到前场也跳)，其余按高位球标准
@@ -975,6 +1009,8 @@ public class ComputerDecision {
     // 返回 true = 已执行跳杀；false = 压不过网/跳不了，调用方落穿到常规挑/抽分支
     // （扣杀必须先跳再击球，不再有站立重扣路径；高位球的主路径是 earlyJumpSmash 提前跳）
     private boolean preciseSmash() {
+        // 5级体力门：玩家没残血(≥30)不圈内扣杀，返回 false 落穿下方调动分支
+        if (!opponentLowEnoughToSmash()) { rejMark("prOppE"); return false; }
         double heightAbove = computerY - badmintonY; // 球高出肩部的像素
         double expectedAngle = tangentHitAngle();
         boolean isRightSide = computerX > GameProperties.netPosition;

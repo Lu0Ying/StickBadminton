@@ -12,6 +12,7 @@ final class Noob1 extends AIDifficultyProfile {
     private Noob1() {
         super(1, /*coeff*/0.5, /*reactionGate*/0.50, /*jumpGate*/0.475,
                 /*inRingBack*/0.35, /*inRingMid*/0.60, /*earlyBack*/0.40, /*earlyMid*/0.75,
-                /*lowSmashGate*/0.55, /*heavyScale*/1.0, /*smashMissRate*/0.0, /*accDrop*/0.0);
+                /*lowSmashGate*/0.55, /*heavyScale*/1.0, /*smashMissRate*/0.0, /*accDrop*/0.0,
+                /*smashReceive*/0.10); // 菜鸟接杀几乎不反应
     }
 }

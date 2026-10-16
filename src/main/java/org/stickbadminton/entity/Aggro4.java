@@ -12,6 +12,7 @@ final class Aggro4 extends AIDifficultyProfile {
     private Aggro4() {
         super(4, /*coeff*/1.0, /*reactionGate*/0.10, /*jumpGate*/0.98,
                 /*inRingBack*/0.55, /*inRingMid*/0.85, /*earlyBack*/0.60, /*earlyMid*/0.95,
-                /*lowSmashGate*/0.0, /*heavyScale*/1.0, /*smashMissRate*/0.35, /*accDrop*/5.0);
+                /*lowSmashGate*/0.0, /*heavyScale*/1.0, /*smashMissRate*/0.35, /*accDrop*/5.0,
+                /*smashReceive*/0.40); // 激进但接杀只有四成反应
     }
 }

@@ -34,11 +34,14 @@ public abstract class AIDifficultyProfile {
     public final double smashMissRate;
     // 回合精度惩罚追加偏差(度)：扣杀/接起玩家扣杀后本回合出球更散（落地复位）
     public final double accDropAfterSmash;
+    // 接玩家扣杀的整拍反应概率：来球判为扣杀时整拍只掷一次——通过才正常反应接球，
+    // 拒绝则本拍全程不动（5级60%、4级40%，其余按档递减），满级不走此门
+    public final double smashReceiveChance;
 
     protected AIDifficultyProfile(int level, double coeff, double reactionGate, double jumpGate,
                                   double inRingBack, double inRingMid, double earlyBack, double earlyMid,
                                   double lowSmashGate, double heavyScale, double smashMissRate,
-                                  double accDropAfterSmash) {
+                                  double accDropAfterSmash, double smashReceiveChance) {
         this.level = level;
         this.coeff = coeff;
         this.reactionGate = reactionGate;
@@ -51,6 +54,7 @@ public abstract class AIDifficultyProfile {
         this.heavyScale = heavyScale;
         this.smashMissRate = smashMissRate;
         this.accDropAfterSmash = accDropAfterSmash;
+        this.smashReceiveChance = smashReceiveChance;
     }
 
     /** 体力管理（3级起启用；G 键满级另行恒开） */

@@ -12,6 +12,7 @@ final class Precise5 extends AIDifficultyProfile {
     private Precise5() {
         super(5, /*coeff*/1.0, /*reactionGate*/0.02, /*jumpGate*/0.85,
                 /*inRingBack*/0.15, /*inRingMid*/0.35, /*earlyBack*/0.20, /*earlyMid*/0.50,
-                /*lowSmashGate*/0.0, /*heavyScale*/1.0, /*smashMissRate*/0.15, /*accDrop*/2.0);
+                /*lowSmashGate*/0.0, /*heavyScale*/1.0, /*smashMissRate*/0.15, /*accDrop*/2.0,
+                /*smashReceive*/0.60); // 全档最快也只有六成接到玩家扣杀
     }
 }

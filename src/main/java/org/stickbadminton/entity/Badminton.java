@@ -6,6 +6,7 @@ import org.stickbadminton.fx.ParticleFX;
 import org.stickbadminton.logic.GameProperties;
 import org.stickbadminton.logic.MatchController;
 import org.stickbadminton.logic.MissTrace;
+import org.stickbadminton.ui.AISpeechBubble;
 
 import com.almasb.fxgl.particle.ParticleComponent;
 import com.almasb.fxgl.particle.ParticleEmitter;
@@ -344,6 +345,11 @@ public class Badminton extends GameObject {
     public void onHitGround() {
         if (isShotable) {
             isShotable = false;
+            // 单人 AI 气泡：作废待过网确认的台词——回击/扣杀没过网就落地的（观感"没接住"）
+            // 不再显示惊讶/夸赞句；双人/联机房无气泡对象即静默跳过
+            if (inRoom != null && inRoom.getUiObject("ai_speech_bubble") instanceof AISpeechBubble speechBubble) {
+                speechBubble.onPointEnd();
+            }
             // 仅主机/单机做落地裁决计分：客户端等主机 SCORE 事件驱动，避免双端裁决分叉
             boolean localAuthority = MatchController.getNetClient() == null || MatchController.isHost();
             if (localAuthority && inRoom != null) {

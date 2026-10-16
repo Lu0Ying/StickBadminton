@@ -21,6 +21,40 @@ final class Quotes3 implements AISpeechQuotes {
         };
     }
 
+    @Override public String[] smashMiss() {
+        return new String[]{
+                "……收线早了。",
+                "手抖了半拍，哼。",
+                "算错了一步。",
+                "这球是我自己丢的。",
+                "失手，难得的失手。",
+                "唔……下次不会了。",
+                "网坏了吗？哦，是我压太狠。"
+        };
+    }
+
+    @Override public String[] praise() {
+        return new String[]{
+                "哦？这都让你过了网。",
+                "有点东西，猎物也会反咬。",
+                "这拍接得刁，记下了。",
+                "漂亮，值得我认真。",
+                "哼，比我预想的机灵。",
+                "好手法，藏得挺深。"
+        };
+    }
+
+    @Override public String[] matchPoint() {
+        return new String[]{
+                "最后一分……别出差错。",
+                "棋到收官，稳住。",
+                "还差一步，收紧网口。",
+                "此时此刻，正是布局之时。",
+                "沉住气，猎物跑不掉。",
+                "最后一步，由我来收。"
+        };
+    }
+
     @Override public String[] taunt() {
         return new String[]{
                 "还以为是你在进攻？",
