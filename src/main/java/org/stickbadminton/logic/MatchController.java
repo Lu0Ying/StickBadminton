@@ -79,6 +79,9 @@ public class MatchController extends GameObject{
     // G 键上一帧按住状态（边沿检测，按一次切换一次）
     private boolean gPrevHeld = false;
 
+    // 本局胜负是否已写入连胜记录（只写一次，防止结算窗口内重复计分）
+    private boolean winStreakRecorded = false;
+
     /**
      * 调试用：p1（左半场 stickman_left）在满级 AI 与玩家之间切换。
      * 单人/双人/联机三个模块统一从这里进入——联机时 G 经服务器 P1 白名单广播，
@@ -241,7 +244,23 @@ public class MatchController extends GameObject{
         }
     }
 
+    /**
+     * 单人模式本局胜负写入连胜记录（结算时调用一次）：
+     * 仅单人(matchMode=1)且非联机才计数；lastPointWinner==1 表示左侧玩家获胜。
+     * 幂等：winStreakRecorded 保证同一局只写一次。
+     */
+    private void recordWinStreakOnce() {
+        if (winStreakRecorded) return;
+        winStreakRecorded = true;
+        if (GameProperties.matchMode != 1 || netClient != null) return;
+        boolean playerWon = (lastPointWinner == 1);
+        WinStreakStore.getInstance().recordMatchResult(GameProperties.difficultyLevel, playerWon);
+    }
+
     private void showGameResult(String winner) {
+        // 单人模式结算时写入连胜：玩家(左侧)获胜 +1，失败清零；难度档即所选角色档
+        recordWinStreakOnce();
+
         // 创建游戏结束UI
         UIGameOver gameOverUI = new UIGameOver(winner);
 

@@ -6,6 +6,7 @@ import org.stickbadminton.ui.HintAIDifficulty;
 import org.stickbadminton.ui.InfiniteEnergySettingDisplay;
 import org.stickbadminton.ui.UIImageButton;
 import org.stickbadminton.ui.UIStickmanPlayer;
+import org.stickbadminton.ui.UIWinStreakDisplay;
 
 import javafx.scene.image.Image;
 import org.stickbadminton.GameObject;
@@ -21,6 +22,9 @@ public class RoomStickmanSelect extends Room{
     private UIStickmanPlayer view2;
 
     private HintAIDifficulty hintAIDifficulty;
+
+    // 连胜局数模块：角色按钮下方展示，选人/撤销时刷新（数据来自 WinStreakStore 接口）
+    private UIWinStreakDisplay winStreakDisplay;
 
     // 当前选择的队伍
     private boolean isTeam1Selecting = true;
@@ -60,6 +64,10 @@ public class RoomStickmanSelect extends Room{
         addCharacterButton(3,520,120);
         addCharacterButton(4,370,220);
         addCharacterButton(5,470,220);
+
+        // 连胜局数模块：第二排角色(220+53=273)与撤销按钮(350)之间的居中空档
+        winStreakDisplay = new UIWinStreakDisplay();
+        addUiObject(winStreakDisplay, 390, 312);
 
         addObject(new GameObject("modeHint", Sprite.loadImage(
                 GameProperties.matchMode == 1 ? "/images/hud/stickmanselect_mode1hint.png" : "/images/hud/stickmanselect_mode2hint.png"
@@ -104,6 +112,8 @@ public class RoomStickmanSelect extends Room{
             GameProperties.characterType2 = characterId;
             updatePlayerViews();
         }
+        // 二次选择(难度)后按所选难度刷新连胜显示
+        winStreakDisplay.refresh();
     }
     //撤销上一次
     private  void onUndoButtonClick() {
@@ -117,6 +127,8 @@ public class RoomStickmanSelect extends Room{
             isTeam1Selecting=true;
             updatePlayerViews();
         }
+        // 撤销后难度选择状态可能变化，刷新连胜显示
+        winStreakDisplay.refresh();
     }
     private void updatePlayerViews(){
         view1.setCurrentNumber(team1);

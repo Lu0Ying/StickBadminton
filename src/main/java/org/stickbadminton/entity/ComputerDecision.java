@@ -132,9 +132,9 @@ public class ComputerDecision {
     private double energy = 100.0;
     // 对手(玩家)体力：3/5 级非满级扣杀门读取
     private double opponentEnergy = 100.0;
-    // 残血扣杀门：玩家体力低于该值才允许扣杀（3级20、5级30；1/2/4级不设门，满级不走此门）
-    private static final double SMASH_OPPONENT_LOW_ENERGY_L3 = 20.0;
-    private static final double SMASH_OPPONENT_LOW_ENERGY_L5 = 30.0;
+    // 残血扣杀门：玩家体力低于该值才允许扣杀（3级25、5级35；1/2/4级不设门，满级不走此门）
+    private static final double SMASH_OPPONENT_LOW_ENERGY_L3 = 25.0;
+    private static final double SMASH_OPPONENT_LOW_ENERGY_L5 = 35.0;
     // StickMan 传入的实际移速（体力插值），仅体力管理路径参与预判
     private double effectiveMoveSpeed;
     // 失分诊断：本帧跳跃/扣杀被拒原因码（仅 MissTrace 开启时被各拒绝点赋值）
